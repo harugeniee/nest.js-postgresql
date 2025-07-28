@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      expandVariables: true,
       cache: true,
     }),
   ],
