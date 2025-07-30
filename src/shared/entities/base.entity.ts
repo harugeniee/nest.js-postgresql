@@ -9,6 +9,7 @@ import {
   Index,
   PrimaryColumn,
   UpdateDateColumn,
+  VersionColumn,
 } from 'typeorm';
 
 export abstract class BaseEntityCustom extends BaseEntity {
@@ -17,7 +18,7 @@ export abstract class BaseEntityCustom extends BaseEntity {
   id: string;
 
   @Index('uuid', { unique: true })
-  @Column('varchar', { length: 50, nullable: false, generated: 'uuid' })
+  @Column('uuid', { nullable: false, generated: 'uuid' })
   uuid: string;
 
   @Index()
@@ -27,6 +28,7 @@ export abstract class BaseEntityCustom extends BaseEntity {
   })
   createdAt: Date;
 
+  @Index() // Index cho updatedAt sorting và filtering
   @UpdateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP(6)',
@@ -34,8 +36,12 @@ export abstract class BaseEntityCustom extends BaseEntity {
   })
   updatedAt: Date;
 
+  @Index() // Index cho soft delete queries
   @DeleteDateColumn({ type: 'timestamp', nullable: true })
   deletedAt: Date | null;
+
+  @VersionColumn()
+  version: number;
 
   @BeforeInsert()
   generateId() {

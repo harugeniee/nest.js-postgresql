@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RedisModule } from '@nestjs-modules/ioredis';
 import { UsersModule } from './users/users.module';
+import { CacheModule } from './shared/services/cache.module';
 import { configValidationSchema } from './shared/config/schema';
 import {
   databaseConfig,
@@ -13,6 +14,7 @@ import {
   awsConfig,
   oauthConfig,
   appConfig,
+  DatabaseConfigFactory,
 } from './shared/config';
 
 @Module({
@@ -32,11 +34,9 @@ import {
         () => ({ oauth: oauthConfig() }),
       ],
     }),
-    // TypeOrmModule.forRootAsync({
-    //   // imports: [ConfigModule],
-    //   // useClass: TypeOrmConfigService,
-    //   // inject: [ConfigService],
-    // }),
+    TypeOrmModule.forRootAsync({
+      useClass: DatabaseConfigFactory,
+    }),
     RedisModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -45,6 +45,7 @@ import {
       }),
     }),
     UsersModule,
+    CacheModule,
   ],
   controllers: [AppController],
   providers: [AppService],

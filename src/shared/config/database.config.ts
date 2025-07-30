@@ -1,3 +1,16 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { TypeOrmOptionsFactory, TypeOrmModuleOptions } from '@nestjs/typeorm';
+
+@Injectable()
+export class DatabaseConfigFactory implements TypeOrmOptionsFactory {
+  constructor(private readonly configService: ConfigService) {}
+
+  createTypeOrmOptions(): TypeOrmModuleOptions {
+    return this.configService.get('database') as TypeOrmModuleOptions;
+  }
+}
+
 export const databaseConfig = () => ({
   type: process.env.DATABASE_TYPE,
   host: process.env.DATABASE_HOST,
@@ -9,6 +22,7 @@ export const databaseConfig = () => ({
   synchronize: !!process.env.DATABASE_SYNCHRONIZE,
   bigNumberStrings: false,
   supportBigNumbers: true,
+  autoLoadEntities: true,
   logging: false,
   extra: {
     decimalNumbers: true,
