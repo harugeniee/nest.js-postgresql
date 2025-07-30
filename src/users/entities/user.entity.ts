@@ -1,4 +1,4 @@
-import { BaseEntityCustom } from 'src/common/entities/base.entity';
+import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column } from 'typeorm';
 
 export class User extends BaseEntityCustom {
