@@ -28,6 +28,7 @@ export abstract class BaseEntityCustom extends BaseEntity {
   })
   createdAt: Date;
 
+  @Index() // Index cho updatedAt sorting và filtering
   @UpdateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP(6)',
@@ -35,6 +36,7 @@ export abstract class BaseEntityCustom extends BaseEntity {
   })
   updatedAt: Date;
 
+  @Index() // Index cho soft delete queries
   @DeleteDateColumn({ type: 'timestamp', nullable: true })
   deletedAt: Date | null;
 

@@ -15,13 +15,6 @@ import {
   appConfig,
   DatabaseConfigFactory,
 } from './shared/config';
-import {
-  MetadataSubscriber,
-  AuditSubscriber,
-  SocialMediaSubscriber,
-  CacheSubscriber,
-  ValidationSubscriber,
-} from './common/subscribers';
 
 @Module({
   imports: [
@@ -41,7 +34,6 @@ import {
       ],
     }),
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
       useClass: DatabaseConfigFactory,
     }),
     RedisModule.forRootAsync({
@@ -54,13 +46,6 @@ import {
     UsersModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    MetadataSubscriber,
-    AuditSubscriber,
-    SocialMediaSubscriber,
-    CacheSubscriber,
-    ValidationSubscriber,
-  ],
+  providers: [AppService],
 })
 export class AppModule {}
