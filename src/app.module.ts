@@ -13,7 +13,15 @@ import {
   awsConfig,
   oauthConfig,
   appConfig,
+  DatabaseConfigFactory,
 } from './shared/config';
+import {
+  MetadataSubscriber,
+  AuditSubscriber,
+  SocialMediaSubscriber,
+  CacheSubscriber,
+  ValidationSubscriber,
+} from './common/subscribers';
 
 @Module({
   imports: [
@@ -32,11 +40,10 @@ import {
         () => ({ oauth: oauthConfig() }),
       ],
     }),
-    // TypeOrmModule.forRootAsync({
-    //   // imports: [ConfigModule],
-    //   // useClass: TypeOrmConfigService,
-    //   // inject: [ConfigService],
-    // }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useClass: DatabaseConfigFactory,
+    }),
     RedisModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -47,6 +54,13 @@ import {
     UsersModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    MetadataSubscriber,
+    AuditSubscriber,
+    SocialMediaSubscriber,
+    CacheSubscriber,
+    ValidationSubscriber,
+  ],
 })
 export class AppModule {}
