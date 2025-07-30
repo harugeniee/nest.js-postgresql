@@ -1,5 +1,5 @@
 import { instanceToPlain } from 'class-transformer';
-import { globalSnowflake } from 'src/libs/snowflake';
+import { globalSnowflake } from 'src/shared/libs/snowflake';
 import {
   BaseEntity,
   BeforeInsert,
