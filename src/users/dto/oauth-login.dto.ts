@@ -31,4 +31,4 @@ export class OAuthLoginDto {
   @IsString()
   @MaxLength(USER_CONSTANTS.OAUTH_TOKEN_MAX_LENGTH)
   refreshToken?: string;
-} 
+}

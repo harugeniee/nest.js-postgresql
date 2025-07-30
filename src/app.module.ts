@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RedisModule } from '@nestjs-modules/ioredis';
 import { UsersModule } from './users/users.module';
+import { CacheModule } from './shared/services/cache.module';
 import { configValidationSchema } from './shared/config/schema';
 import {
   databaseConfig,
@@ -44,6 +45,7 @@ import {
       }),
     }),
     UsersModule,
+    CacheModule,
   ],
   controllers: [AppController],
   providers: [AppService],
