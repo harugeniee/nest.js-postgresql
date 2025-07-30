@@ -2,6 +2,8 @@ import { instanceToPlain } from 'class-transformer';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { USER_CONSTANTS, UserRole, UserStatus } from 'src/shared/constants';
 import { Column, Entity, Index } from 'typeorm';
+import { BaseEntityCustom } from 'src/shared/entities/base.entity';
+import { Column } from 'typeorm';
 
 @Entity('users')
 @Index(['oauthProvider', 'oauthId'], { unique: true }) // Composite unique index cho OAuth
