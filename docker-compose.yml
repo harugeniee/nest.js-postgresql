@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    container_name: nest-app
+    container_name: ${CONTAINER_NAME:-nest-app}
     restart: unless-stopped
     environment:
       NODE_ENV: production
