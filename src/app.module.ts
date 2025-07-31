@@ -14,6 +14,7 @@ import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CacheModule } from './cache/cache.module';
+import { FilesModule } from './files/files.module';
 import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 import {
   appConfig,
@@ -77,6 +78,7 @@ import { WorkerModule } from './workers/worker.module';
     CacheModule,
     WorkerModule,
     RabbitmqModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
