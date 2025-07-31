@@ -14,7 +14,7 @@ async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService);
   const port =
     (configService.get<number>('PORT', { infer: true }) as number) || 3000;
-
+  app.enableCors();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   app.use(morgan('dev'));
 
