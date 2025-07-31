@@ -3,8 +3,17 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import {
+  AcceptLanguageResolver,
+  CookieResolver,
+  HeaderResolver,
+  I18nModule,
+  QueryResolver,
+} from 'nestjs-i18n';
+import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CacheModule } from './cache/cache.module';
 import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 import {
   appConfig,
@@ -16,17 +25,8 @@ import {
   redisConfig,
 } from './shared/config';
 import { configValidationSchema } from './shared/config/schema';
-import { CacheModule } from './shared/services/cache.module';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
-import {
-  I18nModule,
-  HeaderResolver,
-  QueryResolver,
-  AcceptLanguageResolver,
-  CookieResolver,
-} from 'nestjs-i18n';
-import { join } from 'path';
 
 @Module({
   imports: [
