@@ -17,7 +17,7 @@ export abstract class BaseEntityCustom extends BaseEntity {
   @PrimaryColumn('bigint')
   id: string;
 
-  @Index('uuid', { unique: true })
+  @Index({ unique: true })
   @Column('uuid', { nullable: false, generated: 'uuid' })
   uuid: string;
 
