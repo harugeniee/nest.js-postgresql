@@ -1,7 +1,7 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 
-import { JOB_NAME } from '../shared/constants';
+import { JOB_NAME } from 'src/shared/constants';
 
 @Injectable()
 export class RabbitmqService implements OnModuleInit {

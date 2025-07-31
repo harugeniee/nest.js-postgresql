@@ -13,9 +13,7 @@ import {
 import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { CacheModule } from './cache/cache.module';
 import { FilesModule } from './files/files.module';
-import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 import {
   appConfig,
   awsConfig,
@@ -26,6 +24,7 @@ import {
   redisConfig,
 } from './shared/config';
 import { configValidationSchema } from './shared/config/schema';
+import { CacheModule, RabbitmqModule } from './shared/services';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
 
