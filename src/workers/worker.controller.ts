@@ -1,7 +1,6 @@
 import { Controller } from '@nestjs/common';
 import {
   Ctx,
-  EventPattern,
   MessagePattern,
   Payload,
   RmqContext,
@@ -17,7 +16,6 @@ export class WorkerController {
   // @EventPattern(JOB_NAME.TEST_RABBIT)
   @MessagePattern(JOB_NAME.TEST_RABBIT)
   testRmq(@Payload() data: number[], @Ctx() context: RmqContext) {
-    console.log('=>>>>>>>>>>>>>>>>>vao day chua');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();

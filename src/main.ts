@@ -1,9 +1,12 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ValidationPipe } from '@nestjs/common';
-import { Transport, RmqOptions } from '@nestjs/microservices';
+import { NestFactory } from '@nestjs/core';
+import { RmqOptions, Transport } from '@nestjs/microservices';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { I18nService } from 'nestjs-i18n';
+import { AppModule } from './app.module';
+import { I18nHttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ResponseInterceptor } from './shared/interceptors/response.interceptor';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -19,6 +22,15 @@ async function bootstrap(): Promise<void> {
     }),
   );
   app.setGlobalPrefix('api');
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unnecessary-type-assertion
+  const i18nService = app.get(I18nService) as any;
+  app.useGlobalInterceptors(new ResponseInterceptor(i18nService));
+  app.useGlobalFilters(new I18nHttpExceptionFilter(i18nService));
 
   app.connectMicroservice<RmqOptions>({
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
