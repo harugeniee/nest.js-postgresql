@@ -1,9 +1,27 @@
-import { Injectable } from '@nestjs/common';
+import { Repository } from 'typeorm';
+
+import { HttpException, Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { User } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
+  register(userRegister: any) {
+    try {
+      return 'This action adds a new user';
+    } catch (error) {
+      throw new HttpException(error, error.status);
+    }
+  }
+
   create(createUserDto: CreateUserDto) {
     return 'This action adds a new user';
   }

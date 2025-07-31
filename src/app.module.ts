@@ -1,21 +1,24 @@
+import { RedisModule } from '@nestjs-modules/ioredis';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { RedisModule } from '@nestjs-modules/ioredis';
-import { UsersModule } from './users/users.module';
-import { CacheModule } from './shared/services/cache.module';
-import { configValidationSchema } from './shared/config/schema';
+import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
 import {
-  databaseConfig,
-  redisConfig,
-  mailConfig,
-  awsConfig,
-  oauthConfig,
   appConfig,
+  awsConfig,
+  databaseConfig,
   DatabaseConfigFactory,
+  mailConfig,
+  oauthConfig,
+  redisConfig,
 } from './shared/config';
+import { configValidationSchema } from './shared/config/schema';
+import { CacheModule } from './shared/services/cache.module';
+import { UsersModule } from './users/users.module';
+import { WorkerModule } from './workers/worker.module';
 
 @Module({
   imports: [
@@ -46,6 +49,8 @@ import {
     }),
     UsersModule,
     CacheModule,
+    WorkerModule,
+    RabbitmqModule,
   ],
   controllers: [AppController],
   providers: [AppService],

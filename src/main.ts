@@ -21,6 +21,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api');
 
   app.connectMicroservice<RmqOptions>({
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     transport: Transport.RMQ,
     options: {
       urls: [
@@ -31,13 +32,13 @@ async function bootstrap(): Promise<void> {
       noAck: false,
       queueOptions: {
         durable: true,
-        maxPriority: 5,
-        deadLetterExchange: `${configService.get<string>('RABBITMQ_QUEUE', { infer: true })}.amq.dead-letter-exchange`,
-        deadLetterRoutingKey: `${configService.get<string>('RABBITMQ_QUEUE', { infer: true })}.amq.dead-letter-routing-key`,
-        arguments: {
-          'x-queue-type': 'classic',
-          'x-queue-mode': 'lazy',
-        },
+        // maxPriority: 5,
+        // deadLetterExchange: `${configService.get<string>('RABBITMQ_QUEUE', { infer: true })}.amq.dead-letter-exchange`,
+        // deadLetterRoutingKey: `${configService.get<string>('RABBITMQ_QUEUE', { infer: true })}.amq.dead-letter-routing-key`,
+        // arguments: {
+        //   'x-queue-type': 'classic',
+        //   'x-queue-mode': 'lazy',
+        // },
       },
       prefetchCount: 1,
     },
