@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { RmqOptions, Transport } from '@nestjs/microservices';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import * as morgan from 'morgan';
 import { I18nService } from 'nestjs-i18n';
 import { AppModule } from './app.module';
 import { I18nHttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -13,6 +14,9 @@ async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService);
   const port =
     (configService.get<number>('PORT', { infer: true }) as number) || 3000;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  app.use(morgan('dev'));
 
   app.useGlobalPipes(
     new ValidationPipe({
