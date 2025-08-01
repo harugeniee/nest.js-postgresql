@@ -6,7 +6,93 @@ import Redis from 'ioredis';
 export class CacheService {
   constructor(@InjectRedis() private readonly redis: Redis) {}
 
+  async onModuleInit() {
+    this.setupRedisEventListeners();
+    await this.clearCache();
+  }
+
   private readonly defaultTtl = 3600; // 1 hour in seconds
+
+  onModuleDestroy() {
+    this.redis.quit();
+  }
+
+  /**
+   * Setup Redis event listeners for logging
+   */
+  private setupRedisEventListeners() {
+    // Connection events
+    this.redis.on('connect', () => {
+      console.log('🟢 Redis connected');
+    });
+
+    this.redis.on('ready', () => {
+      console.log('✅ Redis ready');
+    });
+
+    this.redis.on('error', (error) => {
+      console.error('❌ Redis error:', error);
+    });
+
+    this.redis.on('close', () => {
+      console.log('🔴 Redis connection closed');
+    });
+
+    this.redis.on('reconnecting', () => {
+      console.log('🔄 Redis reconnecting...');
+    });
+
+    // Command events
+    this.redis.on('command', (command) => {
+      console.log('📤 Redis command sent:', command);
+    });
+
+    // Monitor mode for real-time command logging
+    this.startMonitoring();
+  }
+
+  /**
+   * Start Redis monitoring mode to log all commands
+   */
+  private async startMonitoring() {
+    try {
+      // Use monitor() method which returns a promise
+      await this.redis.monitor();
+
+      // Set up event listener for monitor events
+      this.redis.on(
+        'monitor',
+        (time: number, args: string[], source: string, database: number) => {
+          const timestamp = new Date(time * 1000).toISOString();
+          console.log(
+            `🔍 [${timestamp}] Redis ${source} DB${database}: ${args.join(' ')}`,
+          );
+        },
+      );
+
+      console.log('📊 Redis monitoring started');
+    } catch (error) {
+      console.error('❌ Failed to start Redis monitoring:', error);
+    }
+  }
+
+  /**
+   * Legacy monitor method (kept for backward compatibility)
+   */
+
+  async getRedisInfo() {
+    const info = await this.redis.info();
+    console.log('Redis info:', info);
+  }
+
+  async clearCache() {
+    await this.redis.flushall();
+    console.log('🧹 Redis cache cleared');
+  }
+
+  async getTtl(key: string): Promise<number> {
+    return await this.redis.ttl(key);
+  }
 
   /**
    * Set cache with key and value
@@ -19,6 +105,8 @@ export class CacheService {
     const ttl = ttlInSec ?? this.defaultTtl;
     const serializedValue = JSON.stringify(value);
 
+    console.log(`💾 Setting cache key: ${key}, TTL: ${ttl}s`);
+
     if (ttl >= 0) {
       await this.redis.setex(key, ttl, serializedValue);
     } else {
@@ -30,10 +118,15 @@ export class CacheService {
    * Get cache value by key
    */
   async get(key: string): Promise<any> {
+    console.log(`🔍 Getting cache key: ${key}`);
     const value = await this.redis.get(key);
 
-    if (!value) return null;
+    if (!value) {
+      console.log(`❌ Cache miss for key: ${key}`);
+      return null;
+    }
 
+    console.log(`✅ Cache hit for key: ${key}`);
     try {
       return JSON.parse(value);
     } catch {
@@ -45,6 +138,7 @@ export class CacheService {
    * Delete cache by key
    */
   async delete(key: string): Promise<void> {
+    console.log(`🗑️ Deleting cache key: ${key}`);
     await this.redis.del(key);
   }
 
@@ -86,13 +180,200 @@ export class CacheService {
   }
 
   /**
-   * Clear cache by pattern
+   * Clear cache by pattern (using KEYS - not recommended for production with large datasets)
    */
   async clearCacheByPattern(pattern: string): Promise<void> {
     const keys = await this.redis.keys(`${pattern}:*`);
     if (keys.length > 0) {
       await this.redis.del(...keys);
     }
+  }
+
+  /**
+   * Delete keys by pattern using SCAN (safe for production)
+   * @param pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*')
+   * @param count - Number of keys to scan per iteration (default: 100)
+   */
+  async deleteKeysByPattern(
+    pattern: string,
+    count: number = 100,
+  ): Promise<number> {
+    let cursor = 0;
+    let deletedCount = 0;
+
+    do {
+      const result = await this.redis.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        count,
+      );
+      cursor = parseInt(result[0], 10);
+      const keys = result[1];
+
+      if (keys.length > 0) {
+        await this.redis.del(...keys);
+        deletedCount += keys.length;
+        console.log(
+          `🗑️ Deleted ${keys.length} keys matching pattern: ${pattern}`,
+        );
+      }
+    } while (cursor !== 0);
+
+    console.log(
+      `✅ Total deleted: ${deletedCount} keys for pattern: ${pattern}`,
+    );
+    return deletedCount;
+  }
+
+  /**
+   * Delete keys by pattern using SCAN with UNLINK (non-blocking, Redis 4.0+)
+   * @param pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*')
+   * @param count - Number of keys to scan per iteration (default: 100)
+   */
+  async deleteKeysByPatternAsync(
+    pattern: string,
+    count: number = 100,
+  ): Promise<number> {
+    let cursor = 0;
+    let deletedCount = 0;
+
+    do {
+      const result = await this.redis.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        count,
+      );
+      cursor = parseInt(result[0], 10);
+      const keys = result[1];
+
+      if (keys.length > 0) {
+        await this.redis.unlink(...keys); // Non-blocking delete
+        deletedCount += keys.length;
+        console.log(
+          `🗑️ Unlinked ${keys.length} keys matching pattern: ${pattern}`,
+        );
+      }
+    } while (cursor !== 0);
+
+    console.log(
+      `✅ Total unlinked: ${deletedCount} keys for pattern: ${pattern}`,
+    );
+    return deletedCount;
+  }
+
+  /**
+   * Find keys by pattern using SCAN (safe for production)
+   * @param pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*')
+   * @param count - Number of keys to scan per iteration (default: 100)
+   */
+  async findKeysByPattern(
+    pattern: string,
+    count: number = 100,
+  ): Promise<string[]> {
+    let cursor = 0;
+    const keys: string[] = [];
+
+    do {
+      const result = await this.redis.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        count,
+      );
+      cursor = parseInt(result[0], 10);
+      const foundKeys = result[1];
+
+      keys.push(...foundKeys);
+    } while (cursor !== 0);
+
+    console.log(`🔍 Found ${keys.length} keys matching pattern: ${pattern}`);
+    return keys;
+  }
+
+  /**
+   * Count keys by pattern using SCAN (safe for production)
+   * @param pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*')
+   * @param count - Number of keys to scan per iteration (default: 100)
+   */
+  async countKeysByPattern(
+    pattern: string,
+    count: number = 100,
+  ): Promise<number> {
+    let cursor = 0;
+    let totalCount = 0;
+
+    do {
+      const result = await this.redis.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        count,
+      );
+      cursor = parseInt(result[0], 10);
+      const keys = result[1];
+
+      totalCount += keys.length;
+    } while (cursor !== 0);
+
+    console.log(`📊 Found ${totalCount} keys matching pattern: ${pattern}`);
+    return totalCount;
+  }
+
+  /**
+   * Delete multiple keys by patterns
+   * @param patterns - Array of Redis patterns
+   * @param count - Number of keys to scan per iteration (default: 100)
+   */
+  async deleteKeysByPatterns(
+    patterns: string[],
+    count: number = 100,
+  ): Promise<Record<string, number>> {
+    const results: Record<string, number> = {};
+
+    for (const pattern of patterns) {
+      const deletedCount = await this.deleteKeysByPattern(pattern, count);
+      results[pattern] = deletedCount;
+    }
+
+    console.log(`✅ Deleted keys by patterns:`, results);
+    return results;
+  }
+
+  /**
+   * Delete keys by prefix (convenience method)
+   * @param prefix - Key prefix (e.g., 'ABC:NBN:12')
+   * @param count - Number of keys to scan per iteration (default: 100)
+   */
+  async deleteKeysByPrefix(
+    prefix: string,
+    count: number = 100,
+  ): Promise<number> {
+    return this.deleteKeysByPattern(`${prefix}*`, count);
+  }
+
+  /**
+   * Delete keys by suffix (convenience method)
+   * @param suffix - Key suffix (e.g., ':123')
+   * @param count - Number of keys to scan per iteration (default: 100)
+   *
+   * Pattern matching examples:
+   * - *suffix - Ends with suffix (e.g., '*:123', '*_expired')
+   * - prefix* - Starts with prefix (e.g., 'user:*', 'ABC:NBN:*')
+   * - *pattern* - Contains pattern in the middle (e.g., '*:user:*', '*cache*')
+   * - *:12? - Ends with :12 + 1 character (e.g., '*:123', '*:12a')
+   * - *:12[34] - Ends with :123 or :124
+   */
+  async deleteKeysBySuffix(
+    suffix: string,
+    count: number = 100,
+  ): Promise<number> {
+    return this.deleteKeysByPattern(`${suffix}`, count);
   }
 
   /**

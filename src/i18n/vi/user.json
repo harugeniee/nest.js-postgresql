@@ -1,0 +1,11 @@
+{
+  "USER_ALREADY_EXISTS": "User already exists",
+  "USER_NOT_FOUND": "User not found",
+  "USER_CREATED": "User {name} has been created successfully",
+  "USER_UPDATED": "User {name} has been updated successfully",
+  "USER_DELETED": "User {name} has been deleted successfully",
+  "USER_FETCH_SUCCESS": "User fetched successfully",
+  "EMAIL_ALREADY_EXISTS": "Email already exists",
+  "USERNAME_ALREADY_EXISTS": "Username already exists",
+  "PHONE_ALREADY_EXISTS": "Phone already exists"
+}

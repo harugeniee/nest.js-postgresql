@@ -48,16 +48,16 @@ export class I18nHttpExceptionFilter implements ExceptionFilter {
       );
       message = translatedMessage;
     }
-    const code = exceptionResponse?.code;
-    const data = exceptionResponse?.data || null;
+    // const code = exceptionResponse?.code;
+    // const data = exceptionResponse?.data || null;
 
     // Build error response
     const errorResponse = {
       success: false,
       statusCode: status,
       message,
-      code,
-      data,
+      // code,
+      // data,
       metadata: {
         messageKey,
         messageArgs,
