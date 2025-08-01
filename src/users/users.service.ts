@@ -1,10 +1,12 @@
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { CreateUserDto } from './dto/register.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import * as bcrypt from 'bcrypt';
+import { USER_CONSTANTS } from 'src/shared/constants';
+import { CreateSessionDto, RegisterDto } from './dto';
+import { UserSession } from './entities/user-sessions.entity';
 import { User } from './entities/user.entity';
 
 @Injectable()
@@ -12,33 +14,97 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+
+    @InjectRepository(UserSession)
+    private readonly userSessionRepository: Repository<UserSession>,
   ) {}
 
-  register(userRegister: any) {
+  async register(userRegister: RegisterDto) {
     try {
-      return 'This action adds a new user';
-    } catch (error) {
-      throw new HttpException(error, error.status);
+      const user = await this.findByEmail(userRegister.email);
+      if (user) {
+        throw new HttpException(
+          { messageKey: 'user.EMAIL_ALREADY_EXISTS' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const hashedPassword = await bcrypt.hash(userRegister.password, 10);
+
+      const newUser = this.userRepository.create({
+        ...userRegister,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        password: hashedPassword,
+        authMethod: USER_CONSTANTS.AUTH_METHODS.EMAIL_PASSWORD,
+      });
+
+      return await this.userRepository.save(newUser);
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'common.INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+  async findByEmail(email: string) {
+    return await this.userRepository.findOne({ where: { email } });
   }
 
-  findAll() {
-    return `This action returns all users`;
+  async findOne(where: FindOptionsWhere<User>): Promise<User> {
+    const user = await this.userRepository.findOne({ where });
+    if (!user) {
+      throw new HttpException(
+        { messageKey: 'user.USER_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return user;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async findById(id: string): Promise<User | null> {
+    const user = await this.findOne({ id });
+    if (!user) {
+      return null;
+    }
+    return user;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async createSession(
+    createSessionDto: CreateSessionDto,
+  ): Promise<UserSession> {
+    const session = this.userSessionRepository.create({
+      ...createSessionDto,
+    });
+    return await this.userSessionRepository.save(session);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async findSessionById(id: string): Promise<UserSession | null> {
+    return await this.userSessionRepository.findOne({
+      where: { id, revoked: false },
+    });
+  }
+
+  async revokeSession(id: string): Promise<void> {
+    const session = await this.userSessionRepository.findOne({ where: { id } });
+    if (!session) {
+      throw new HttpException(
+        { messageKey: 'user.SESSION_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    session.revoked = true;
+    await this.userSessionRepository.save(session);
+  }
+
+  async revokeSessionsByUserId(userId: string): Promise<void> {
+    await this.userSessionRepository.update(
+      { userId: userId, revoked: false },
+      { revoked: true },
+    );
   }
 }

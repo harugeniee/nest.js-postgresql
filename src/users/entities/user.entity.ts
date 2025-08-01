@@ -11,7 +11,8 @@ export class User extends BaseEntityCustom {
   @Column({
     type: 'varchar',
     length: USER_CONSTANTS.NAME_MAX_LENGTH,
-    nullable: false,
+    nullable: true,
+    default: null,
   })
   name: string;
 
@@ -45,7 +46,6 @@ export class User extends BaseEntityCustom {
     type: 'varchar',
     length: USER_CONSTANTS.EMAIL_MAX_LENGTH,
     nullable: true,
-    unique: true,
   })
   email: string;
 
@@ -104,6 +104,7 @@ export class User extends BaseEntityCustom {
   toJSON() {
     const result = instanceToPlain(this);
     delete result.password;
+    delete result.uuid;
     return result;
   }
 }

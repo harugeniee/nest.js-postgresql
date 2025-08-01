@@ -27,6 +27,7 @@ import { configValidationSchema } from './shared/config/schema';
 import { CacheModule, RabbitmqModule } from './shared/services';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -61,13 +62,13 @@ import { WorkerModule } from './workers/worker.module';
           'app.i18n.fallbackLanguage',
         ),
         loaderOptions: {
-          path: join(__dirname, '/i18n/'),
+          path: join(__dirname, '../i18n/'),
           watch: true,
         },
       }),
       resolvers: [
         new QueryResolver(['lang', 'language']),
-        new HeaderResolver(['x-custom-lang', 'x-lang', 'x-custom-language']),
+        new HeaderResolver(['x-api-language', 'x-custom-lang', 'x-lang']),
         new CookieResolver(),
         AcceptLanguageResolver,
       ],
@@ -78,6 +79,7 @@ import { WorkerModule } from './workers/worker.module';
     WorkerModule,
     RabbitmqModule,
     FilesModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
