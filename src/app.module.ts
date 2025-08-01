@@ -61,7 +61,7 @@ import { WorkerModule } from './workers/worker.module';
           'app.i18n.fallbackLanguage',
         ),
         loaderOptions: {
-          path: join(__dirname, '/i18n/'),
+          path: join(__dirname, '../i18n/'),
           watch: true,
         },
       }),
