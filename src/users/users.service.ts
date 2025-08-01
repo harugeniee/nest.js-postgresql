@@ -3,7 +3,7 @@ import { Repository } from 'typeorm';
 import { HttpException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { CreateUserDto } from './dto/register.dto';
+import { RegisterDto } from './dto/register.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 
@@ -22,7 +22,7 @@ export class UsersService {
     }
   }
 
-  create(createUserDto: CreateUserDto) {
+  create(createUserDto: RegisterDto) {
     return 'This action adds a new user';
   }
 
