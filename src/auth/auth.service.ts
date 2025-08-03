@@ -169,4 +169,22 @@ export class AuthService {
       messageKey: 'user.PASSWORD_UPDATED_SUCCESS',
     });
   }
+
+  async refreshToken(authPayload: AuthPayload) {
+    const accessTokenExpiresIn =
+      this.configService.get<string>('app.jwt.accessTokenExpiresIn') || '1h';
+    const accessToken = await this.jwtService.signAsync(
+      { uid: authPayload.uid, ssid: authPayload.ssid },
+      {
+        expiresIn: accessTokenExpiresIn,
+        algorithm: 'HS256',
+      },
+    );
+    return buildResponse({
+      data: {
+        accessToken,
+      },
+      messageKey: 'user.ACCESS_TOKEN_REFRESHED_SUCCESS',
+    });
+  }
 }

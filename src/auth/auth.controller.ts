@@ -1,19 +1,22 @@
-import {
-  Controller,
-  Post,
-  Body,
-  UseGuards,
-  Request,
-  HttpCode,
-  HttpStatus,
-  Put,
-} from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from 'src/users/dto';
 import { ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
-import { JwtAccessTokenGuard } from './guard/jwt-access-token.guard';
+import { LoginDto, RegisterDto } from 'src/users/dto';
 import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
+
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Put,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
+
+import { AuthService } from './auth.service';
+import { JwtAccessTokenGuard } from './guard/jwt-access-token.guard';
+import { JwtRefreshTokenGuard } from './guard/jwt-refresh-token.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -34,6 +37,14 @@ export class AuthController {
     @ClientInfo() clientInfo: ClientInfo,
   ) {
     return this.authService.login(loginDto, clientInfo);
+  }
+
+  @Post('refresh-token')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtRefreshTokenGuard)
+  async refreshToken(@Request() req: Request & { user: AuthPayload }) {
+    const authPayload = req.user;
+    return this.authService.refreshToken(authPayload);
   }
 
   @Post('logout')
