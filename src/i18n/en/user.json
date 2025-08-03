@@ -11,5 +11,6 @@
   "INVALID_PASSWORD": "Invalid password",
   "LOGIN_SUCCESS": "Login successfully",
   "LOGOUT_SUCCESS": "Logout successfully",
-  "LOGOUT_ALL_DEVICES_SUCCESS": "Logout all devices successfully"
+  "LOGOUT_ALL_DEVICES_SUCCESS": "Logout all devices successfully",
+  "PASSWORD_UPDATED_SUCCESS": "Password updated successfully"
 }

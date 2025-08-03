@@ -6,12 +6,14 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  Put,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from 'src/users/dto';
 import { ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { JwtAccessTokenGuard } from './guard/jwt-access-token.guard';
+import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -48,5 +50,16 @@ export class AuthController {
   async logoutAll(@Request() req: Request & { user: AuthPayload }) {
     const authPayload = req.user;
     return this.authService.logoutAll(authPayload);
+  }
+
+  @Put('update-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAccessTokenGuard)
+  async updatePassword(
+    @Request() req: Request & { user: AuthPayload },
+    @Body() updatePasswordDto: UpdatePasswordDto,
+  ) {
+    const authPayload = req.user;
+    return this.authService.updatePassword(authPayload, updatePasswordDto);
   }
 }
