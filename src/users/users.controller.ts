@@ -1,4 +1,5 @@
 import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
+import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 
 import {
@@ -24,7 +25,7 @@ export class UsersController {
   }
 
   @Get(['@me', 'me'])
-  @UseGuards(JwtAccessTokenGuard)
+  @Auth()
   async getMe(@Request() req: Request & { user: AuthPayload }) {
     return await this.usersService.findOne({ id: req.user.uid });
   }

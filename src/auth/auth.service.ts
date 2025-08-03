@@ -85,7 +85,7 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.sign(
-        { uid: id, ssid: session.id },
+        { uid: id, ssid: session.id, role: user.role },
         {
           expiresIn: accessTokenExpiresIn,
           algorithm: 'HS256',
