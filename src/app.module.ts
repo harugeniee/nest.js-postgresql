@@ -29,7 +29,6 @@ import { configValidationSchema } from './shared/config/schema';
 import { CacheModule, RabbitmqModule } from './shared/services';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
-import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [

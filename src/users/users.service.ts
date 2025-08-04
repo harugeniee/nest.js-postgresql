@@ -20,10 +20,6 @@ export class UsersService {
     private readonly userSessionRepository: Repository<UserSession>,
   ) {}
 
-    @InjectRepository(UserSession)
-    private readonly userSessionRepository: Repository<UserSession>,
-  ) {}
-
   async register(userRegister: RegisterDto) {
     try {
       const user = await this.findByEmail(userRegister.email);
