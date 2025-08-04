@@ -8,7 +8,7 @@ export class CacheService {
 
   async onModuleInit() {
     this.setupRedisEventListeners();
-    await this.clearCache();
+    // await this.clearCache();
   }
 
   private readonly defaultTtl = 3600; // 1 hour in seconds

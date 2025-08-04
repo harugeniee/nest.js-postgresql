@@ -3,6 +3,7 @@ import {
   IsEmail,
   IsNotEmpty,
   IsString,
+  IsStrongPassword,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -17,7 +18,13 @@ export class RegisterDto {
 
   @IsNotEmpty()
   @IsString()
-  @MinLength(USER_CONSTANTS.PASSWORD_MIN_LENGTH)
+  @IsStrongPassword({
+    minLength: 5,
+    minNumbers: 1,
+    minLowercase: 1,
+    minUppercase: 0,
+    minSymbols: 0,
+  })
   @MaxLength(16)
   password: string;
 

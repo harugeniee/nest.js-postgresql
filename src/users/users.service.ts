@@ -8,12 +8,17 @@ import { USER_CONSTANTS } from 'src/shared/constants';
 import { CreateSessionDto, RegisterDto } from './dto';
 import { UserSession } from './entities/user-sessions.entity';
 import { User } from './entities/user.entity';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+
+    @InjectRepository(UserSession)
+    private readonly userSessionRepository: Repository<UserSession>,
+  ) {}
 
     @InjectRepository(UserSession)
     private readonly userSessionRepository: Repository<UserSession>,
@@ -106,5 +111,17 @@ export class UsersService {
       { userId: userId, revoked: false },
       { revoked: true },
     );
+  }
+
+  async updateUser(id: string, updateUserDto: UpdateUserDto) {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new HttpException(
+        { messageKey: 'user.USER_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    Object.assign(user, updateUserDto);
+    return await this.userRepository.update(id, updateUserDto);
   }
 }

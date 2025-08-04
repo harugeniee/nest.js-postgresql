@@ -1,4 +1,5 @@
 import { instanceToPlain } from 'class-transformer';
+import { AuthType, USER_CONSTANTS } from 'src/shared/constants/user.constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column, Entity, Index } from 'typeorm';
 
@@ -21,6 +22,14 @@ export class UserSession extends BaseEntityCustom {
 
   @Column({ type: 'boolean', default: false })
   revoked: boolean;
+
+  @Column({
+    type: 'varchar',
+    nullable: true,
+    enum: USER_CONSTANTS.AUTH_TYPES,
+    default: USER_CONSTANTS.AUTH_TYPES.EMAIL_PASSWORD,
+  })
+  authType: AuthType;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any> | null;

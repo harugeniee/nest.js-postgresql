@@ -1,6 +1,6 @@
 import { instanceToPlain } from 'class-transformer';
-import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { USER_CONSTANTS, UserRole, UserStatus } from 'src/shared/constants';
+import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column, Entity, Index } from 'typeorm';
 
 @Entity('users')

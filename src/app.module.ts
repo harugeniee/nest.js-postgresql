@@ -1,8 +1,3 @@
-import { RedisModule } from '@nestjs-modules/ioredis';
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-
 import {
   AcceptLanguageResolver,
   CookieResolver,
@@ -11,8 +6,15 @@ import {
   QueryResolver,
 } from 'nestjs-i18n';
 import { join } from 'path';
+
+import { RedisModule } from '@nestjs-modules/ioredis';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
 import { FilesModule } from './files/files.module';
 import {
   appConfig,

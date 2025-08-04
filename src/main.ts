@@ -1,10 +1,13 @@
+import helmet from 'helmet';
+import * as morgan from 'morgan';
+import { I18nService } from 'nestjs-i18n';
+
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { RmqOptions, Transport } from '@nestjs/microservices';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import * as morgan from 'morgan';
-import { I18nService } from 'nestjs-i18n';
+
 import { AppModule } from './app.module';
 import { I18nHttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './shared/interceptors/response.interceptor';
@@ -17,7 +20,7 @@ async function bootstrap(): Promise<void> {
   app.enableCors();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   app.use(morgan('dev'));
-
+  app.use(helmet());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

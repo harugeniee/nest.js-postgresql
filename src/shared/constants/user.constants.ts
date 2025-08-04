@@ -49,6 +49,13 @@ export const USER_CONSTANTS = {
     OAUTH: 'oauth',
     PHONE_OTP: 'phone_otp',
   },
+
+  AUTH_TYPES: {
+    QR_CODE: 'qr_code',
+    EMAIL_PASSWORD: 'email_password',
+    PHONE_OTP: 'phone_otp',
+    OAUTH: 'oauth',
+  },
 } as const;
 
 // Type definitions for better TypeScript support
@@ -64,3 +71,6 @@ export type OAuthProvider =
 
 export type AuthMethod =
   (typeof USER_CONSTANTS.AUTH_METHODS)[keyof typeof USER_CONSTANTS.AUTH_METHODS];
+
+export type AuthType =
+  (typeof USER_CONSTANTS.AUTH_TYPES)[keyof typeof USER_CONSTANTS.AUTH_TYPES];

@@ -1,14 +1,16 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { buildResponse } from 'src/shared/helpers/build-response';
 import { CacheService } from 'src/shared/services';
 import { LoginDto, RegisterDto } from 'src/users/dto';
+import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
 import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
+
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
@@ -83,7 +85,7 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.sign(
-        { uid: id, ssid: session.id },
+        { uid: id, ssid: session.id, role: user.role },
         {
           expiresIn: accessTokenExpiresIn,
           algorithm: 'HS256',
@@ -130,6 +132,59 @@ export class AuthService {
     ]);
     return buildResponse({
       messageKey: 'user.LOGOUT_ALL_DEVICES_SUCCESS',
+    });
+  }
+
+  async updatePassword(
+    authPayload: AuthPayload,
+    updatePasswordDto: UpdatePasswordDto,
+  ) {
+    const user = await this.usersService.findById(authPayload.uid);
+    if (!user) {
+      throw new HttpException(
+        { messageKey: 'user.USER_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const isPasswordValid = await bcrypt.compare(
+      updatePasswordDto.currentPassword,
+      user.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new HttpException(
+        { messageKey: 'user.INVALID_PASSWORD' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const hashedPassword = await bcrypt.hash(updatePasswordDto.newPassword, 10);
+    await this.usersService.updateUser(authPayload.uid, {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      password: hashedPassword,
+    });
+    return buildResponse({
+      messageKey: 'user.PASSWORD_UPDATED_SUCCESS',
+    });
+  }
+
+  async refreshToken(authPayload: AuthPayload) {
+    const accessTokenExpiresIn =
+      this.configService.get<string>('app.jwt.accessTokenExpiresIn') || '1h';
+    const accessToken = await this.jwtService.signAsync(
+      { uid: authPayload.uid, ssid: authPayload.ssid },
+      {
+        expiresIn: accessTokenExpiresIn,
+        algorithm: 'HS256',
+      },
+    );
+    return buildResponse({
+      data: {
+        accessToken,
+      },
+      messageKey: 'user.ACCESS_TOKEN_REFRESHED_SUCCESS',
     });
   }
 }

@@ -8,7 +8,9 @@ export class JwtRefreshTokenGuard extends AuthGuard {
     const cacheKey = `auth:user:${payload.uid}:refreshToken:${payload.ssid}`;
     const ttl = await this.cacheService.getTtl(cacheKey);
     if (!ttl || ttl <= 0) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException({
+        messageKey: 'auth.INVALID_TOKEN',
+      });
     }
   }
 
