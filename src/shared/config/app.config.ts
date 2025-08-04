@@ -1,5 +1,6 @@
 export const appConfig = () => ({
   port: Number(process.env.APP_PORT) || 3000,
+  timezone: process.env.TZ || 'UTC',
   jwt: {
     secret: process.env.JWT_SECRET || 'victory_secret_key',
     accessTokenExpiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || '1h',

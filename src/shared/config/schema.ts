@@ -3,6 +3,7 @@ import * as Joi from 'joi';
 export const configValidationSchema = Joi.object({
   APP_PORT: Joi.number().required(),
   JWT_SECRET: Joi.string().min(16).required(),
+  TZ: Joi.string().required(),
 
   DATABASE_TYPE: Joi.string().required(),
   DATABASE_HOST: Joi.string().required(),
