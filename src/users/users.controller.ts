@@ -8,12 +8,15 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
 
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from './users.service';
+import { AdvancedPaginationDto } from 'src/common/dto';
+import { USER_CONSTANTS } from 'src/shared/constants';
 
 @Controller('users')
 export class UsersController {
@@ -34,5 +37,11 @@ export class UsersController {
   @UseGuards(JwtAccessTokenGuard)
   async getUserById(@Param('id') id: string) {
     return await this.usersService.findOne({ id });
+  }
+
+  @Get()
+  @Auth(USER_CONSTANTS.ROLES.ADMIN)
+  async getUsers(@Query() paginationDto: AdvancedPaginationDto) {
+    return await this.usersService.findAll(paginationDto);
   }
 }

@@ -16,5 +16,6 @@
     "zero": "Never",
     "one": "Every day",
     "other": "Every {count} days"
-  }
+  },
+  "INTERNAL_SERVER_ERROR": "Internal server error"
 }
