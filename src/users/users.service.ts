@@ -9,6 +9,10 @@ import { CreateSessionDto, RegisterDto } from './dto';
 import { UserSession } from './entities/user-sessions.entity';
 import { User } from './entities/user.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ConditionBuilder } from 'src/shared/helpers/condition-builder';
+import { AdvancedPaginationDto } from 'src/common/dto';
+import { PaginationFormatter } from 'src/shared/helpers/pagination-formatter';
+import { IPagination } from 'src/common/interface';
 
 @Injectable()
 export class UsersService {
@@ -119,5 +123,33 @@ export class UsersService {
     }
     Object.assign(user, updateUserDto);
     return await this.userRepository.update(id, updateUserDto);
+  }
+
+  async findAll(
+    paginationDto: AdvancedPaginationDto,
+  ): Promise<IPagination<User>> {
+    try {
+      const { page, limit, sortBy, order, ...rest } = paginationDto;
+      console.log(ConditionBuilder.build(rest));
+      const [data, total] = await this.userRepository.findAndCount({
+        skip: (page - 1) * limit,
+        take: limit,
+        order: { [sortBy]: order },
+        where: ConditionBuilder.build(rest),
+      });
+      return PaginationFormatter.offset(data, total, page, limit);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        {
+          message: error?.message,
+          messageKey: 'common.INTERNAL_SERVER_ERROR',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

@@ -16,6 +16,7 @@ export const USER_CONSTANTS = {
     INACTIVE: 'inactive',
     PENDING: 'pending',
     SUSPENDED: 'suspended',
+    REMOVED: 'removed',
   },
 
   // Role values
