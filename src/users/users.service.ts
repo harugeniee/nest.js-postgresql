@@ -145,6 +145,7 @@ export class UsersService {
 
       throw new HttpException(
         {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
           message: error?.message,
           messageKey: 'common.INTERNAL_SERVER_ERROR',
         },
