@@ -1,6 +1,6 @@
 import { ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
-import { LoginDto, RegisterDto } from 'src/users/dto';
+import { CreateDeviceTokenDto, LoginDto, RegisterDto } from 'src/users/dto';
 import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
 
 import {
@@ -72,5 +72,19 @@ export class AuthController {
   ) {
     const authPayload = req.user;
     return this.authService.updatePassword(authPayload, updatePasswordDto);
+  }
+
+  @Post('device-token')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAccessTokenGuard)
+  async createDeviceToken(
+    @Request() req: Request & { user: AuthPayload },
+    @Body() createDeviceTokenDto: CreateDeviceTokenDto,
+  ) {
+    const authPayload = req.user;
+    return this.authService.createDeviceToken(
+      createDeviceTokenDto,
+      authPayload,
+    );
   }
 }

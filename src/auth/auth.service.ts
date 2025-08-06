@@ -3,7 +3,7 @@ import { ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { buildResponse } from 'src/shared/helpers/build-response';
 import { CacheService } from 'src/shared/services';
-import { LoginDto, RegisterDto } from 'src/users/dto';
+import { CreateDeviceTokenDto, LoginDto, RegisterDto } from 'src/users/dto';
 import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
 import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
@@ -186,5 +186,15 @@ export class AuthService {
       },
       messageKey: 'user.ACCESS_TOKEN_REFRESHED_SUCCESS',
     });
+  }
+
+  async createDeviceToken(
+    createDeviceTokenDto: CreateDeviceTokenDto,
+    authPayload: AuthPayload,
+  ) {
+    return await this.usersService.createDeviceToken(
+      createDeviceTokenDto,
+      authPayload,
+    );
   }
 }

@@ -57,6 +57,12 @@ export const USER_CONSTANTS = {
     PHONE_OTP: 'phone_otp',
     OAUTH: 'oauth',
   },
+  DEVICE_TYPES: {
+    IOS: 'ios',
+    ANDROID: 'android',
+    WEB: 'web',
+    DESKTOP: 'desktop',
+  },
 } as const;
 
 // Type definitions for better TypeScript support
@@ -75,3 +81,6 @@ export type AuthMethod =
 
 export type AuthType =
   (typeof USER_CONSTANTS.AUTH_TYPES)[keyof typeof USER_CONSTANTS.AUTH_TYPES];
+
+export type DeviceType =
+  (typeof USER_CONSTANTS.DEVICE_TYPES)[keyof typeof USER_CONSTANTS.DEVICE_TYPES];
