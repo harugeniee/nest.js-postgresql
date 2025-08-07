@@ -1,5 +1,7 @@
 import * as firebase from 'firebase-admin';
 
+import { auth, messaging } from 'firebase-admin';
+
 import { Injectable, Logger } from '@nestjs/common';
 
 import { firebaseConfig } from './firebase.config';
