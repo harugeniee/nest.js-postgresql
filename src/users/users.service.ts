@@ -5,6 +5,7 @@ import { USER_CONSTANTS } from 'src/shared/constants';
 import { ConditionBuilder } from 'src/shared/helpers/condition-builder';
 import { PaginationFormatter } from 'src/shared/helpers/pagination-formatter';
 import { FindOptionsWhere, Repository } from 'typeorm';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -176,7 +177,10 @@ export class UsersService {
     return deviceToken;
   }
 
-  async updateDeviceTokenBySessionId(sessionId: string, update: any) {
+  async updateDeviceTokenBySessionId(
+    sessionId: string,
+    update: QueryDeepPartialEntity<UserDeviceToken>,
+  ) {
     return await this.userDeviceTokenRepository.update({ sessionId }, update);
   }
 }
