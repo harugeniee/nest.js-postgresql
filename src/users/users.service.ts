@@ -14,7 +14,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserDeviceToken } from './entities/user-device-tokens.entity';
 import { UserSession } from './entities/user-sessions.entity';
 import { User } from './entities/user.entity';
-import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
