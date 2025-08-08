@@ -1,18 +1,20 @@
+import * as bcrypt from 'bcrypt';
+import { AdvancedPaginationDto } from 'src/common/dto';
+import { AuthPayload, IPagination } from 'src/common/interface';
+import { USER_CONSTANTS } from 'src/shared/constants';
+import { ConditionBuilder } from 'src/shared/helpers/condition-builder';
+import { PaginationFormatter } from 'src/shared/helpers/pagination-formatter';
 import { FindOptionsWhere, Repository } from 'typeorm';
 
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import * as bcrypt from 'bcrypt';
-import { USER_CONSTANTS } from 'src/shared/constants';
-import { CreateSessionDto, RegisterDto } from './dto';
+import { CreateDeviceTokenDto, CreateSessionDto, RegisterDto } from './dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserDeviceToken } from './entities/user-device-tokens.entity';
 import { UserSession } from './entities/user-sessions.entity';
 import { User } from './entities/user.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ConditionBuilder } from 'src/shared/helpers/condition-builder';
-import { AdvancedPaginationDto } from 'src/common/dto';
-import { PaginationFormatter } from 'src/shared/helpers/pagination-formatter';
-import { IPagination } from 'src/common/interface';
 
 @Injectable()
 export class UsersService {
@@ -22,6 +24,9 @@ export class UsersService {
 
     @InjectRepository(UserSession)
     private readonly userSessionRepository: Repository<UserSession>,
+
+    @InjectRepository(UserDeviceToken)
+    private readonly userDeviceTokenRepository: Repository<UserDeviceToken>,
   ) {}
 
   async register(userRegister: RegisterDto) {
@@ -152,5 +157,27 @@ export class UsersService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  async createDeviceToken(
+    createDeviceTokenDto: CreateDeviceTokenDto,
+    authPayload: AuthPayload,
+  ) {
+    const deviceToken = await this.userDeviceTokenRepository.upsert(
+      {
+        userId: authPayload.uid,
+        sessionId: authPayload.ssid,
+        token: createDeviceTokenDto.token,
+      },
+      {
+        conflictPaths: ['token', 'userId'],
+        skipUpdateIfNoValuesChanged: true,
+      },
+    );
+    return deviceToken;
+  }
+
+  async updateDeviceTokenBySessionId(sessionId: string, update: any) {
+    return await this.userDeviceTokenRepository.update({ sessionId }, update);
   }
 }
