@@ -1,5 +1,4 @@
-import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
-import { RolesGuard } from 'src/auth/guard/role.guard';
+import { JwtAccessTokenGuard, RolesGuard } from 'src/auth/guard';
 import { UserRole } from 'src/shared/constants';
 
 import { applyDecorators, UseGuards } from '@nestjs/common';
