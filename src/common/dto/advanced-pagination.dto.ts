@@ -5,10 +5,14 @@ import { PaginationDto } from './pagination.dto';
 export class AdvancedPaginationDto extends PaginationDto {
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
   @ArrayMaxSize(3)
   @Transform(({ value }: { value: any }): string | string[] => {
     if (typeof value === 'string') {
-      return value.split(',');
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item !== '');
     }
     return value as string | string[];
   })
@@ -43,7 +47,10 @@ export class AdvancedPaginationDto extends PaginationDto {
   @ArrayMaxSize(3)
   @Transform(({ value }: { value: any }): string | string[] => {
     if (typeof value === 'string') {
-      return value.split(',');
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item !== '');
     }
     return value as string | string[];
   })
@@ -54,7 +61,10 @@ export class AdvancedPaginationDto extends PaginationDto {
   @ArrayMaxSize(3)
   @Transform(({ value }: { value: any }): string | string[] => {
     if (typeof value === 'string') {
-      return value.split(',');
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item !== '');
     }
     return value as string | string[];
   })
