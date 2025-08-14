@@ -2,19 +2,30 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 
+// CacheOptions defines cache configuration for consumers of CacheService
+// - enabled: toggle caching behavior
+// - ttlSec: default time-to-live in seconds
+// - prefix: optional key namespace prefix
+// - swrSec: optional stale-while-revalidate window in seconds
+export interface CacheOptions {
+  enabled: boolean;
+  ttlSec: number;
+  prefix?: string;
+  swrSec?: number;
+}
+
 @Injectable()
 export class CacheService {
   constructor(@InjectRedis() private readonly redis: Redis) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
     this.setupRedisEventListeners();
-    // await this.clearCache();
   }
 
   private readonly defaultTtl = 3600; // 1 hour in seconds
 
   onModuleDestroy() {
-    this.redis.quit();
+    void this.redis.quit();
   }
 
   /**
@@ -48,7 +59,7 @@ export class CacheService {
     });
 
     // Monitor mode for real-time command logging
-    this.startMonitoring();
+    void this.startMonitoring();
   }
 
   /**
@@ -97,11 +108,7 @@ export class CacheService {
   /**
    * Set cache with key and value
    */
-  async set(
-    key: string,
-    value: string | Record<string, any>,
-    ttlInSec?: number,
-  ): Promise<void> {
+  async set(key: string, value: any, ttlInSec?: number): Promise<void> {
     const ttl = ttlInSec ?? this.defaultTtl;
     const serializedValue = JSON.stringify(value);
 
