@@ -2,8 +2,6 @@ import * as bcrypt from 'bcrypt';
 import { AdvancedPaginationDto } from 'src/common/dto';
 import { AuthPayload, IPagination } from 'src/common/interface';
 import { USER_CONSTANTS } from 'src/shared/constants';
-import { ConditionBuilder } from 'src/shared/helpers/condition-builder';
-import { PaginationFormatter } from 'src/shared/helpers/pagination-formatter';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
@@ -15,19 +13,38 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserDeviceToken } from './entities/user-device-tokens.entity';
 import { UserSession } from './entities/user-sessions.entity';
 import { User } from './entities/user.entity';
+import { BaseService } from 'src/shared/services/base/base.service';
+import { BaseRepository } from 'src/shared/repositories/base.repository';
+import { TypeormBaseRepository } from 'src/shared/repositories/typeorm.base-repo';
+import { DataSource } from 'typeorm';
+import { CacheService } from 'src/shared/services/cache/cache.service';
 
 @Injectable()
-export class UsersService {
+export class UsersService extends BaseService<User> {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-
+    dataSource: DataSource,
+    @InjectRepository(User) userRepo: Repository<User>,
+    private readonly cache: CacheService,
     @InjectRepository(UserSession)
     private readonly userSessionRepository: Repository<UserSession>,
-
     @InjectRepository(UserDeviceToken)
     private readonly userDeviceTokenRepository: Repository<UserDeviceToken>,
-  ) {}
+  ) {
+    const baseRepo: BaseRepository<User> = new TypeormBaseRepository<User>(
+      dataSource,
+      userRepo,
+      User,
+    );
+    super(
+      baseRepo,
+      {
+        entityName: 'users',
+        cache: { enabled: true, ttlSec: 60, prefix: 'users' },
+        defaultSearchField: 'name',
+      },
+      cache,
+    );
+  }
 
   async register(userRegister: RegisterDto) {
     try {
@@ -41,19 +58,16 @@ export class UsersService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const hashedPassword = await bcrypt.hash(userRegister.password, 10);
 
-      const newUser = this.userRepository.create({
+      const newUser: Partial<User> = {
         ...userRegister,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         password: hashedPassword,
         authMethod: USER_CONSTANTS.AUTH_METHODS.EMAIL_PASSWORD,
-      });
+      };
 
-      return await this.userRepository.save(newUser);
-    } catch (error: any) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-
+      return await this.create(newUser);
+    } catch (err: unknown) {
+      if (err instanceof HttpException) throw err;
       throw new HttpException(
         { messageKey: 'common.INTERNAL_SERVER_ERROR' },
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -62,11 +76,11 @@ export class UsersService {
   }
 
   async findByEmail(email: string) {
-    return await this.userRepository.findOne({ where: { email } });
+    return await this.findOne({ email });
   }
 
   async findOne(where: FindOptionsWhere<User>): Promise<User> {
-    const user = await this.userRepository.findOne({ where });
+    const user = await super.findOne(where);
     if (!user) {
       throw new HttpException(
         { messageKey: 'user.USER_NOT_FOUND' },
@@ -76,13 +90,7 @@ export class UsersService {
     return user;
   }
 
-  async findById(id: string): Promise<User | null> {
-    const user = await this.findOne({ id });
-    if (!user) {
-      return null;
-    }
-    return user;
-  }
+  // Note: use base `findById` or `findOne` from BaseService as needed
 
   async createSession(
     createSessionDto: CreateSessionDto,
@@ -126,37 +134,13 @@ export class UsersService {
         HttpStatus.NOT_FOUND,
       );
     }
-    Object.assign(user, updateUserDto);
-    return await this.userRepository.update(id, updateUserDto);
+    return await super.update(id, updateUserDto);
   }
 
   async findAll(
     paginationDto: AdvancedPaginationDto,
   ): Promise<IPagination<User>> {
-    try {
-      const { page, limit, sortBy, order, ...rest } = paginationDto;
-      console.log(ConditionBuilder.build(rest));
-      const [data, total] = await this.userRepository.findAndCount({
-        skip: (page - 1) * limit,
-        take: limit,
-        order: { [sortBy]: order },
-        where: ConditionBuilder.build(rest),
-      });
-      return PaginationFormatter.offset(data, total, page, limit);
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-
-      throw new HttpException(
-        {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-          message: error?.message,
-          messageKey: 'common.INTERNAL_SERVER_ERROR',
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    return await this.listOffset(paginationDto);
   }
 
   async createDeviceToken(
