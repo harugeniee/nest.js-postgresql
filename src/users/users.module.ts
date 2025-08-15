@@ -1,11 +1,11 @@
+import { UserDeviceToken } from 'src/users/entities/user-device-tokens.entity';
+import { UserSession } from 'src/users/entities/user-sessions.entity';
+import { User } from 'src/users/entities/user.entity';
+import { UsersController } from 'src/users/users.controller';
+import { UsersService } from 'src/users/users.service';
+
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
-import { UserDeviceToken } from './entities/user-device-tokens.entity';
-import { UserSession } from './entities/user-sessions.entity';
-import { User } from './entities/user.entity';
-import { UsersController } from './users.controller';
-import { UsersService } from './users.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, UserSession, UserDeviceToken])],

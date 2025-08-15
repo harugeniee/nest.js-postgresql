@@ -1,13 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { BaseService } from './base.service';
 import { AdvancedPaginationDto } from 'src/common/dto';
 import { PaginationFormatter } from 'src/shared/helpers/pagination-formatter';
+import { QueryRunner } from 'typeorm';
+
 import {
   BaseRepository,
   BaseRepositoryFindAndCountOpts,
   BaseRepositoryFindByIdOpts,
 } from '../repositories/base.repository';
-import { QueryRunner } from 'typeorm';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { BaseService } from './base.service';
 
 class DummyEntity {
   id!: string;
@@ -57,7 +58,7 @@ class InMemoryRepo implements BaseRepository<DummyEntity> {
   private matchWhere(where: any): DummyEntity | null {
     return (
       this.store.find((e) =>
-        Object.entries(where).every(([k, v]) => (e as any)[k] === v),
+        Object.entries(where).every(([k, v]) => (e as unknown as any)[k] === v),
       ) || null
     );
   }
@@ -67,14 +68,19 @@ class InMemoryRepo implements BaseRepository<DummyEntity> {
     const { skip = 0, take = 10, order } = opts;
     let result = [...this.store];
     if (order) {
-      const [k, dir] = Object.entries(order)[0] as [string, any];
-      result.sort((a, b) => {
-        const av = (a as any)[k];
-        const bv = (b as any)[k];
-        if (av < bv) return dir === 'ASC' ? -1 : 1;
-        if (av > bv) return dir === 'ASC' ? 1 : -1;
-        return 0;
-      });
+      const rec = order as Record<string, 'ASC' | 'DESC'>;
+      const keys = Object.keys(rec);
+      if (keys.length > 0) {
+        const k = keys[0] as keyof DummyEntity;
+        const dir = rec[keys[0]];
+        result.sort((a, b) => {
+          const av = a[k] as unknown as number | string | Date;
+          const bv = b[k] as unknown as number | string | Date;
+          if (av < bv) return dir === 'ASC' ? -1 : 1;
+          if (av > bv) return dir === 'ASC' ? 1 : -1;
+          return 0;
+        });
+      }
     }
     const total = result.length;
     result = result.slice(skip, skip + take);

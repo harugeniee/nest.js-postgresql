@@ -9,17 +9,20 @@ import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo
 import { BaseService } from 'src/common/services/base.service';
 import { USER_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services/cache/cache.service';
+import {
+  CreateDeviceTokenDto,
+  CreateSessionDto,
+  RegisterDto,
+} from 'src/users/dto';
+import { UpdateUserDto } from 'src/users/dto/update-user.dto';
+import { UserDeviceToken } from 'src/users/entities/user-device-tokens.entity';
+import { UserSession } from 'src/users/entities/user-sessions.entity';
+import { User } from 'src/users/entities/user.entity';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-
-import { CreateDeviceTokenDto, CreateSessionDto, RegisterDto } from './dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { UserDeviceToken } from './entities/user-device-tokens.entity';
-import { UserSession } from './entities/user-sessions.entity';
-import { User } from './entities/user.entity';
 
 @Injectable()
 export class UsersService extends BaseService<User> {

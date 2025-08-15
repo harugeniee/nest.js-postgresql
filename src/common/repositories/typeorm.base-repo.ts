@@ -1,17 +1,16 @@
 import {
+  BaseRepository,
+  BaseRepositoryFindAndCountOpts,
+  BaseRepositoryFindByIdOpts,
+} from 'src/common/repositories/base.repository';
+import {
   DeepPartial,
-  FindOptionsOrder,
   FindOptionsRelations,
   FindOptionsWhere,
   QueryRunner,
   Repository,
 } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
-import {
-  BaseRepository,
-  BaseRepositoryFindAndCountOpts,
-  BaseRepositoryFindByIdOpts,
-} from './base.repository';
 
 export class TypeOrmBaseRepository<T extends { id: string }>
   implements BaseRepository<T>

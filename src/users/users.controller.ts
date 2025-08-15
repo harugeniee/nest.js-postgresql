@@ -2,8 +2,10 @@ import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
 import { Auth } from 'src/common/decorators';
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { AuthPayload } from 'src/common/interface';
-import { SnowflakeIdPipe } from 'src/common/pipes/snowflake-id.pipe';
+import { SnowflakeIdPipe } from 'src/common/pipes';
 import { USER_CONSTANTS } from 'src/shared/constants';
+import { RegisterDto } from 'src/users/dto/register.dto';
+import { UsersService } from 'src/users/users.service';
 
 import {
   Body,
@@ -15,9 +17,6 @@ import {
   Request,
   UseGuards,
 } from '@nestjs/common';
-
-import { RegisterDto } from './dto/register.dto';
-import { UsersService } from './users.service';
 
 @Controller('users')
 export class UsersController {
