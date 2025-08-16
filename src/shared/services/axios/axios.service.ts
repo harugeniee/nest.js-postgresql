@@ -21,7 +21,7 @@ export class AxiosService {
   ): Promise<any> {
     return lastValueFrom(
       this.httpService.get(url, configuration).pipe(
-        map(res => {
+        map((res) => {
           return res || null;
         }),
       ),
@@ -40,7 +40,7 @@ export class AxiosService {
   ): Promise<any> {
     return lastValueFrom(
       this.httpService.post(url, configuration).pipe(
-        map(res => {
+        map((res) => {
           return res || null;
         }),
       ),
@@ -59,7 +59,7 @@ export class AxiosService {
   ): Promise<any> {
     return lastValueFrom(
       this.httpService.put(url, configuration).pipe(
-        map(res => {
+        map((res) => {
           return res || null;
         }),
       ),
@@ -78,7 +78,7 @@ export class AxiosService {
   ): Promise<any> {
     return lastValueFrom(
       this.httpService.delete(url, configuration).pipe(
-        map(res => {
+        map((res) => {
           return res || null;
         }),
       ),
@@ -97,7 +97,7 @@ export class AxiosService {
   ): Promise<any> {
     return lastValueFrom(
       this.httpService.patch(url, configuration).pipe(
-        map(res => {
+        map((res) => {
           return res || null;
         }),
       ),

@@ -422,7 +422,7 @@ export abstract class BaseService<T extends { id: string }> {
     let select = opts?.select;
     if (this.opts.selectWhitelist && select) {
       const whitelist = this.opts.selectWhitelist;
-      select = select.filter(k => whitelist.includes(k));
+      select = select.filter((k) => whitelist.includes(k));
     }
     const withDeleted = opts?.withDeleted ?? false;
     return {

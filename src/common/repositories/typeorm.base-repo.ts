@@ -141,6 +141,8 @@ export class TypeOrmBaseRepository<T extends { id: string }>
   supportsSoftDelete(): boolean {
     // Heuristic: entities with DeleteDateColumn support soft delete
     // TypeORM repository has metadata with columns
-    return this.repo.metadata.columns.some(c => c.propertyName === 'deletedAt');
+    return this.repo.metadata.columns.some(
+      (c) => c.propertyName === 'deletedAt',
+    );
   }
 }

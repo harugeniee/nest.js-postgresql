@@ -7,7 +7,7 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-rl.question('📝 Enter migration name: ', name => {
+rl.question('📝 Enter migration name: ', (name) => {
   if (!name.trim()) {
     console.error('❌ Migration name cannot be empty!');
     rl.close();

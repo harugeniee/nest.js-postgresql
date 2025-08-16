@@ -21,7 +21,7 @@ export class ResponseInterceptor implements NestInterceptor {
         const lang = request.i18nLang || 'en';
         return from(
           Promise.resolve(formatI18nResponse(this.i18n, lang, response)).then(
-            translated => ({
+            (translated) => ({
               success: true,
               data: response?.data ?? response ?? {},
               message: translated.message,

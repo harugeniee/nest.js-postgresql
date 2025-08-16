@@ -11,8 +11,8 @@ export class AdvancedPaginationDto extends PaginationDto {
     if (typeof value === 'string') {
       return value
         .split(',')
-        .map(item => item.trim())
-        .filter(item => item !== '');
+        .map((item) => item.trim())
+        .filter((item) => item !== '');
     }
     return value as string | string[];
   })
@@ -49,8 +49,8 @@ export class AdvancedPaginationDto extends PaginationDto {
     if (typeof value === 'string') {
       return value
         .split(',')
-        .map(item => item.trim())
-        .filter(item => item !== '');
+        .map((item) => item.trim())
+        .filter((item) => item !== '');
     }
     return value as string | string[];
   })
@@ -63,8 +63,8 @@ export class AdvancedPaginationDto extends PaginationDto {
     if (typeof value === 'string') {
       return value
         .split(',')
-        .map(item => item.trim())
-        .filter(item => item !== '');
+        .map((item) => item.trim())
+        .filter((item) => item !== '');
     }
     return value as string | string[];
   })

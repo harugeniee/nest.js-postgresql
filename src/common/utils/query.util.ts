@@ -13,5 +13,5 @@ export function applyWhitelist<T extends object>(
 ): string[] | undefined {
   if (!input || input.length === 0) return undefined;
   if (!whitelist || whitelist.length === 0) return input;
-  return input.filter(r => whitelist.includes(r));
+  return input.filter((r) => whitelist.includes(r));
 }

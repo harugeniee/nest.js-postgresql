@@ -126,7 +126,7 @@ export class HealthService {
   }
 
   private getOverallStatus(serviceStatuses: HealthStatus[]): 'ok' | 'error' {
-    return serviceStatuses.every(status => status.status === 'ok')
+    return serviceStatuses.every((status) => status.status === 'ok')
       ? 'ok'
       : 'error';
   }

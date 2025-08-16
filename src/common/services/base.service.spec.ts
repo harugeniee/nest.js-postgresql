@@ -34,7 +34,7 @@ class InMemoryRepo implements BaseRepository<DummyEntity> {
     } as DummyEntity;
   }
   async save(entity: DummyEntity): Promise<DummyEntity> {
-    const idx = this.store.findIndex(e => e.id === entity.id);
+    const idx = this.store.findIndex((e) => e.id === entity.id);
     if (idx >= 0) this.store[idx] = entity;
     else this.store.push(entity);
     return entity;
@@ -43,7 +43,7 @@ class InMemoryRepo implements BaseRepository<DummyEntity> {
     id: string,
     _opts?: BaseRepositoryFindByIdOpts<DummyEntity>,
   ): Promise<DummyEntity | null> {
-    return this.store.find(e => e.id === id) || null;
+    return this.store.find((e) => e.id === id) || null;
   }
   async findOne(where: any): Promise<DummyEntity | null> {
     if (Array.isArray(where)) {
@@ -57,7 +57,7 @@ class InMemoryRepo implements BaseRepository<DummyEntity> {
   }
   private matchWhere(where: any): DummyEntity | null {
     return (
-      this.store.find(e =>
+      this.store.find((e) =>
         Object.entries(where).every(([k, v]) => (e as unknown as any)[k] === v),
       ) || null
     );
@@ -90,7 +90,7 @@ class InMemoryRepo implements BaseRepository<DummyEntity> {
     return;
   }
   async deleteById(id: string): Promise<void> {
-    this.store = this.store.filter(e => e.id !== id);
+    this.store = this.store.filter((e) => e.id !== id);
   }
   async softDeleteById(id: string): Promise<void> {
     await this.deleteById(id);
