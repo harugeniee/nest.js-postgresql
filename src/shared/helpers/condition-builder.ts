@@ -66,7 +66,7 @@ export class ConditionBuilder {
         ? data.fields
         : [data.fields];
       if (searchFields.length > 1) {
-        conditions = searchFields.map((field) => ({
+        conditions = searchFields.map(field => ({
           ...conditions,
           [field]: Like(`%${data.query}%`),
         }));

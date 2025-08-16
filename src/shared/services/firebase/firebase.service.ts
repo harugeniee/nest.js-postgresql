@@ -187,7 +187,7 @@ export class FirebaseService {
 
       // Send to each device individually since sendToDevice is deprecated
       const results = await Promise.allSettled(
-        tokens.map((token) =>
+        tokens.map(token =>
           this.messaging.send({
             token,
             ...payload,
@@ -196,10 +196,10 @@ export class FirebaseService {
       );
 
       const successCount = results.filter(
-        (result) => result.status === 'fulfilled',
+        result => result.status === 'fulfilled',
       ).length;
       const failureCount = results.filter(
-        (result) => result.status === 'rejected',
+        result => result.status === 'rejected',
       ).length;
 
       this.logger.log(

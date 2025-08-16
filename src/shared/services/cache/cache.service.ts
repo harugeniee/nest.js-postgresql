@@ -1,5 +1,10 @@
 import { InjectRedis } from '@nestjs-modules/ioredis';
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import Redis from 'ioredis';
 
 // CacheOptions defines cache configuration for consumers of CacheService
@@ -15,129 +20,161 @@ export interface CacheOptions {
 }
 
 @Injectable()
-export class CacheService {
+export class CacheService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(CacheService.name);
+  private readonly defaultTtl = 3600; // 1 hour in seconds
+
   constructor(@InjectRedis() private readonly redis: Redis) {}
 
   onModuleInit(): void {
     this.setupRedisEventListeners();
   }
 
-  private readonly defaultTtl = 3600; // 1 hour in seconds
-
-  onModuleDestroy() {
+  onModuleDestroy(): void {
     void this.redis.quit();
   }
 
   /**
-   * Setup Redis event listeners for logging
+   * Setup Redis event listeners for logging and monitoring
    */
-  private setupRedisEventListeners() {
+  private setupRedisEventListeners(): void {
     // Connection events
     this.redis.on('connect', () => {
-      console.log('🟢 Redis connected');
+      this.logger.log('🟢 Redis connected');
     });
 
     this.redis.on('ready', () => {
-      console.log('✅ Redis ready');
+      this.logger.log('✅ Redis ready');
     });
 
-    this.redis.on('error', (error) => {
-      console.error('❌ Redis error:', error);
+    this.redis.on('error', (error: Error) => {
+      this.logger.error('❌ Redis error:', error);
     });
 
     this.redis.on('close', () => {
-      console.log('🔴 Redis connection closed');
+      this.logger.log('🔴 Redis connection closed');
     });
 
     this.redis.on('reconnecting', () => {
-      console.log('🔄 Redis reconnecting...');
+      this.logger.log('🔄 Redis reconnecting...');
     });
 
     // Command events
-    this.redis.on('command', (command) => {
-      console.log('📤 Redis command sent:', command);
+    this.redis.on('command', (command: string[]) => {
+      this.logger.debug(`📤 Redis command sent: ${command.join(' ')}`);
     });
 
-    // Monitor mode for real-time command logging
-    void this.startMonitoring();
+    // Start monitoring in development mode
+    if (process.env.NODE_ENV === 'development') {
+      void this.startMonitoring();
+    }
   }
 
   /**
-   * Start Redis monitoring mode to log all commands
+   * Start Redis monitoring mode to log all commands (development only)
    */
-  private async startMonitoring() {
+  private async startMonitoring(): Promise<void> {
     try {
-      // Use monitor() method which returns a promise
       await this.redis.monitor();
 
-      // Set up event listener for monitor events
       this.redis.on(
         'monitor',
         (time: number, args: string[], source: string, database: number) => {
           const timestamp = new Date(time * 1000).toISOString();
-          console.log(
+          this.logger.debug(
             `🔍 [${timestamp}] Redis ${source} DB${database}: ${args.join(' ')}`,
           );
         },
       );
 
-      console.log('📊 Redis monitoring started');
+      this.logger.log('📊 Redis monitoring started');
     } catch (error) {
-      console.error('❌ Failed to start Redis monitoring:', error);
+      this.logger.error('❌ Failed to start Redis monitoring:', error);
     }
   }
 
   /**
-   * Legacy monitor method (kept for backward compatibility)
+   * Get Redis server information
    */
-
-  async getRedisInfo() {
-    const info = await this.redis.info();
-    console.log('Redis info:', info);
+  async getRedisInfo(): Promise<string> {
+    try {
+      const info = await this.redis.info();
+      this.logger.debug('Redis info retrieved');
+      return info;
+    } catch (error) {
+      this.logger.error('Failed to get Redis info:', error);
+      throw error;
+    }
   }
 
-  async clearCache() {
-    await this.redis.flushall();
-    console.log('🧹 Redis cache cleared');
+  /**
+   * Clear all cache (use with caution in production)
+   */
+  async clearCache(): Promise<void> {
+    try {
+      await this.redis.flushall();
+      this.logger.log('🧹 Redis cache cleared');
+    } catch (error) {
+      this.logger.error('Failed to clear cache:', error);
+      throw error;
+    }
   }
 
+  /**
+   * Get TTL for a key
+   */
   async getTtl(key: string): Promise<number> {
-    return await this.redis.ttl(key);
+    try {
+      return await this.redis.ttl(key);
+    } catch (error) {
+      this.logger.error(`Failed to get TTL for key ${key}:`, error);
+      throw error;
+    }
   }
 
   /**
    * Set cache with key and value
    */
-  async set(key: string, value: any, ttlInSec?: number): Promise<void> {
-    const ttl = ttlInSec ?? this.defaultTtl;
-    const serializedValue = JSON.stringify(value);
+  async set(key: string, value: unknown, ttlInSec?: number): Promise<void> {
+    try {
+      const ttl = ttlInSec ?? this.defaultTtl;
+      const serializedValue = JSON.stringify(value);
 
-    console.log(`💾 Setting cache key: ${key}, TTL: ${ttl}s`);
+      this.logger.debug(`💾 Setting cache key: ${key}, TTL: ${ttl}s`);
 
-    if (ttl >= 0) {
-      await this.redis.setex(key, ttl, serializedValue);
-    } else {
-      await this.redis.set(key, serializedValue);
+      if (ttl >= 0) {
+        await this.redis.setex(key, ttl, serializedValue);
+      } else {
+        await this.redis.set(key, serializedValue);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to set cache key ${key}:`, error);
+      throw error;
     }
   }
 
   /**
    * Get cache value by key
    */
-  async get(key: string): Promise<any> {
-    console.log(`🔍 Getting cache key: ${key}`);
-    const value = await this.redis.get(key);
-
-    if (!value) {
-      console.log(`❌ Cache miss for key: ${key}`);
-      return null;
-    }
-
-    console.log(`✅ Cache hit for key: ${key}`);
+  async get<T>(key: string): Promise<T | null> {
     try {
-      return JSON.parse(value);
-    } catch {
-      return value;
+      this.logger.debug(`🔍 Getting cache key: ${key}`);
+      const value = await this.redis.get(key);
+
+      if (!value) {
+        this.logger.debug(`❌ Cache miss for key: ${key}`);
+        return null;
+      }
+
+      this.logger.debug(`✅ Cache hit for key: ${key}`);
+      try {
+        return JSON.parse(value) as T;
+      } catch {
+        return value as T;
+      }
+    } catch (error) {
+      this.logger.error(`Failed to get cache key ${key}:`, error);
+      throw error;
     }
   }
 
@@ -145,16 +182,26 @@ export class CacheService {
    * Delete cache by key
    */
   async delete(key: string): Promise<void> {
-    console.log(`🗑️ Deleting cache key: ${key}`);
-    await this.redis.del(key);
+    try {
+      this.logger.debug(`🗑️ Deleting cache key: ${key}`);
+      await this.redis.del(key);
+    } catch (error) {
+      this.logger.error(`Failed to delete cache key ${key}:`, error);
+      throw error;
+    }
   }
 
   /**
    * Check if key exists
    */
   async exists(key: string): Promise<boolean> {
-    const result = await this.redis.exists(key);
-    return result === 1;
+    try {
+      const result = await this.redis.exists(key);
+      return result === 1;
+    } catch (error) {
+      this.logger.error(`Failed to check existence of key ${key}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -163,7 +210,7 @@ export class CacheService {
   async setWithPrefix(
     prefix: string,
     key: string,
-    value: any,
+    value: unknown,
     ttl?: number,
   ): Promise<void> {
     const fullKey = `${prefix}:${key}`;
@@ -173,9 +220,9 @@ export class CacheService {
   /**
    * Get cache with prefix
    */
-  async getWithPrefix(prefix: string, key: string): Promise<any> {
+  async getWithPrefix<T>(prefix: string, key: string): Promise<T | null> {
     const fullKey = `${prefix}:${key}`;
-    return this.get(fullKey);
+    return this.get<T>(fullKey);
   }
 
   /**
@@ -187,51 +234,43 @@ export class CacheService {
   }
 
   /**
-   * Clear cache by pattern (using KEYS - not recommended for production with large datasets)
-   */
-  async clearCacheByPattern(pattern: string): Promise<void> {
-    const keys = await this.redis.keys(`${pattern}:*`);
-    if (keys.length > 0) {
-      await this.redis.del(...keys);
-    }
-  }
-
-  /**
-   * Delete keys by pattern using SCAN (safe for production)
+   * Clear cache by pattern using SCAN (safe for production)
    * @param pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*')
    * @param count - Number of keys to scan per iteration (default: 100)
    */
-  async deleteKeysByPattern(
-    pattern: string,
-    count: number = 100,
-  ): Promise<number> {
-    let cursor = 0;
-    let deletedCount = 0;
+  async deleteKeysByPattern(pattern: string, count = 100): Promise<number> {
+    try {
+      let cursor = 0;
+      let deletedCount = 0;
 
-    do {
-      const result = await this.redis.scan(
-        cursor,
-        'MATCH',
-        pattern,
-        'COUNT',
-        count,
-      );
-      cursor = parseInt(result[0], 10);
-      const keys = result[1];
-
-      if (keys.length > 0) {
-        await this.redis.del(...keys);
-        deletedCount += keys.length;
-        console.log(
-          `🗑️ Deleted ${keys.length} keys matching pattern: ${pattern}`,
+      do {
+        const result = await this.redis.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          count,
         );
-      }
-    } while (cursor !== 0);
+        cursor = parseInt(result[0], 10);
+        const keys = result[1];
 
-    console.log(
-      `✅ Total deleted: ${deletedCount} keys for pattern: ${pattern}`,
-    );
-    return deletedCount;
+        if (keys.length > 0) {
+          await this.redis.del(...keys);
+          deletedCount += keys.length;
+          this.logger.debug(
+            `🗑️ Deleted ${keys.length} keys matching pattern: ${pattern}`,
+          );
+        }
+      } while (cursor !== 0);
+
+      this.logger.log(
+        `✅ Total deleted: ${deletedCount} keys for pattern: ${pattern}`,
+      );
+      return deletedCount;
+    } catch (error) {
+      this.logger.error(`Failed to delete keys by pattern ${pattern}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -241,35 +280,40 @@ export class CacheService {
    */
   async deleteKeysByPatternAsync(
     pattern: string,
-    count: number = 100,
+    count = 100,
   ): Promise<number> {
-    let cursor = 0;
-    let deletedCount = 0;
+    try {
+      let cursor = 0;
+      let deletedCount = 0;
 
-    do {
-      const result = await this.redis.scan(
-        cursor,
-        'MATCH',
-        pattern,
-        'COUNT',
-        count,
-      );
-      cursor = parseInt(result[0], 10);
-      const keys = result[1];
-
-      if (keys.length > 0) {
-        await this.redis.unlink(...keys); // Non-blocking delete
-        deletedCount += keys.length;
-        console.log(
-          `🗑️ Unlinked ${keys.length} keys matching pattern: ${pattern}`,
+      do {
+        const result = await this.redis.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          count,
         );
-      }
-    } while (cursor !== 0);
+        cursor = parseInt(result[0], 10);
+        const keys = result[1];
 
-    console.log(
-      `✅ Total unlinked: ${deletedCount} keys for pattern: ${pattern}`,
-    );
-    return deletedCount;
+        if (keys.length > 0) {
+          await this.redis.unlink(...keys); // Non-blocking delete
+          deletedCount += keys.length;
+          this.logger.debug(
+            `🗑️ Unlinked ${keys.length} keys matching pattern: ${pattern}`,
+          );
+        }
+      } while (cursor !== 0);
+
+      this.logger.log(
+        `✅ Total unlinked: ${deletedCount} keys for pattern: ${pattern}`,
+      );
+      return deletedCount;
+    } catch (error) {
+      this.logger.error(`Failed to unlink keys by pattern ${pattern}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -277,29 +321,33 @@ export class CacheService {
    * @param pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*')
    * @param count - Number of keys to scan per iteration (default: 100)
    */
-  async findKeysByPattern(
-    pattern: string,
-    count: number = 100,
-  ): Promise<string[]> {
-    let cursor = 0;
-    const keys: string[] = [];
+  async findKeysByPattern(pattern: string, count = 100): Promise<string[]> {
+    try {
+      let cursor = 0;
+      const keys: string[] = [];
 
-    do {
-      const result = await this.redis.scan(
-        cursor,
-        'MATCH',
-        pattern,
-        'COUNT',
-        count,
+      do {
+        const result = await this.redis.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          count,
+        );
+        cursor = parseInt(result[0], 10);
+        const foundKeys = result[1];
+
+        keys.push(...foundKeys);
+      } while (cursor !== 0);
+
+      this.logger.debug(
+        `🔍 Found ${keys.length} keys matching pattern: ${pattern}`,
       );
-      cursor = parseInt(result[0], 10);
-      const foundKeys = result[1];
-
-      keys.push(...foundKeys);
-    } while (cursor !== 0);
-
-    console.log(`🔍 Found ${keys.length} keys matching pattern: ${pattern}`);
-    return keys;
+      return keys;
+    } catch (error) {
+      this.logger.error(`Failed to find keys by pattern ${pattern}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -307,29 +355,33 @@ export class CacheService {
    * @param pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*')
    * @param count - Number of keys to scan per iteration (default: 100)
    */
-  async countKeysByPattern(
-    pattern: string,
-    count: number = 100,
-  ): Promise<number> {
-    let cursor = 0;
-    let totalCount = 0;
+  async countKeysByPattern(pattern: string, count = 100): Promise<number> {
+    try {
+      let cursor = 0;
+      let totalCount = 0;
 
-    do {
-      const result = await this.redis.scan(
-        cursor,
-        'MATCH',
-        pattern,
-        'COUNT',
-        count,
+      do {
+        const result = await this.redis.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          count,
+        );
+        cursor = parseInt(result[0], 10);
+        const keys = result[1];
+
+        totalCount += keys.length;
+      } while (cursor !== 0);
+
+      this.logger.debug(
+        `📊 Found ${totalCount} keys matching pattern: ${pattern}`,
       );
-      cursor = parseInt(result[0], 10);
-      const keys = result[1];
-
-      totalCount += keys.length;
-    } while (cursor !== 0);
-
-    console.log(`📊 Found ${totalCount} keys matching pattern: ${pattern}`);
-    return totalCount;
+      return totalCount;
+    } catch (error) {
+      this.logger.error(`Failed to count keys by pattern ${pattern}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -339,17 +391,22 @@ export class CacheService {
    */
   async deleteKeysByPatterns(
     patterns: string[],
-    count: number = 100,
+    count = 100,
   ): Promise<Record<string, number>> {
-    const results: Record<string, number> = {};
+    try {
+      const results: Record<string, number> = {};
 
-    for (const pattern of patterns) {
-      const deletedCount = await this.deleteKeysByPattern(pattern, count);
-      results[pattern] = deletedCount;
+      for (const pattern of patterns) {
+        const deletedCount = await this.deleteKeysByPattern(pattern, count);
+        results[pattern] = deletedCount;
+      }
+
+      this.logger.log(`✅ Deleted keys by patterns:`, results);
+      return results;
+    } catch (error) {
+      this.logger.error('Failed to delete keys by patterns:', error);
+      throw error;
     }
-
-    console.log(`✅ Deleted keys by patterns:`, results);
-    return results;
   }
 
   /**
@@ -357,10 +414,7 @@ export class CacheService {
    * @param prefix - Key prefix (e.g., 'ABC:NBN:12')
    * @param count - Number of keys to scan per iteration (default: 100)
    */
-  async deleteKeysByPrefix(
-    prefix: string,
-    count: number = 100,
-  ): Promise<number> {
+  async deleteKeysByPrefix(prefix: string, count = 100): Promise<number> {
     return this.deleteKeysByPattern(`${prefix}*`, count);
   }
 
@@ -368,76 +422,98 @@ export class CacheService {
    * Delete keys by suffix (convenience method)
    * @param suffix - Key suffix (e.g., ':123')
    * @param count - Number of keys to scan per iteration (default: 100)
-   *
-   * Pattern matching examples:
-   * - *suffix - Ends with suffix (e.g., '*:123', '*_expired')
-   * - prefix* - Starts with prefix (e.g., 'user:*', 'ABC:NBN:*')
-   * - *pattern* - Contains pattern in the middle (e.g., '*:user:*', '*cache*')
-   * - *:12? - Ends with :12 + 1 character (e.g., '*:123', '*:12a')
-   * - *:12[34] - Ends with :123 or :124
    */
-  async deleteKeysBySuffix(
-    suffix: string,
-    count: number = 100,
-  ): Promise<number> {
-    return this.deleteKeysByPattern(`${suffix}`, count);
+  async deleteKeysBySuffix(suffix: string, count = 100): Promise<number> {
+    return this.deleteKeysByPattern(`*${suffix}`, count);
   }
 
   /**
    * Reset all cache
    */
   async reset(): Promise<void> {
-    await this.redis.flushall();
-  }
-
-  /**
-   * Set lock
-   */
-  async setLock(identifier: string, ttl: number): Promise<boolean> {
-    const key = `lock:${identifier}`;
-    const lock = await this.redis.get(key);
-    if (lock) {
-      return true;
-    } else {
-      await this.redis.setex(key, ttl, 'true');
-      return false;
+    try {
+      await this.redis.flushall();
+      this.logger.log('🧹 Redis cache reset');
+    } catch (error) {
+      this.logger.error('Failed to reset cache:', error);
+      throw error;
     }
   }
 
   /**
-   * Remember pattern (Cache-Aside)
+   * Set distributed lock
+   * @param identifier - Lock identifier
+   * @param ttl - Lock TTL in seconds
+   * @returns true if lock was acquired, false if already locked
+   */
+  async setLock(identifier: string, ttl: number): Promise<boolean> {
+    try {
+      const key = `lock:${identifier}`;
+      const lock = await this.redis.get(key);
+      if (lock) {
+        return false; // Already locked
+      } else {
+        await this.redis.setex(key, ttl, 'true');
+        return true; // Lock acquired
+      }
+    } catch (error) {
+      this.logger.error(`Failed to set lock for ${identifier}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Release distributed lock
+   * @param identifier - Lock identifier
+   */
+  async releaseLock(identifier: string): Promise<void> {
+    try {
+      const key = `lock:${identifier}`;
+      await this.redis.del(key);
+      this.logger.debug(`🔓 Lock released for: ${identifier}`);
+    } catch (error) {
+      this.logger.error(`Failed to release lock for ${identifier}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remember pattern (Cache-Aside pattern)
+   * @param key - Cache key
+   * @param factory - Function to generate value if not cached
+   * @param ttlInSec - Optional TTL override
    */
   async remember<T>(
     key: string,
-    cb: () => Promise<T>,
+    factory: () => Promise<T>,
     ttlInSec?: number,
   ): Promise<T | null> {
-    const exists = (await this.get(key)) as T | null;
-    if (!exists) {
-      try {
-        const response = await cb();
-        if (ttlInSec) {
-          await this.set(key, response as any, ttlInSec);
-        } else {
-          await this.set(key, response as any);
-        }
-        return response;
-      } catch {
-        return null;
+    try {
+      const existing = await this.get<T>(key);
+      if (existing !== null) {
+        return existing;
       }
+
+      const response = await factory();
+      if (response !== null && response !== undefined) {
+        await this.set(key, response, ttlInSec);
+      }
+      return response;
+    } catch (error) {
+      this.logger.error(`Failed to remember value for key ${key}:`, error);
+      return null;
     }
-    return exists;
   }
 
   /**
    * Get or Set cache with prefix
    */
-  async getOrSetWithPrefix(
+  async getOrSetWithPrefix<T>(
     prefix: string,
     key: string,
-    factory: () => Promise<any>,
+    factory: () => Promise<T>,
     ttl?: number,
-  ): Promise<any> {
+  ): Promise<T | null> {
     const fullKey = `${prefix}:${key}`;
     return this.remember(fullKey, factory, ttl);
   }
@@ -458,52 +534,60 @@ export class CacheService {
     limit: number,
     windowInSeconds: number,
   ): Promise<{ current: number; remaining: number; resetTime: number }> {
-    const luaScript = `
-      local key = KEYS[1]
-      local limit = tonumber(ARGV[1])
-      local window = tonumber(ARGV[2])
-      local current_time = tonumber(ARGV[3])
-      
-      -- Get current count and window start time
-      local current = redis.call('GET', key)
-      local window_start = redis.call('GET', key .. ':window')
-      
-      -- If no window exists or window has expired, start new window
-      if not window_start or tonumber(window_start) < current_time - window then
-        redis.call('SETEX', key, window, '1')
-        redis.call('SETEX', key .. ':window', window, current_time)
-        return {1, limit - 1, current_time + window}
-      end
-      
-      -- Check if limit exceeded
-      if tonumber(current) >= limit then
+    try {
+      const luaScript = `
+        local key = KEYS[1]
+        local limit = tonumber(ARGV[1])
+        local window = tonumber(ARGV[2])
+        local current_time = tonumber(ARGV[3])
+        
+        -- Get current count and window start time
+        local current = redis.call('GET', key)
+        local window_start = redis.call('GET', key .. ':window')
+        
+        -- If no window exists or window has expired, start new window
+        if not window_start or tonumber(window_start) < current_time - window then
+          redis.call('SETEX', key, window, '1')
+          redis.call('SETEX', key .. ':window', window, current_time)
+          return {1, limit - 1, current_time + window}
+        end
+        
+        -- Check if limit exceeded
+        if tonumber(current) >= limit then
+          local reset_time = tonumber(window_start) + window
+          return {tonumber(current), 0, reset_time}
+        end
+        
+        -- Increment counter
+        local new_count = redis.call('INCR', key)
+        local remaining = limit - new_count
         local reset_time = tonumber(window_start) + window
-        return {tonumber(current), 0, reset_time}
-      end
-      
-      -- Increment counter
-      local new_count = redis.call('INCR', key)
-      local remaining = limit - new_count
-      local reset_time = tonumber(window_start) + window
-      
-      return {new_count, remaining, reset_time}
-    `;
+        
+        return {new_count, remaining, reset_time}
+      `;
 
-    const currentTime = Math.floor(Date.now() / 1000);
-    const result = (await this.redis.eval(
-      luaScript,
-      1, // number of keys
-      key, // key
-      limit.toString(), // limit
-      windowInSeconds.toString(), // window
-      currentTime.toString(), // current time
-    )) as number[];
+      const currentTime = Math.floor(Date.now() / 1000);
+      const result = (await this.redis.eval(
+        luaScript,
+        1, // number of keys
+        key, // key
+        limit.toString(), // limit
+        windowInSeconds.toString(), // window
+        currentTime.toString(), // current time
+      )) as number[];
 
-    return {
-      current: result[0],
-      remaining: result[1],
-      resetTime: result[2],
-    };
+      return {
+        current: result[0],
+        remaining: result[1],
+        resetTime: result[2],
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to perform atomic increment for key ${key}:`,
+        error,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -512,58 +596,66 @@ export class CacheService {
    */
   async compareAndSwap(
     key: string,
-    expectedValue: any,
-    newValue: any,
+    expectedValue: unknown,
+    newValue: unknown,
     ttl?: number,
   ): Promise<boolean> {
-    const luaScript = `
-      local key = KEYS[1]
-      local expected = ARGV[1]
-      local new_val = ARGV[2]
-      local ttl = tonumber(ARGV[3])
-      
-      -- Get current value
-      local current = redis.call('GET', key)
-      
-      -- If key doesn't exist and expected is nil, set the value
-      if not current and expected == 'NIL' then
-        if ttl and ttl > 0 then
-          redis.call('SETEX', key, ttl, new_val)
-        else
-          redis.call('SET', key, new_val)
+    try {
+      const luaScript = `
+        local key = KEYS[1]
+        local expected = ARGV[1]
+        local new_val = ARGV[2]
+        local ttl = tonumber(ARGV[3])
+        
+        -- Get current value
+        local current = redis.call('GET', key)
+        
+        -- If key doesn't exist and expected is nil, set the value
+        if not current and expected == 'NIL' then
+          if ttl and ttl > 0 then
+            redis.call('SETEX', key, ttl, new_val)
+          else
+            redis.call('SET', key, new_val)
+          end
+          return 1
         end
-        return 1
-      end
-      
-      -- If current value matches expected, update it
-      if current == expected then
-        if ttl and ttl > 0 then
-          redis.call('SETEX', key, ttl, new_val)
-        else
-          redis.call('SET', key, new_val)
+        
+        -- If current value matches expected, update it
+        if current == expected then
+          if ttl and ttl > 0 then
+            redis.call('SETEX', key, ttl, new_val)
+          else
+            redis.call('SET', key, new_val)
+          end
+          return 1
         end
-        return 1
-      end
-      
-      -- Values don't match, return 0
-      return 0
-    `;
+        
+        -- Values don't match, return 0
+        return 0
+      `;
 
-    const expected =
-      expectedValue === null ? 'NIL' : JSON.stringify(expectedValue);
-    const newVal = JSON.stringify(newValue);
-    const ttlStr = ttl ? ttl.toString() : '0';
+      const expected =
+        expectedValue === null ? 'NIL' : JSON.stringify(expectedValue);
+      const newVal = JSON.stringify(newValue);
+      const ttlStr = ttl ? ttl.toString() : '0';
 
-    const result = (await this.redis.eval(
-      luaScript,
-      1, // number of keys
-      key, // key
-      expected, // expected value
-      newVal, // new value
-      ttlStr, // TTL
-    )) as number;
+      const result = (await this.redis.eval(
+        luaScript,
+        1, // number of keys
+        key, // key
+        expected, // expected value
+        newVal, // new value
+        ttlStr, // TTL
+      )) as number;
 
-    return result === 1;
+      return result === 1;
+    } catch (error) {
+      this.logger.error(
+        `Failed to perform compare and swap for key ${key}:`,
+        error,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -574,47 +666,52 @@ export class CacheService {
     operations: {
       type: 'set' | 'delete' | 'increment';
       key: string;
-      value?: any;
+      value?: unknown;
       ttl?: number;
     }[],
   ): Promise<boolean> {
-    const luaScript = `
-      local operations = cjson.decode(ARGV[1])
-      local results = {}
-      
-      for i, op in ipairs(operations) do
-        if op.type == 'set' then
-          if op.ttl and op.ttl > 0 then
-            redis.call('SETEX', op.key, op.ttl, op.value)
-          else
-            redis.call('SET', op.key, op.value)
+    try {
+      const luaScript = `
+        local operations = cjson.decode(ARGV[1])
+        local results = {}
+        
+        for i, op in ipairs(operations) do
+          if op.type == 'set' then
+            if op.ttl and op.ttl > 0 then
+              redis.call('SETEX', op.key, op.ttl, op.value)
+            else
+              redis.call('SET', op.key, op.value)
+            end
+            table.insert(results, 'OK')
+          elseif op.type == 'delete' then
+            local deleted = redis.call('DEL', op.key)
+            table.insert(results, deleted)
+          elseif op.type == 'increment' then
+            local incremented = redis.call('INCR', op.key)
+            table.insert(results, incremented)
           end
-          table.insert(results, 'OK')
-        elseif op.type == 'delete' then
-          local deleted = redis.call('DEL', op.key)
-          table.insert(results, deleted)
-        elseif op.type == 'increment' then
-          local incremented = redis.call('INCR', op.key)
-          table.insert(results, incremented)
         end
-      end
-      
-      return cjson.encode(results)
-    `;
+        
+        return cjson.encode(results)
+      `;
 
-    const operationsData = operations.map((op) => ({
-      type: op.type,
-      key: op.key,
-      value: op.value ? JSON.stringify(op.value) : null,
-      ttl: op.ttl || 0,
-    }));
+      const operationsData = operations.map((op) => ({
+        type: op.type,
+        key: op.key,
+        value: op.value ? JSON.stringify(op.value) : null,
+        ttl: op.ttl || 0,
+      }));
 
-    const result = (await this.redis.eval(
-      luaScript,
-      0, // no keys
-      JSON.stringify(operationsData), // operations data
-    )) as string;
+      const result = (await this.redis.eval(
+        luaScript,
+        0, // no keys
+        JSON.stringify(operationsData), // operations data
+      )) as string;
 
-    return result !== null;
+      return result !== null;
+    } catch (error) {
+      this.logger.error('Failed to perform atomic multi-operation:', error);
+      throw error;
+    }
   }
 }
