@@ -26,6 +26,7 @@ export interface BaseRepositoryFindAndCountOpts<T> {
 export interface BaseRepository<T> {
   create(data: DeepPartial<T>): T;
   save(entity: T, ctx?: { queryRunner?: QueryRunner }): Promise<T>;
+  saveMany(entities: T[], ctx?: { queryRunner?: QueryRunner }): Promise<T[]>;
   findById(id: string, opts?: BaseRepositoryFindByIdOpts<T>): Promise<T | null>;
   findOne(
     where: FindOptionsWhere<T> | FindOptionsWhere<T>[],

@@ -31,12 +31,12 @@ export class AuthGuard implements CanActivate {
     return type === 'Bearer' ? token : undefined;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/require-await
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected async afterVerify(payload: AuthPayload): Promise<void> {
     return;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/require-await
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected async verifyCache(payload: AuthPayload): Promise<void> {
     return;
   }

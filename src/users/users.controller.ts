@@ -48,6 +48,6 @@ export class UsersController {
   @Get(':id')
   @UseGuards(JwtAccessTokenGuard)
   async getUserById(@Param('id', new SnowflakeIdPipe()) id: string) {
-    return await this.usersService.findOne({ id });
+    return await this.usersService.findById(id);
   }
 }

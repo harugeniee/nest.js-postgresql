@@ -28,6 +28,16 @@ export class TypeOrmBaseRepository<T extends { id: string }>
     return await this.repo.save(entity);
   }
 
+  async saveMany(
+    entities: T[],
+    ctx?: { queryRunner?: QueryRunner },
+  ): Promise<T[]> {
+    if (ctx?.queryRunner) {
+      return await ctx.queryRunner.manager.save(entities);
+    }
+    return await this.repo.save(entities);
+  }
+
   async findById(
     id: string,
     opts?: BaseRepositoryFindByIdOpts<T>,

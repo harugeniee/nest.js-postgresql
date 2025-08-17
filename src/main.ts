@@ -45,7 +45,6 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new I18nHttpExceptionFilter(i18nService));
 
   app.connectMicroservice<RmqOptions>({
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     transport: Transport.RMQ,
     options: {
       urls: [

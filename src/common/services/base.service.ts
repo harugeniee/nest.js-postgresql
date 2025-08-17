@@ -129,6 +129,44 @@ export abstract class BaseService<T extends { id: string }> {
     }
   }
 
+  /**
+   * Create multiple entities in batch
+   * @param data Array of data objects to create entities from
+   * @param ctx Transaction context
+   * @returns Array of created entities
+   */
+  async createMany(data: DeepPartial<T>[], ctx?: TxCtx): Promise<T[]> {
+    try {
+      const preparedData: DeepPartial<T>[] = [];
+
+      // Prepare all data using beforeCreate hook
+      for (const item of data) {
+        const prepared = await this.beforeCreate(item);
+        preparedData.push(prepared);
+      }
+
+      // Create entities one by one since repo.create expects single entity
+      const entities: T[] = [];
+      for (const item of preparedData) {
+        const entity = this.repo.create(item);
+        entities.push(entity);
+      }
+
+      const saved = await this.repo.saveMany(entities, ctx);
+
+      // Execute afterCreate hook for each entity
+      for (const entity of saved) {
+        await this.afterCreate(entity);
+        await this.invalidateCacheForEntity(entity.id);
+        this.emitEvent(`${this.entityName}.created`, { after: entity });
+      }
+
+      return saved;
+    } catch (error) {
+      mapTypeOrmError(error);
+    }
+  }
+
   async findById(id: string, opts?: QOpts<T>, ctx?: TxCtx): Promise<T> {
     const safe = this.applyQueryOpts(opts);
     const cacheKey = this.cache ? `${this.cache.prefix}:id:${id}` : undefined;
@@ -375,6 +413,45 @@ export abstract class BaseService<T extends { id: string }> {
     }
   }
 
+  /**
+   * Update multiple entities in batch
+   * @param updates Array of objects containing id and patch data
+   * @param ctx Transaction context
+   * @returns Array of updated entities
+   */
+  async updateMany(
+    updates: Array<{ id: string; patch: DeepPartial<T> }>,
+    ctx?: TxCtx,
+  ): Promise<T[]> {
+    try {
+      const updatedEntities: T[] = [];
+
+      // Execute beforeUpdate hook for each update
+      for (const { id, patch } of updates) {
+        await this.beforeUpdate(id, patch);
+      }
+
+      // Perform all updates
+      for (const { id, patch } of updates) {
+        await this.repo.updateById(id, patch as QueryDeepPartialEntity<T>, ctx);
+      }
+
+      // Fetch updated entities and execute afterUpdate hooks
+      for (const { id } of updates) {
+        const updated = await this.repo.findById(id);
+        if (!updated) notFound(this.entityName, id);
+        await this.afterUpdate(updated);
+        await this.invalidateCacheForEntity(id);
+        this.emitEvent(`${this.entityName}.updated`, { after: updated });
+        updatedEntities.push(updated);
+      }
+
+      return updatedEntities;
+    } catch (error) {
+      mapTypeOrmError(error);
+    }
+  }
+
   async remove(id: string, ctx?: TxCtx): Promise<void> {
     try {
       await this.beforeDelete(id);
@@ -382,6 +459,34 @@ export abstract class BaseService<T extends { id: string }> {
       await this.afterDelete(id);
       await this.invalidateCacheForEntity(id);
       this.emitEvent(`${this.entityName}.deleted`, { before: { id } });
+    } catch (error) {
+      mapTypeOrmError(error);
+    }
+  }
+
+  /**
+   * Remove multiple entities in batch
+   * @param ids Array of entity IDs to remove
+   * @param ctx Transaction context
+   */
+  async removeMany(ids: string[], ctx?: TxCtx): Promise<void> {
+    try {
+      // Execute beforeDelete hook for each entity
+      for (const id of ids) {
+        await this.beforeDelete(id);
+      }
+
+      // Perform all deletions
+      for (const id of ids) {
+        await this.repo.deleteById(id, ctx);
+      }
+
+      // Execute afterDelete hook and cache invalidation for each entity
+      for (const id of ids) {
+        await this.afterDelete(id);
+        await this.invalidateCacheForEntity(id);
+        this.emitEvent(`${this.entityName}.deleted`, { before: { id } });
+      }
     } catch (error) {
       mapTypeOrmError(error);
     }
@@ -395,6 +500,35 @@ export abstract class BaseService<T extends { id: string }> {
       await this.afterDelete(id);
       await this.invalidateCacheForEntity(id);
       this.emitEvent(`${this.entityName}.deleted`, { before: { id } });
+    } catch (error) {
+      mapTypeOrmError(error);
+    }
+  }
+
+  /**
+   * Soft delete multiple entities in batch
+   * @param ids Array of entity IDs to soft delete
+   * @param ctx Transaction context
+   */
+  async softDeleteMany(ids: string[], ctx?: TxCtx): Promise<void> {
+    if (!this.softDeleteEnabled) return;
+    try {
+      // Execute beforeDelete hook for each entity
+      for (const id of ids) {
+        await this.beforeDelete(id);
+      }
+
+      // Perform all soft deletions
+      for (const id of ids) {
+        await this.repo.softDeleteById(id, ctx);
+      }
+
+      // Execute afterDelete hook and cache invalidation for each entity
+      for (const id of ids) {
+        await this.afterDelete(id);
+        await this.invalidateCacheForEntity(id);
+        this.emitEvent(`${this.entityName}.deleted`, { before: { id } });
+      }
     } catch (error) {
       mapTypeOrmError(error);
     }
