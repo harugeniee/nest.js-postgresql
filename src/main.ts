@@ -2,7 +2,7 @@ import helmet from 'helmet';
 import * as morgan from 'morgan';
 import { I18nService } from 'nestjs-i18n';
 
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ConsoleLogger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { RmqOptions, Transport } from '@nestjs/microservices';
@@ -13,7 +13,12 @@ import { I18nHttpExceptionFilter } from './common/filters/http-exception.filter'
 import { ResponseInterceptor } from './shared/interceptors/response.interceptor';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: new ConsoleLogger({
+      prefix: 'API',
+      showHidden: true,
+    }),
+  });
   const configService = app.get(ConfigService);
   const port =
     (configService.get<number>('PORT', { infer: true }) as number) || 3000;

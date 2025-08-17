@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsOptional, IsString } from 'class-validator';
+
 import { PaginationDto } from './pagination.dto';
 
 export class AdvancedPaginationDto extends PaginationDto {
@@ -7,7 +8,7 @@ export class AdvancedPaginationDto extends PaginationDto {
   @IsArray()
   @IsString({ each: true })
   @ArrayMaxSize(3)
-  @Transform(({ value }: { value: any }): string | string[] => {
+  @Transform(({ value }: { value: string }): string | string[] => {
     if (typeof value === 'string') {
       return value
         .split(',')
@@ -45,7 +46,7 @@ export class AdvancedPaginationDto extends PaginationDto {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(3)
-  @Transform(({ value }: { value: any }): string | string[] => {
+  @Transform(({ value }: { value: string }): string | string[] => {
     if (typeof value === 'string') {
       return value
         .split(',')
@@ -59,7 +60,7 @@ export class AdvancedPaginationDto extends PaginationDto {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(3)
-  @Transform(({ value }: { value: any }): string | string[] => {
+  @Transform(({ value }: { value: string }): string | string[] => {
     if (typeof value === 'string') {
       return value
         .split(',')
