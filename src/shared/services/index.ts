@@ -5,5 +5,3 @@ export * from './cache/cache.service';
 export * from './cache/cache.module';
 export * from './rabbitmq/rabbitmq.service';
 export * from './rabbitmq/rabbitmq.module';
-export * from './websocket/websocket.service';
-export * from './websocket/websocket.module';

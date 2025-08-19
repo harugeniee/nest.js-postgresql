@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { AdvancedPaginationDto } from 'src/common/dto';
 import { PaginationFormatter } from 'src/shared/helpers/pagination-formatter';
 import { QueryRunner } from 'typeorm';
@@ -104,8 +105,11 @@ class InMemoryRepo implements BaseRepository<DummyEntity> {
     return [result, total];
   }
 
-  async updateById(_id: string): Promise<void> {
-    return;
+  async updateById(id: string, patch: Partial<DummyEntity>): Promise<void> {
+    const idx = this.store.findIndex((e) => e.id === id);
+    if (idx >= 0) {
+      this.store[idx] = { ...this.store[idx], ...patch };
+    }
   }
 
   async deleteById(id: string): Promise<void> {
@@ -125,7 +129,7 @@ class InMemoryRepo implements BaseRepository<DummyEntity> {
   }
 
   supportsSoftDelete(): boolean {
-    return false;
+    return true;
   }
 }
 
@@ -224,8 +228,11 @@ describe('BaseService', () => {
 
     describe('updateMany', () => {
       it('should update multiple entities in batch', async () => {
-        // First create some entities
-        const entities = await service.createMany([
+        // First create some entities in a fresh service instance
+        const freshRepo = new InMemoryRepo();
+        const freshService = new DummyService(freshRepo, { entityName: 'Dummy' });
+        
+        const entities = await freshService.createMany([
           { name: 'Original 1' },
           { name: 'Original 2' },
         ]);
@@ -235,7 +242,7 @@ describe('BaseService', () => {
           { id: entities[1].id, patch: { name: 'Updated 2' } },
         ];
 
-        const result = await service.updateMany(updates);
+        const result = await freshService.updateMany(updates);
 
         expect(result).toHaveLength(2);
         expect(result[0].name).toBe('Updated 1');
@@ -250,8 +257,12 @@ describe('BaseService', () => {
 
     describe('removeMany', () => {
       it('should remove multiple entities in batch', async () => {
+        // Use a fresh service instance to avoid interference
+        const freshRepo = new InMemoryRepo();
+        const freshService = new DummyService(freshRepo, { entityName: 'Dummy' });
+        
         // First create some entities
-        const entities = await service.createMany([
+        const entities = await freshService.createMany([
           { name: 'To Delete 1' },
           { name: 'To Delete 2' },
           { name: 'To Keep' },
@@ -259,10 +270,10 @@ describe('BaseService', () => {
 
         const idsToDelete = [entities[0].id, entities[1].id];
 
-        await service.removeMany(idsToDelete);
+        await freshService.removeMany(idsToDelete);
 
         // Verify entities are deleted
-        const remaining = await service.listOffset(
+        const remaining = await freshService.listOffset(
           Object.assign(new AdvancedPaginationDto(), { page: 1, limit: 10 }),
         );
         expect(remaining.result).toHaveLength(1);
@@ -276,8 +287,12 @@ describe('BaseService', () => {
 
     describe('softDeleteMany', () => {
       it('should soft delete multiple entities in batch', async () => {
+        // Use a fresh service instance to avoid interference
+        const freshRepo = new InMemoryRepo();
+        const freshService = new DummyService(freshRepo, { entityName: 'Dummy' });
+        
         // First create some entities
-        const entities = await service.createMany([
+        const entities = await freshService.createMany([
           { name: 'To Soft Delete 1' },
           { name: 'To Soft Delete 2' },
           { name: 'To Keep' },
@@ -285,10 +300,10 @@ describe('BaseService', () => {
 
         const idsToSoftDelete = [entities[0].id, entities[1].id];
 
-        await service.softDeleteMany(idsToSoftDelete);
+        await freshService.softDeleteMany(idsToSoftDelete);
 
         // Verify entities are soft deleted (in this mock implementation, they're actually deleted)
-        const remaining = await service.listOffset(
+        const remaining = await freshService.listOffset(
           Object.assign(new AdvancedPaginationDto(), { page: 1, limit: 10 }),
         );
         expect(remaining.result).toHaveLength(1);
