@@ -12,43 +12,112 @@ import {
   VersionColumn,
 } from 'typeorm';
 
+/**
+ * Base entity class that provides common fields and functionality for all entities
+ *
+ * Features:
+ * - Snowflake ID generation for distributed systems
+ * - UUID for external references
+ * - Timestamps for creation, updates, and soft deletes
+ * - Optimistic locking with version column
+ * - Proper indexing for performance
+ * - JSON serialization support
+ */
 export abstract class BaseEntityCustom extends BaseEntity {
-  // Snowflake ID
+  /**
+   * Unique snowflake ID for distributed systems
+   * Uses bigint type for large number support
+   */
   @PrimaryColumn('bigint')
-  id: string;
+  id!: string;
 
+  /**
+   * UUID for external references and API responses
+   * Indexed for fast lookups
+   */
   @Index({ unique: true })
   @Column('uuid', { nullable: false, generated: 'uuid' })
-  uuid: string;
+  uuid!: string;
 
+  /**
+   * Creation timestamp with microsecond precision
+   * Indexed for sorting and filtering
+   */
   @Index()
   @CreateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP(6)',
+    precision: 6,
   })
-  createdAt: Date;
+  createdAt!: Date;
 
-  @Index() // Index cho updatedAt sorting và filtering
+  /**
+   * Last update timestamp with microsecond precision
+   * Indexed for sorting and filtering
+   */
+  @Index()
   @UpdateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP(6)',
     onUpdate: 'CURRENT_TIMESTAMP(6)',
+    precision: 6,
   })
-  updatedAt: Date;
+  updatedAt!: Date;
 
-  @Index() // Index cho soft delete queries
-  @DeleteDateColumn({ type: 'timestamp', nullable: true })
-  deletedAt: Date | null;
+  /**
+   * Soft delete timestamp for data retention
+   * Indexed for soft delete queries
+   */
+  @Index()
+  @DeleteDateColumn({
+    type: 'timestamp',
+    nullable: true,
+    precision: 6,
+  })
+  deletedAt!: Date | null;
 
+  /**
+   * Optimistic locking version for concurrency control
+   * Automatically incremented on each update
+   */
   @VersionColumn()
-  version: number;
+  version!: number;
 
+  /**
+   * Generate snowflake ID before inserting new entity
+   * Ensures unique IDs across distributed systems
+   */
   @BeforeInsert()
-  generateId() {
+  generateId(): void {
     this.id = globalSnowflake.nextId().toString();
   }
 
-  toJSON() {
+  /**
+   * Convert entity to plain object for JSON serialization
+   * Removes TypeORM metadata and circular references
+   */
+  toJSON(): Record<string, unknown> {
     return instanceToPlain(this);
+  }
+
+  /**
+   * Check if entity is soft deleted
+   */
+  isDeleted(): boolean {
+    return this.deletedAt !== null;
+  }
+
+  /**
+   * Get entity age in milliseconds
+   */
+  getAge(): number {
+    return Date.now() - this.createdAt.getTime();
+  }
+
+  /**
+   * Get time since last update in milliseconds
+   */
+  getTimeSinceUpdate(): number {
+    return Date.now() - this.updatedAt.getTime();
   }
 }

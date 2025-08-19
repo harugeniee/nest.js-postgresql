@@ -1,23 +1,31 @@
 import * as bcrypt from 'bcrypt';
-import { AdvancedPaginationDto } from 'src/common/dto';
-import { AuthPayload, IPagination } from 'src/common/interface';
+import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
+import {
+  AuthPayload,
+  IPagination,
+  IPaginationCursor,
+} from 'src/common/interface';
+import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
+import { BaseService } from 'src/common/services/base.service';
 import { USER_CONSTANTS } from 'src/shared/constants';
-import { ConditionBuilder } from 'src/shared/helpers/condition-builder';
-import { PaginationFormatter } from 'src/shared/helpers/pagination-formatter';
+import { CacheService } from 'src/shared/services/cache/cache.service';
+import {
+  CreateDeviceTokenDto,
+  CreateSessionDto,
+  RegisterDto,
+} from 'src/users/dto';
+import { UpdateUserDto } from 'src/users/dto/update-user.dto';
+import { UserDeviceToken } from 'src/users/entities/user-device-tokens.entity';
+import { UserSession } from 'src/users/entities/user-sessions.entity';
+import { User } from 'src/users/entities/user.entity';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { CreateDeviceTokenDto, CreateSessionDto, RegisterDto } from './dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { UserDeviceToken } from './entities/user-device-tokens.entity';
-import { UserSession } from './entities/user-sessions.entity';
-import { User } from './entities/user.entity';
-
 @Injectable()
-export class UsersService {
+export class UsersService extends BaseService<User> {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -27,7 +35,18 @@ export class UsersService {
 
     @InjectRepository(UserDeviceToken)
     private readonly userDeviceTokenRepository: Repository<UserDeviceToken>,
-  ) {}
+    cacheService: CacheService,
+  ) {
+    super(
+      new TypeOrmBaseRepository<User>(userRepository),
+      {
+        entityName: 'User',
+        cache: { enabled: true, ttlSec: 60, prefix: 'users', swrSec: 30 },
+        defaultSearchField: 'name',
+      },
+      cacheService,
+    );
+  }
 
   async register(userRegister: RegisterDto) {
     try {
@@ -76,13 +95,7 @@ export class UsersService {
     return user;
   }
 
-  async findById(id: string): Promise<User | null> {
-    const user = await this.findOne({ id });
-    if (!user) {
-      return null;
-    }
-    return user;
-  }
+  // Inherit BaseService.findById
 
   async createSession(
     createSessionDto: CreateSessionDto,
@@ -133,30 +146,13 @@ export class UsersService {
   async findAll(
     paginationDto: AdvancedPaginationDto,
   ): Promise<IPagination<User>> {
-    try {
-      const { page, limit, sortBy, order, ...rest } = paginationDto;
-      console.log(ConditionBuilder.build(rest));
-      const [data, total] = await this.userRepository.findAndCount({
-        skip: (page - 1) * limit,
-        take: limit,
-        order: { [sortBy]: order },
-        where: ConditionBuilder.build(rest),
-      });
-      return PaginationFormatter.offset(data, total, page, limit);
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
+    return this.listOffset(paginationDto);
+  }
 
-      throw new HttpException(
-        {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-          message: error?.message,
-          messageKey: 'common.INTERNAL_SERVER_ERROR',
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+  async findAllCursor(
+    paginationDto: CursorPaginationDto,
+  ): Promise<IPaginationCursor<User>> {
+    return this.listCursor(paginationDto);
   }
 
   async createDeviceToken(
