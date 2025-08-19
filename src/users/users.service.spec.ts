@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -135,10 +136,12 @@ describe('UsersService', () => {
 
       const result = await service.register(registerDto);
 
-      expect(userRepository.findOne).toHaveBeenCalledWith({ where: { email: registerDto.email } });
+      expect(userRepository.findOne).toHaveBeenCalledWith({
+        where: { email: registerDto.email },
+      });
       expect(userRepository.create).toHaveBeenCalledWith({
         ...registerDto,
-        password: expect.any(String),
+        password: expect.any(String) as unknown as string,
         authMethod: USER_CONSTANTS.AUTH_METHODS.EMAIL_PASSWORD,
       });
       expect(userRepository.save).toHaveBeenCalledWith(newUser);
@@ -216,12 +219,18 @@ describe('UsersService', () => {
         userAgent: 'test-agent',
       };
 
-      userSessionRepository.create.mockReturnValue(mockUserSession as UserSession);
-      userSessionRepository.save.mockResolvedValue(mockUserSession as UserSession);
+      userSessionRepository.create.mockReturnValue(
+        mockUserSession as UserSession,
+      );
+      userSessionRepository.save.mockResolvedValue(
+        mockUserSession as UserSession,
+      );
 
       const result = await service.createSession(createSessionDto);
 
-      expect(userSessionRepository.create).toHaveBeenCalledWith(createSessionDto);
+      expect(userSessionRepository.create).toHaveBeenCalledWith(
+        createSessionDto,
+      );
       expect(userSessionRepository.save).toHaveBeenCalledWith(mockUserSession);
       expect(result).toEqual(mockUserSession);
     });
@@ -230,7 +239,9 @@ describe('UsersService', () => {
   describe('findSessionById', () => {
     it('should find active session by id', async () => {
       const sessionId = 'session123';
-      userSessionRepository.findOne.mockResolvedValue(mockUserSession as UserSession);
+      userSessionRepository.findOne.mockResolvedValue(
+        mockUserSession as UserSession,
+      );
 
       const result = await service.findSessionById(sessionId);
 
@@ -253,15 +264,26 @@ describe('UsersService', () => {
   describe('revokeSession', () => {
     it('should revoke a session', async () => {
       const sessionId = 'session123';
-      const sessionToRevoke = { ...mockUserSession, revoked: false } as UserSession;
-      
+      const sessionToRevoke = {
+        ...mockUserSession,
+        revoked: false,
+      } as UserSession;
+
       userSessionRepository.findOne.mockResolvedValue(sessionToRevoke);
-      userSessionRepository.save.mockResolvedValue({ ...sessionToRevoke, revoked: true } as UserSession);
+      userSessionRepository.save.mockResolvedValue({
+        ...sessionToRevoke,
+        revoked: true,
+      } as UserSession);
 
       await service.revokeSession(sessionId);
 
-      expect(userSessionRepository.findOne).toHaveBeenCalledWith({ where: { id: sessionId } });
-      expect(userSessionRepository.save).toHaveBeenCalledWith({ ...sessionToRevoke, revoked: true });
+      expect(userSessionRepository.findOne).toHaveBeenCalledWith({
+        where: { id: sessionId },
+      });
+      expect(userSessionRepository.save).toHaveBeenCalledWith({
+        ...sessionToRevoke,
+        revoked: true,
+      });
     });
 
     it('should throw error if session not found', async () => {
@@ -295,18 +317,18 @@ describe('UsersService', () => {
     it('should update user successfully', async () => {
       const userId = '123';
       const updateUserDto: UpdateUserDto = { username: 'updateduser' };
-      
+
       // Mock findById to return a user
       userRepository.findOne.mockResolvedValue(mockUser as User);
       userRepository.update.mockResolvedValue({ affected: 1 } as any);
 
       const result = await service.updateUser(userId, updateUserDto);
 
-      expect(userRepository.findOne).toHaveBeenCalledWith({ 
+      expect(userRepository.findOne).toHaveBeenCalledWith({
         where: { id: userId },
         relations: undefined,
         select: undefined,
-        withDeleted: false
+        withDeleted: false,
       });
       expect(userRepository.update).toHaveBeenCalledWith(userId, updateUserDto);
       expect(result).toEqual({ affected: 1 });
@@ -315,17 +337,26 @@ describe('UsersService', () => {
 
   describe('createDeviceToken', () => {
     it('should create or update device token', async () => {
-      const createDeviceTokenDto: CreateDeviceTokenDto = { 
+      const createDeviceTokenDto: CreateDeviceTokenDto = {
         token: 'device-token-123',
         deviceId: 'device123',
         deviceType: 'mobile',
-        provider: 'fcm'
+        provider: 'fcm',
       };
-      const authPayload = { uid: '123', ssid: 'session123', role: USER_CONSTANTS.ROLES.USER };
+      const authPayload = {
+        uid: '123',
+        ssid: 'session123',
+        role: USER_CONSTANTS.ROLES.USER,
+      };
 
-      userDeviceTokenRepository.upsert.mockResolvedValue(mockUserDeviceToken as any);
+      userDeviceTokenRepository.upsert.mockResolvedValue(
+        mockUserDeviceToken as any,
+      );
 
-      const result = await service.createDeviceToken(createDeviceTokenDto, authPayload);
+      const result = await service.createDeviceToken(
+        createDeviceTokenDto,
+        authPayload,
+      );
 
       expect(userDeviceTokenRepository.upsert).toHaveBeenCalledWith(
         {
@@ -346,12 +377,20 @@ describe('UsersService', () => {
     it('should update device token by session id', async () => {
       const sessionId = 'session123';
       const update = { token: 'new-token' };
-      
-      userDeviceTokenRepository.update.mockResolvedValue({ affected: 1 } as any);
 
-      const result = await service.updateDeviceTokenBySessionId(sessionId, update);
+      userDeviceTokenRepository.update.mockResolvedValue({
+        affected: 1,
+      } as any);
 
-      expect(userDeviceTokenRepository.update).toHaveBeenCalledWith({ sessionId }, update);
+      const result = await service.updateDeviceTokenBySessionId(
+        sessionId,
+        update,
+      );
+
+      expect(userDeviceTokenRepository.update).toHaveBeenCalledWith(
+        { sessionId },
+        update,
+      );
       expect(result).toEqual({ affected: 1 });
     });
   });

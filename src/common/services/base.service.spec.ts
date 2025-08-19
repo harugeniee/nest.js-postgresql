@@ -230,8 +230,10 @@ describe('BaseService', () => {
       it('should update multiple entities in batch', async () => {
         // First create some entities in a fresh service instance
         const freshRepo = new InMemoryRepo();
-        const freshService = new DummyService(freshRepo, { entityName: 'Dummy' });
-        
+        const freshService = new DummyService(freshRepo, {
+          entityName: 'Dummy',
+        });
+
         const entities = await freshService.createMany([
           { name: 'Original 1' },
           { name: 'Original 2' },
@@ -259,8 +261,10 @@ describe('BaseService', () => {
       it('should remove multiple entities in batch', async () => {
         // Use a fresh service instance to avoid interference
         const freshRepo = new InMemoryRepo();
-        const freshService = new DummyService(freshRepo, { entityName: 'Dummy' });
-        
+        const freshService = new DummyService(freshRepo, {
+          entityName: 'Dummy',
+        });
+
         // First create some entities
         const entities = await freshService.createMany([
           { name: 'To Delete 1' },
@@ -289,8 +293,10 @@ describe('BaseService', () => {
       it('should soft delete multiple entities in batch', async () => {
         // Use a fresh service instance to avoid interference
         const freshRepo = new InMemoryRepo();
-        const freshService = new DummyService(freshRepo, { entityName: 'Dummy' });
-        
+        const freshService = new DummyService(freshRepo, {
+          entityName: 'Dummy',
+        });
+
         // First create some entities
         const entities = await freshService.createMany([
           { name: 'To Soft Delete 1' },

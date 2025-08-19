@@ -1,18 +1,45 @@
 import 'reflect-metadata';
-import { Test, TestingModule } from '@nestjs/testing';
+
+import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
+import { AuthPayload } from 'src/common/interface';
+import { USER_CONSTANTS } from 'src/shared/constants';
+
+import { RegisterDto } from './dto/register.dto';
+import { User } from './entities/user.entity';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
-import { User } from './entities/user.entity';
-import { RegisterDto } from './dto/register.dto';
-import { AdvancedPaginationDto } from 'src/common/dto';
-import { CursorPaginationDto } from 'src/common/dto';
-import { USER_CONSTANTS } from 'src/shared/constants';
-import { AuthPayload } from 'src/common/interface';
-
 
 describe('UsersController', () => {
   let controller: UsersController;
-  let usersService: any;
+  let usersService: {
+    register: jest.Mock;
+    findOne: jest.Mock;
+    findAll: jest.Mock;
+    findAllCursor: jest.Mock;
+    findById: jest.Mock;
+    findByEmail: jest.Mock;
+    createSession: jest.Mock;
+    findSessionById: jest.Mock;
+    revokeSession: jest.Mock;
+    revokeSessionsByUserId: jest.Mock;
+    updateUser: jest.Mock;
+    createDeviceToken: jest.Mock;
+    updateDeviceTokenBySessionId: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+    listOffset: jest.Mock;
+    listCursor: jest.Mock;
+    remove: jest.Mock;
+    softDelete: jest.Mock;
+    createMany: jest.Mock;
+    updateMany: jest.Mock;
+    removeMany: jest.Mock;
+    softDeleteMany: jest.Mock;
+    withTransaction: jest.Mock;
+    runInTransaction: jest.Mock;
+    update: jest.Mock;
+    restore: jest.Mock;
+  };
 
   const mockUser: Partial<User> = {
     id: '123',
@@ -32,7 +59,7 @@ describe('UsersController', () => {
 
   const mockRequest = {
     user: mockAuthPayload,
-  } as any;
+  } as Request & { user: AuthPayload };
 
   beforeEach(async () => {
     const mockUsersService = {
@@ -67,7 +94,9 @@ describe('UsersController', () => {
     };
 
     // Create controller directly to avoid guard dependency issues
-    controller = new UsersController(mockUsersService as any);
+    controller = new UsersController(
+      mockUsersService as unknown as UsersService,
+    );
     usersService = mockUsersService;
   });
 
@@ -99,7 +128,9 @@ describe('UsersController', () => {
 
       const result = await controller.getMe(mockRequest);
 
-      expect(usersService.findOne).toHaveBeenCalledWith({ id: mockAuthPayload.uid });
+      expect(usersService.findOne).toHaveBeenCalledWith({
+        id: mockAuthPayload.uid,
+      });
       expect(result).toEqual(mockUser);
     });
   });
@@ -167,7 +198,7 @@ describe('UsersController', () => {
 
       const result = await controller.getUserById(userId);
 
-      expect(usersService.findById).toHaveBeenCalledWith(userId);
+      expect(usersService?.findById).toHaveBeenCalledWith(userId);
       expect(result).toEqual(mockUser);
     });
   });
