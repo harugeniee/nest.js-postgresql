@@ -6,7 +6,7 @@ import {
   IPaginationCursor,
 } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
-import { BaseService } from 'src/common/services/base.service';
+import { BaseService } from 'src/common/services';
 import { USER_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services/cache/cache.service';
 import {
