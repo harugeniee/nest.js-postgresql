@@ -8,6 +8,9 @@ import { CacheService } from 'src/shared/services';
 import { GraphQLPaginationDto } from '../dto/graphql-pagination.dto';
 import { DeepPartial } from 'typeorm';
 
+// Set required environment variable for cursor tests
+process.env.CURSOR_HMAC_SECRET = 'test-cursor-secret-key';
+
 // Mock entity for testing
 interface MockEntity {
   id: string;
@@ -249,24 +252,25 @@ describe('GraphQLBaseService', () => {
         { id: '2', name: 'User 2' } as MockEntity,
       ];
 
-      mockCacheService.get.mockResolvedValue(cachedData);
+      const getSpy = jest
+        .spyOn(mockCacheService, 'get')
+        .mockResolvedValue(cachedData);
 
       const result = await service.batchLoadByIds(ids);
 
-      const { get } = mockCacheService;
-      expect(get).toHaveBeenCalledWith('test:batch:1,2');
+      expect(getSpy).toHaveBeenCalledWith('test:batch:1,2');
       expect(result).toEqual(cachedData);
     });
 
     it('should fallback to database when cache miss', async () => {
       const ids = ['1', '2'];
 
-      mockCacheService.get.mockResolvedValue(null);
+      jest.spyOn(mockCacheService, 'get').mockResolvedValue(null);
+      const setSpy = jest.spyOn(mockCacheService, 'set');
 
       const result = await service.batchLoadByIds(ids);
 
-      const { set } = mockCacheService;
-      expect(set).toHaveBeenCalled();
+      expect(setSpy).toHaveBeenCalled();
       expect(result).toHaveLength(2);
     });
   });

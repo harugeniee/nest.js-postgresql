@@ -3,9 +3,9 @@
     "success": "Thành công",
     "error": "Đã xảy ra lỗi"
   },
-  "USER_FETCH_SUCCESS": "Lấy thông tin người dùng thành công",
+  "FETCH_SUCCESS": "Lấy thông tin người dùng thành công",
   "USER_NOT_FOUND": "Không tìm thấy người dùng",
-  "USER_CREATED": "Người dùng {name} đã được tạo thành công",
+  "CREATED": "Người dùng {name} đã được tạo thành công",
   "POST_CREATED": "Bài viết '{title}' đã được đăng thành công",
   "SETUP_PASSWORD": {
     "heading": "Xin chào, {username}",
