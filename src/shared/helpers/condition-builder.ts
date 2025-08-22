@@ -7,6 +7,8 @@ import {
   LessThanOrEqual,
   Not,
   In,
+  ILike,
+  FindOptionsWhere,
 } from 'typeorm';
 
 export class ConditionBuilder {
@@ -16,7 +18,7 @@ export class ConditionBuilder {
     } = {},
     defaultField = 'name',
   ) {
-    let conditions: Record<string, any> = {
+    let conditions: FindOptionsWhere<any> = {
       status: Not(USER_CONSTANTS.STATUS.REMOVED),
     };
 
@@ -61,21 +63,24 @@ export class ConditionBuilder {
     }
 
     // Handle multi-field search
-    if (data.query && data.fields) {
-      const searchFields = Array.isArray(data.fields)
-        ? data.fields
-        : [data.fields];
-      if (searchFields.length > 1) {
-        conditions = searchFields.map((field) => ({
-          ...conditions,
-          [field]: Like(`%${data.query}%`),
-        }));
+    if (data.query) {
+      const searchOperator = data.caseSensitive == 1 ? Like : ILike;
+
+      if (data.fields) {
+        const searchFields = Array.isArray(data.fields)
+          ? data.fields
+          : [data.fields];
+        if (searchFields.length > 1) {
+          conditions = searchFields.map((field) => ({
+            ...conditions,
+            [field]: searchOperator(`%${data.query}%`),
+          }));
+        } else {
+          conditions[searchFields[0]] = searchOperator(`%${data.query}%`);
+        }
       } else {
-        conditions[searchFields[0]] = Like(`%${data.query}%`);
+        conditions[defaultField] = searchOperator(`%${data.query}%`);
       }
-    } else if (data.query) {
-      // Fallback to default field if no specific fields provided
-      conditions[defaultField] = Like(`%${data.query}%`);
     }
 
     return conditions;

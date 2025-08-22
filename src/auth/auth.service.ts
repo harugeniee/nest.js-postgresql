@@ -173,12 +173,26 @@ export class AuthService {
   async refreshToken(authPayload: AuthPayload) {
     const accessTokenExpiresIn =
       this.configService.get<string>('app.jwt.accessTokenExpiresIn') || '1h';
+    const session = await this.usersService.findSessionById(authPayload.ssid);
+
+    if (!session || session.isExpired() || !session.isValid()) {
+      throw new HttpException(
+        { messageKey: 'user.SESSION_EXPIRED' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    const user = await this.usersService.findById(session.userId);
     const accessToken = await this.jwtService.signAsync(
-      { uid: authPayload.uid, ssid: authPayload.ssid },
+      { uid: session.userId, ssid: session.id, role: user.role },
       {
         expiresIn: accessTokenExpiresIn,
         algorithm: 'HS256',
       },
+    );
+    await this.cacheService.set(
+      `auth:user:${session.userId}:accessToken:${session.id}`,
+      accessToken,
+      60 * 60,
     );
     return buildResponse({
       data: {

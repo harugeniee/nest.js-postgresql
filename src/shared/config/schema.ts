@@ -13,6 +13,14 @@ export const configValidationSchema = Joi.object({
   JWT_ACCESS_TOKEN_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_TOKEN_EXPIRES_IN: Joi.string().default('7d'),
 
+  // I18n configuration
+  I18N_FALLBACK_LANGUAGE: Joi.string().default('en'),
+  I18N_SUPPORTED_LANGUAGES: Joi.string().default('en,vi'),
+
+  // QR HMAC secret
+  QR_HMAC_SECRET: Joi.string().required(),
+  CURSOR_HMAC_SECRET: Joi.string().required(),
+
   // Database configuration
   DATABASE_TYPE: Joi.string().valid('postgres').default('postgres'),
   DATABASE_HOST: Joi.string().required(),

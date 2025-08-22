@@ -2,6 +2,8 @@ import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsNotEmpty,
+  IsDate,
+  IsOptional,
   IsString,
   IsStrongPassword,
   MaxLength,
@@ -33,4 +35,23 @@ export class RegisterDto {
   @MinLength(5)
   @MaxLength(20)
   username: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  phoneNumber?: string;
+
+  @IsOptional()
+  @IsDate()
+  dob?: Date;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  avatar?: string;
 }

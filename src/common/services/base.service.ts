@@ -3,8 +3,8 @@ import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { BaseRepository } from 'src/common/repositories/base.repository';
 import {
   applyWhitelist,
-  decodeCursor,
-  encodeCursor,
+  decodeSignedCursor,
+  encodeSignedCursor,
   mapTypeOrmError,
   normalizeSearchInput,
   notFound,
@@ -176,8 +176,9 @@ export abstract class BaseService<T extends { id: string }> {
     }
     const found = await this.repo.findById(id, safe);
     if (!found) notFound(this.entityName, id);
-    if (cacheKey && found && this.cache)
+    if (cacheKey && found && this.cache) {
       await this.cacheService?.set(cacheKey, found, this.cache.ttlSec);
+    }
     return found;
   }
 
@@ -207,7 +208,7 @@ export abstract class BaseService<T extends { id: string }> {
     (orderObj as Record<string, 'ASC' | 'DESC'>)[sortBy] = order;
     (orderObj as Record<string, 'ASC' | 'DESC'>)[String(this.idKey)] = order;
     await this.onListQueryBuilt({ where, order: orderObj, dto: pagination });
-
+    console.log('where', where);
     const cacheKey = this.cache
       ? `${this.cache.prefix}:list:${sha1Hex(
           stableStringify({
@@ -278,8 +279,9 @@ export abstract class BaseService<T extends { id: string }> {
     });
 
     const envelope = PaginationFormatter.offset<T>(data, total, page, limit);
-    if (cacheKey && this.cache)
+    if (cacheKey && this.cache) {
       await this.cacheService?.set(cacheKey, envelope, this.cache.ttlSec);
+    }
     return envelope;
   }
 
@@ -307,7 +309,7 @@ export abstract class BaseService<T extends { id: string }> {
     }
     const where = ConditionBuilder.build(baseFilter, this.defaultSearchField);
     const safe = this.applyQueryOpts(opts);
-    const token = decodeCursor(cursor);
+    const token = decodeSignedCursor(cursor);
     const take = limit;
 
     // Apply cursor boundary: (sortBy, id) tuple for stable ordering
@@ -341,7 +343,7 @@ export abstract class BaseService<T extends { id: string }> {
     const last = data.length > 0 ? data[data.length - 1] : undefined;
     const lastRecord = last;
     const nextCursor = lastRecord
-      ? encodeCursor({
+      ? encodeSignedCursor({
           key: sortBy,
           order: direction,
           value: {

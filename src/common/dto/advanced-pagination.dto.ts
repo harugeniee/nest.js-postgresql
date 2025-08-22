@@ -1,5 +1,13 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsOptional, IsString } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 import { PaginationDto } from './pagination.dto';
 
@@ -22,6 +30,11 @@ export class AdvancedPaginationDto extends PaginationDto {
   @IsOptional()
   @IsString()
   query?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @IsIn([0, 1])
+  caseSensitive?: number;
 
   @IsOptional()
   @Type(() => Date)
@@ -70,4 +83,8 @@ export class AdvancedPaginationDto extends PaginationDto {
     return value as string | string[];
   })
   ids?: string | string[];
+
+  @IsOptional()
+  @IsString()
+  userId?: string;
 }

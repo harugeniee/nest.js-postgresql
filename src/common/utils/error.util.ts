@@ -19,7 +19,6 @@ export function mapTypeOrmError(error: any): never {
 }
 
 export function notFound(entityName: string, id?: string): never {
-  throw new NotFoundException(
-    id ? `${entityName} not found: ${id}` : `${entityName} not found`,
-  );
+  const messageKey = `${entityName.toLowerCase()}.NOT_FOUND`;
+  throw new NotFoundException({ messageKey, messageArgs: { id } });
 }

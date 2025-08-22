@@ -3,9 +3,6 @@
     "success": "OK",
     "error": "Something went wrong"
   },
-  "USER_FETCH_SUCCESS": "User fetched successfully",
-  "USER_NOT_FOUND": "User not found",
-  "USER_CREATED": "User {name} has been created successfully",
   "POST_CREATED": "Post '{title}' was published successfully",
   "SETUP_PASSWORD": {
     "heading": "Hello, {username}",
