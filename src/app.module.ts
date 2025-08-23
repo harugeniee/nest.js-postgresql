@@ -16,6 +16,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { FilesModule } from './files/files.module';
+import { QrModule } from './qr/qr.module';
 import {
   appConfig,
   awsConfig,
@@ -81,6 +82,7 @@ import { WorkerModule } from './workers/worker.module';
     RabbitmqModule,
     FilesModule,
     AuthModule,
+    QrModule,
   ],
   controllers: [AppController],
   providers: [AppService],

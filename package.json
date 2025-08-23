@@ -35,7 +35,9 @@
     "@nestjs/mapped-types": "*",
     "@nestjs/microservices": "^11.1.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/platform-socket.io": "^11.1.6",
     "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/websockets": "^11.1.6",
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.8",
     "axios": "^1.11.0",
@@ -52,6 +54,7 @@
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "socket.io": "^4.8.1",
     "typeorm": "^0.3.25"
   },
   "devDependencies": {
@@ -101,6 +104,8 @@
     "moduleNameMapper": {
       "^src/(.*)$": "<rootDir>/$1"
     },
-    "setupFilesAfterEnv": ["<rootDir>/../test/jest.setup.ts"]
+    "setupFilesAfterEnv": [
+      "<rootDir>/../test/jest.setup.ts"
+    ]
   }
 }
