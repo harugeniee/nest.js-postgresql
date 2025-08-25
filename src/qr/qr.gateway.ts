@@ -1,3 +1,6 @@
+import { Server, Socket } from 'socket.io';
+import { QR_ROOM_PREFIX, QR_WS_EVENTS } from 'src/shared/constants';
+
 import { Logger } from '@nestjs/common';
 import {
   ConnectedSocket,
@@ -8,8 +11,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { QR_ROOM_PREFIX, QR_WS_EVENTS } from './qr.constants';
+
 import { QrService } from './qr.service';
 import { QrStatusEvent, QrTicketStatus } from './qr.types';
 

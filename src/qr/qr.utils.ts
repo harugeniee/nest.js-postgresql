@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'crypto';
+import { QR_CRYPTO_CONFIG } from 'src/shared/constants';
 
 /**
  * QR Utilities - Cryptographic and utility functions for the QR Actions feature
@@ -11,7 +12,9 @@ import { createHash, randomBytes } from 'crypto';
  * @param length - Length of the verifier string (default: 64)
  * @returns Base64url encoded random string
  */
-export function generateCodeVerifier(length: number = 64): string {
+export function generateCodeVerifier(
+  length: number = QR_CRYPTO_CONFIG.DEFAULT_CODE_VERIFIER_LENGTH,
+): string {
   const randomBytesBuffer = randomBytes(length);
   return base64UrlEncode(randomBytesBuffer);
 }
@@ -51,7 +54,9 @@ export function verifyCodeChallenge(
  * @param length - Length of the token string (default: 32)
  * @returns Base64url encoded random string
  */
-export function generateGrantToken(length: number = 32): string {
+export function generateGrantToken(
+  length: number = QR_CRYPTO_CONFIG.DEFAULT_GRANT_TOKEN_LENGTH,
+): string {
   const randomBytesBuffer = randomBytes(length);
   return base64UrlEncode(randomBytesBuffer);
 }
@@ -62,7 +67,9 @@ export function generateGrantToken(length: number = 32): string {
  * @param length - Length of the ticket ID (default: 16)
  * @returns Base64url encoded random string
  */
-export function generateTicketId(length: number = 16): string {
+export function generateTicketId(
+  length: number = QR_CRYPTO_CONFIG.DEFAULT_TICKET_ID_LENGTH,
+): string {
   const randomBytesBuffer = randomBytes(length);
   return base64UrlEncode(randomBytesBuffer);
 }

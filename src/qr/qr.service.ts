@@ -1,18 +1,20 @@
 import {
+  QR_ERROR_MESSAGES,
+  QR_REDIS_PREFIXES,
+  QR_TTL_DEFAULTS,
+} from 'src/shared/constants';
+import { CacheService } from 'src/shared/services';
+
+import {
   BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CacheService } from 'src/shared/services';
+
 import { CreateTicketDto } from './dto';
 import { QrActionExecutorService } from './qr-action-executor.service';
-import {
-  QR_ERROR_MESSAGES,
-  QR_REDIS_PREFIXES,
-  QR_TTL_DEFAULTS,
-} from './qr.constants';
 import {
   QrActionType,
   QrGrant,
