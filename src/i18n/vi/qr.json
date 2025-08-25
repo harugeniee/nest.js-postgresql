@@ -1,0 +1,20 @@
+{
+  "TICKET_CREATED": "QR ticket created successfully",
+  "TICKET_SCANNED": "QR ticket scanned successfully",
+  "TICKET_APPROVED": "QR ticket approved successfully",
+  "TICKET_REJECTED": "QR ticket rejected successfully",
+  "GRANT_EXCHANGED": "Grant exchanged successfully",
+  "ACTION_EXECUTED": "Action executed successfully",
+  "TICKET_NOT_FOUND": "QR ticket not found or has expired",
+  "TICKET_ALREADY_USED": "QR ticket has already been used",
+  "TICKET_EXPIRED": "QR ticket has expired",
+  "INVALID_CODE_VERIFIER": "Invalid code verifier provided",
+  "INVALID_STATUS_TRANSITION": "Invalid status transition for this ticket",
+  "RATE_LIMIT_EXCEEDED": "Rate limit exceeded, please try again later",
+  "UNAUTHORIZED_OPERATION": "You are not authorized to perform this operation",
+  "ACTION_EXECUTION_FAILED": "Failed to execute the requested action",
+  "INVALID_ACTION_TYPE": "Invalid action type specified",
+  "MISSING_ACTION_IMPLEMENTATION": "Action implementation not found",
+  "INVALID_TICKET_ID": "Invalid ticket ID format",
+  "INVALID_CODE_CHALLENGE": "Invalid code challenge format"
+}

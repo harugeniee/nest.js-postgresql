@@ -1,6 +1,7 @@
 import { Request } from 'express';
 import { JwtAccessTokenGuard } from 'src/auth/guard';
 import { AuthPayload } from 'src/common/interface';
+import { QrActionType } from 'src/shared/constants';
 import { buildResponse } from 'src/shared/helpers/build-response';
 
 import {
@@ -19,7 +20,6 @@ import {
 import { ApproveTicketDto, CreateTicketDto } from './dto';
 import { QrGateway } from './qr.gateway';
 import { QrService } from './qr.service';
-import { QrActionType } from './qr.types';
 
 /**
  * QR Controller - REST API endpoints for QR Actions feature
@@ -65,10 +65,10 @@ export class QrController {
     @Req() req: Request,
   ) {
     // Extract web session ID from request (could be from cookie, header, or body)
-    const webSessionId =
+    const webSessionId: string | undefined =
       createTicketDto.webSessionId ||
       (req.headers['x-web-session-id'] as string) ||
-      req.cookies?.['web-session-id'];
+      (req.cookies as Record<string, string>)?.['web-session-id'];
 
     // Create the ticket
     const ticket = await this.qrService.createTicket(
@@ -396,7 +396,7 @@ export class QrController {
         data: {
           status: 'unhealthy',
           timestamp: new Date().toISOString(),
-          error: error.message,
+          error: (error as Error).message,
         },
       });
     }

@@ -2,6 +2,11 @@ import {
   QR_ERROR_MESSAGES,
   QR_REDIS_PREFIXES,
   QR_TTL_DEFAULTS,
+  QrActionType,
+  QrGrant,
+  QrTicket,
+  QrTicketPreview,
+  QrTicketStatus,
 } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
 
@@ -15,13 +20,6 @@ import { ConfigService } from '@nestjs/config';
 
 import { CreateTicketDto } from './dto';
 import { QrActionExecutorService } from './qr-action-executor.service';
-import {
-  QrActionType,
-  QrGrant,
-  QrTicket,
-  QrTicketPreview,
-  QrTicketStatus,
-} from 'src/shared/constants';
 import {
   generateCodeChallenge,
   generateCodeVerifier,

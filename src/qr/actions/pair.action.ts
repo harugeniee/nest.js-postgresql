@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseQrAction, QrActionContext } from './base-action';
-import { QrActionType } from '../qr.types';
+import { QrActionType } from 'src/shared/constants';
 
 /**
  * Device Pairing Action - Handles QR-based device pairing requests

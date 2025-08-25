@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseQrAction, QrActionContext } from './base-action';
-import { QrActionType } from '../qr.types';
+import { QrActionType } from 'src/shared/constants';
 
 /**
  * Join Organization Action - Handles QR-based organization membership requests

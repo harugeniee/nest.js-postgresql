@@ -1,4 +1,4 @@
-import { QrActionType } from '../qr.types';
+import { QrActionType } from 'src/shared/constants';
 
 /**
  * Context object passed to QR actions during execution
