@@ -5,7 +5,7 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
-import { QrActionType } from '../qr.types';
+import { QrActionType } from 'src/shared/constants';
 
 /**
  * DTO for creating a new QR ticket

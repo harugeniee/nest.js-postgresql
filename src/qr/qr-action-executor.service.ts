@@ -4,7 +4,7 @@ import { AddFriendAction } from './actions/add-friend.action';
 import { JoinOrgAction } from './actions/join-org.action';
 import { LoginAction } from './actions/login.action';
 import { PairAction } from './actions/pair.action';
-import { QrActionType } from './qr.types';
+import { QrActionType } from 'src/shared/constants';
 
 /**
  * QR Action Executor Service

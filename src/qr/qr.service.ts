@@ -21,7 +21,7 @@ import {
   QrTicket,
   QrTicketPreview,
   QrTicketStatus,
-} from './qr.types';
+} from 'src/shared/constants';
 import {
   generateCodeChallenge,
   generateCodeVerifier,

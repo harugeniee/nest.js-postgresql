@@ -1,6 +1,8 @@
+import { QrActionType } from 'src/shared/constants';
+
 import { Injectable, Logger } from '@nestjs/common';
+
 import { BaseQrAction, QrActionContext } from './base-action';
-import { QrActionType } from '../qr.types';
 
 /**
  * Add Friend Action - Handles QR-based friend requests
