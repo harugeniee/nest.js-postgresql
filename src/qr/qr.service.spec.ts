@@ -1,11 +1,17 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
-import { QrService } from './qr.service';
-import { QrActionExecutorService } from './qr-action-executor.service';
+import {
+  QR_REDIS_PREFIXES,
+  QrActionType,
+  QrGrant,
+  QrTicket,
+} from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
-import { QrActionType, QrTicket, QrGrant } from './qr.types';
+
+import { ConfigService } from '@nestjs/config';
+import { Test, TestingModule } from '@nestjs/testing';
+
 import { CreateTicketDto } from './dto';
-import { QR_REDIS_PREFIXES } from './qr.constants';
+import { QrActionExecutorService } from './qr-action-executor.service';
+import { QrService } from './qr.service';
 import { generateCodeChallenge } from './qr.utils';
 
 // Helper function to generate valid test ticket IDs
@@ -113,7 +119,7 @@ describe('QrService', () => {
       expect(result).toHaveProperty('status');
       expect(result.status).toBe('PENDING');
 
-      expect(cacheService.set).toHaveBeenCalledWith(
+      expect(mockCacheService.set).toHaveBeenCalledWith(
         expect.stringContaining(QR_REDIS_PREFIXES.TICKET),
         expect.objectContaining({
           type: QrActionType.LOGIN,
@@ -132,7 +138,7 @@ describe('QrService', () => {
 
       const result = await service.createTicket(createTicketDto, 'session_123');
 
-      expect(cacheService.set).toHaveBeenCalledWith(
+      expect(mockCacheService.set).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           webSessionId: 'session_123',
@@ -172,7 +178,7 @@ describe('QrService', () => {
       const result = await service.getTicket(validTid);
 
       expect(result).toEqual(mockTicket);
-      expect(cacheService.get).toHaveBeenCalledWith(
+      expect(mockCacheService.get).toHaveBeenCalledWith(
         `${QR_REDIS_PREFIXES.TICKET}${validTid}`,
       );
     });
@@ -204,7 +210,7 @@ describe('QrService', () => {
       const result = await service.getTicket(validTid);
 
       expect(result?.status).toBe('EXPIRED');
-      expect(cacheService.set).toHaveBeenCalledWith(
+      expect(mockCacheService.set).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ status: 'EXPIRED' }),
         180,
@@ -267,12 +273,12 @@ describe('QrService', () => {
       const result = await service.scanTicket(validTid, 'user123');
 
       expect(result).toBe(true);
-      expect(cacheService.set).toHaveBeenCalledWith(
+      expect(mockCacheService.set).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           status: 'SCANNED',
           scannedBy: 'user123',
-          scannedAt: expect.any(Number),
+          scannedAt: expect.any(Number) as number,
         }),
         180,
       );
@@ -351,16 +357,16 @@ describe('QrService', () => {
 
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
-      expect(cacheService.set).toHaveBeenCalledWith(
+      expect(mockCacheService.set).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           status: 'APPROVED',
           approvedBy: 'user123',
-          approvedAt: expect.any(Number),
+          approvedAt: expect.any(Number) as number,
         }),
         180,
       );
-      expect(actionExecutor.execute).toHaveBeenCalledWith(
+      expect(mockActionExecutor.execute).toHaveBeenCalledWith(
         QrActionType.LOGIN,
         expect.objectContaining({
           tid: validTid,
@@ -418,7 +424,7 @@ describe('QrService', () => {
       ).rejects.toThrow();
 
       // Should revert to PENDING status
-      expect(cacheService.set).toHaveBeenCalledWith(
+      expect(mockCacheService.set).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ status: 'PENDING' }),
         180,
@@ -447,7 +453,7 @@ describe('QrService', () => {
       const result = await service.rejectTicket(validTid, 'user123');
 
       expect(result).toBe(true);
-      expect(cacheService.set).toHaveBeenCalledWith(
+      expect(mockCacheService.set).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           status: 'REJECTED',
@@ -488,12 +494,12 @@ describe('QrService', () => {
       const result = await service.exchangeGrant('grant123');
 
       expect(result).toEqual(mockGrant);
-      expect(cacheService.set).toHaveBeenCalledWith(
+      expect(mockCacheService.set).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ status: 'USED' }),
         180,
       );
-      expect(cacheService.delete).toHaveBeenCalledWith(
+      expect(mockCacheService.delete).toHaveBeenCalledWith(
         `${QR_REDIS_PREFIXES.GRANT}grant123`,
       );
     });
@@ -545,7 +551,7 @@ describe('QrService', () => {
 
       expect(result.tickets).toBe(2);
       expect(result.grants).toBe(1);
-      expect(cacheService.delete).toHaveBeenCalledTimes(3);
+      expect(mockCacheService.delete).toHaveBeenCalledTimes(3);
     });
   });
 
