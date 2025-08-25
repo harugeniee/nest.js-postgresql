@@ -1,35 +1,34 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
-  BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CacheService } from 'src/shared/services';
+import { CreateTicketDto } from './dto';
 import { QrActionExecutorService } from './qr-action-executor.service';
 import {
-  QrActionType,
-  QrTicket,
-  QrTicketStatus,
-  QrGrant,
-  QrTicketPreview,
-} from './qr.types';
-import { CreateTicketDto } from './dto';
-import {
+  QR_ERROR_MESSAGES,
   QR_REDIS_PREFIXES,
   QR_TTL_DEFAULTS,
-  QR_ERROR_MESSAGES,
 } from './qr.constants';
 import {
-  generateCodeVerifier,
+  QrActionType,
+  QrGrant,
+  QrTicket,
+  QrTicketPreview,
+  QrTicketStatus,
+} from './qr.types';
+import {
   generateCodeChallenge,
-  verifyCodeChallenge,
+  generateCodeVerifier,
+  generateDeepLink,
   generateGrantToken,
   generateTicketId,
-  generateDeepLink,
-  sanitizePayload,
   isValidTicketId,
+  sanitizePayload,
+  verifyCodeChallenge,
 } from './qr.utils';
 
 /**

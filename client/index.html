@@ -1,0 +1,54 @@
+<html>
+  <head>
+    <title>QR WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.3.2/socket.io.min.js" integrity="sha384-KAZ4DtjNhLChOB/hxXuKqhMLYvx3b5MlT55xPEiNmREKRzeEm+RVPlTnAn0ajQNs" crossorigin="anonymous"></script>
+    <script>
+      // Connect to QR namespace
+      const socket = io('http://localhost:3000/');
+      
+      socket.on('connect', function() {
+        console.log('Connected to QR Gateway');
+        document.body.innerHTML = '<h2>Connected to QR Gateway!</h2>';
+        
+        // Test QR subscription
+        socket.emit('qr:subscribe', { ticketId: 'test-ticket-123' });
+      });
+      
+      socket.on('disconnect', function() {
+        console.log('Disconnected from QR Gateway');
+        document.body.innerHTML = '<h2>Disconnected from QR Gateway</h2>';
+      });
+      
+      // QR-specific events
+      socket.on('qr:connected', function(data) {
+        console.log('QR Connected:', data);
+        document.body.innerHTML += `<p>QR Connected: ${JSON.stringify(data)}</p>`;
+      });
+      
+      socket.on('qr:subscribed', function(data) {
+        console.log('Subscribed to ticket:', data);
+        document.body.innerHTML += `<p>Subscribed: ${JSON.stringify(data)}</p>`;
+      });
+      
+      socket.on('qr:status:update', function(data) {
+        console.log('Status update:', data);
+        document.body.innerHTML += `<p>Status: ${JSON.stringify(data)}</p>`;
+      });
+      
+      socket.on('qr:error', function(error) {
+        console.error('QR Error:', error);
+        document.body.innerHTML += `<p style="color: red;">Error: ${JSON.stringify(error)}</p>`;
+      });
+      
+      socket.on('connect_error', function(error) {
+        console.error('Connection error:', error);
+        document.body.innerHTML = `<h2 style="color: red;">Connection failed!</h2><p>${error.message}</p>`;
+      });
+    </script>
+  </head>
+
+  <body>
+    <h1>QR WebSocket Test</h1>
+    <p>Connecting to QR Gateway...</p>
+  </body>
+</html>

@@ -1,10 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { QrActionType } from './qr.types';
 import { BaseQrAction, QrActionContext } from './actions';
-import { LoginAction } from './actions/login.action';
 import { AddFriendAction } from './actions/add-friend.action';
 import { JoinOrgAction } from './actions/join-org.action';
+import { LoginAction } from './actions/login.action';
 import { PairAction } from './actions/pair.action';
+import { QrActionType } from './qr.types';
 
 /**
  * QR Action Executor Service

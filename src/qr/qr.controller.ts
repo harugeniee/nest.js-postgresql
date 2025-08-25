@@ -1,26 +1,25 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  UseGuards,
-  Req,
-  HttpStatus,
-  HttpCode,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAccessTokenGuard } from 'src/auth/guard';
 import { AuthPayload } from 'src/common/interface';
 import { buildResponse } from 'src/shared/helpers/build-response';
-import { QrService } from './qr.service';
+
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
+import { ApproveTicketDto, CreateTicketDto } from './dto';
 import { QrGateway } from './qr.gateway';
-import { CreateTicketDto, ApproveTicketDto } from './dto';
-import { QrActionType, QrTicketStatus } from './qr.types';
-import { QR_ERROR_MESSAGES } from './qr.constants';
-import { QrRateLimitGuard } from './guards/qr-rate-limit.guard';
+import { QrService } from './qr.service';
+import { QrActionType } from './qr.types';
 
 /**
  * QR Controller - REST API endpoints for QR Actions feature
@@ -60,7 +59,6 @@ export class QrController {
    * }
    */
   @Post('tickets')
-  @UseGuards(QrRateLimitGuard)
   @HttpCode(HttpStatus.CREATED)
   async createTicket(
     @Body() createTicketDto: CreateTicketDto,
@@ -246,7 +244,6 @@ export class QrController {
    * }
    */
   @Post('auth/qr/grant')
-  @UseGuards(QrRateLimitGuard)
   @HttpCode(HttpStatus.OK)
   async exchangeGrant(@Body() body: { tid: string; grantToken: string }) {
     const { tid, grantToken } = body;

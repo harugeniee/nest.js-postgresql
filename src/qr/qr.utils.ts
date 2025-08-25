@@ -230,13 +230,23 @@ export function sanitizePayload(
     'user_id',
   ];
 
-  function sanitizeValue(value: any, depth: number): any {
+  function sanitizeValue(
+    value: any,
+    depth: number,
+  ):
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | Record<string, any>
+    | (string | number | boolean | Record<string, any>)[] {
     if (depth > maxDepth) {
       return '[Nested Object]';
     }
 
     if (value === null || value === undefined) {
-      return value;
+      return value as null | undefined;
     }
 
     if (typeof value === 'string') {
@@ -253,7 +263,14 @@ export function sanitizePayload(
     }
 
     if (Array.isArray(value)) {
-      return value.slice(0, 10).map((item) => sanitizeValue(item, depth + 1));
+      return value
+        .slice(0, 10)
+        .map((item) => sanitizeValue(item, depth + 1)) as (
+        | string
+        | number
+        | boolean
+        | Record<string, any>
+      )[];
     }
 
     if (typeof value === 'object') {

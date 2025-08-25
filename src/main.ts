@@ -4,16 +4,15 @@ import { I18nService } from 'nestjs-i18n';
 
 import { ConsoleLogger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
+import { NestApplication, NestFactory } from '@nestjs/core';
 import { RmqOptions, Transport } from '@nestjs/microservices';
-import { NestExpressApplication } from '@nestjs/platform-express';
 
 import { AppModule } from './app.module';
 import { I18nHttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './shared/interceptors/response.interceptor';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+  const app = await NestFactory.create<NestApplication>(AppModule, {
     logger: new ConsoleLogger({
       prefix: 'API',
       showHidden: true,

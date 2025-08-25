@@ -1,17 +1,17 @@
+import { Logger } from '@nestjs/common';
 import {
-  WebSocketGateway,
-  WebSocketServer,
-  SubscribeMessage,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
   ConnectedSocket,
   MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
-import { Logger, UseGuards } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import { QR_ROOM_PREFIX, QR_WS_EVENTS } from './qr.constants';
 import { QrService } from './qr.service';
 import { QrStatusEvent, QrTicketStatus } from './qr.types';
-import { QR_WS_EVENTS, QR_ROOM_PREFIX } from './qr.constants';
 
 /**
  * QR WebSocket Gateway
@@ -32,6 +32,7 @@ import { QR_WS_EVENTS, QR_ROOM_PREFIX } from './qr.constants';
     origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
     credentials: true,
   },
+  transports: ['websocket', 'polling'],
 })
 export class QrGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
