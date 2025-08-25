@@ -1,5 +1,10 @@
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+
+import {
+  Logger,
+  UnauthorizedException,
+  ExecutionContext,
+} from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -7,22 +12,26 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 
+import { WebSocketAuthGuard } from '../guards/websocket-auth.guard';
+
 /**
- * Base WebSocket Gateway
+ * Base WebSocket Gateway with JWT Authentication Support
  *
  * This abstract class provides common WebSocket functionality that can be
  * inherited by specific gateway implementations. It handles:
- * - Connection management
- * - Client tracking
+ * - JWT authentication and validation (using existing AuthGuard)
+ * - Connection management with auth
+ * - Client tracking with user context
  * - Room management
  * - Event broadcasting
  * - Error handling
  * - Logging
  *
  * @template T - Type for client metadata (e.g., user info, permissions)
+ * @template U - Type for JWT payload (e.g., AuthPayload)
  */
 @WebSocketGateway()
-export abstract class BaseGateway<T = Record<string, any>>
+export abstract class BaseGateway<T = Record<string, any>, U = any>
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
@@ -31,40 +40,203 @@ export abstract class BaseGateway<T = Record<string, any>>
   protected readonly logger = new Logger(this.constructor.name);
   protected readonly connectedClients = new Map<string, Set<string>>(); // clientId -> Set<roomNames>
   protected readonly clientMetadata = new Map<string, T>(); // clientId -> metadata
+  protected readonly authenticatedClients = new Map<string, U>(); // clientId -> JWT payload
 
   /**
-   * Handles new WebSocket connections
+   * Optional: Override this to use custom authentication logic
+   * If not overridden, will use the default AuthGuard-based authentication
+   */
+  protected useCustomAuthentication = false;
+
+  /**
+   * Handles new WebSocket connections with JWT authentication
    * Override this method to add custom connection logic
    *
    * @param client - The connected socket client
    */
   async handleConnection(client: Socket): Promise<void> {
     const clientId = client.id;
-    this.logger.log(`Client connected: ${clientId}`);
+    this.logger.log(`Client connecting: ${clientId}`);
 
     try {
+      let authPayload: U | null = null;
+
+      // Choose authentication method
+      if (this.useCustomAuthentication) {
+        // Use custom authentication logic
+        authPayload = await this.authenticateClient(client);
+      } else {
+        // Use existing AuthGuard logic
+        authPayload = await this.authenticateWithGuard(client);
+      }
+
+      if (!authPayload) {
+        this.logger.warn(`Authentication failed for client ${clientId}`);
+        client.emit('auth:error', {
+          message: 'Authentication failed',
+          timestamp: Date.now(),
+        });
+        client.disconnect();
+        return;
+      }
+
+      // Store authenticated client
+      this.authenticatedClients.set(clientId, authPayload);
+
       // Initialize client's room tracking
       this.connectedClients.set(clientId, new Set());
 
       // Extract and store client metadata
-      const metadata = await this.extractClientMetadata(client);
+      const metadata = await this.extractClientMetadata(client, authPayload);
       this.clientMetadata.set(clientId, metadata);
 
       // Send connection confirmation
-      await this.sendConnectionConfirmation(client, metadata);
+      await this.sendConnectionConfirmation(client, metadata, authPayload);
 
       // Call custom connection logic
-      await this.onClientConnected(client, metadata);
+      await this.onClientConnected(client, metadata, authPayload);
 
-      this.logger.log(`Client ${clientId} connected successfully`);
+      this.logger.log(
+        `Client ${clientId} connected successfully as user ${this.getUserId(authPayload)}`,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to handle connection for client ${clientId}:`,
         error,
       );
+
+      // Send error to client before disconnecting
+      client.emit('auth:error', {
+        message: error.message || 'Authentication failed',
+        timestamp: Date.now(),
+      });
+
       client.disconnect();
     }
   }
+
+  /**
+   * Authenticates a client using the existing AuthGuard logic
+   * This method reuses the same JWT verification logic as HTTP endpoints
+   *
+   * @param client - The socket client
+   * @returns JWT payload if valid, null if invalid
+   */
+  protected async authenticateWithGuard(client: Socket): Promise<U | null> {
+    try {
+      // Create a mock execution context for the guard
+      const mockContext: ExecutionContext = {
+        switchToHttp: () => ({
+          getRequest: () => client,
+        }),
+        getClass: () => ({}) as any,
+        getHandler: () => ({}) as any,
+        getType: () => 'ws',
+        getArgs: () => [],
+        getArgByIndex: () => undefined,
+        getArg: () => undefined,
+      };
+
+      // Use the WebSocketAuthGuard to authenticate
+      const authGuard = new WebSocketAuthGuard(
+        this.getJwtService(),
+        this.getCacheService(),
+        this.getConfigService(),
+      );
+
+      const isAuthenticated = await authGuard.canActivate(mockContext);
+
+      if (isAuthenticated) {
+        // Extract the authenticated user from the socket
+        const user = (client as any).user;
+        return user || null;
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.warn(
+        `Guard-based authentication failed for client ${client.id}:`,
+        error,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Authenticates a client using custom JWT validation logic
+   * Override this method to implement custom authentication
+   * Only called when useCustomAuthentication = true
+   *
+   * @param client - The socket client
+   * @returns JWT payload if valid, null if invalid
+   */
+  protected async authenticateClient(client: Socket): Promise<U | null> {
+    // Default implementation - should be overridden if useCustomAuthentication = true
+    throw new Error(
+      'Custom authentication not implemented. Override authenticateClient() method.',
+    );
+  }
+
+  /**
+   * Extract client metadata from the connection
+   * Override this method to extract user info, permissions, etc.
+   *
+   * @param client - The socket client
+   * @param authPayload - The authenticated JWT payload
+   * @returns Client metadata
+   */
+  protected abstract extractClientMetadata(
+    client: Socket,
+    authPayload: U,
+  ): Promise<T>;
+
+  /**
+   * Send connection confirmation to the client
+   * Override this method to customize the connection message
+   *
+   * @param client - The socket client
+   * @param metadata - The extracted client metadata
+   * @param authPayload - The authenticated JWT payload
+   */
+  protected abstract sendConnectionConfirmation(
+    client: Socket,
+    metadata: T,
+    authPayload: U,
+  ): Promise<void>;
+
+  /**
+   * Gets the user ID from the JWT payload
+   * Override this method if your JWT payload structure is different
+   *
+   * @param authPayload - The JWT payload
+   * @returns User ID string
+   */
+  protected getUserId(authPayload: U): string {
+    // Default implementation - assume payload has 'uid' or 'userId' property
+    return (
+      (authPayload as any)?.uid || (authPayload as any)?.userId || 'unknown'
+    );
+  }
+
+  // Abstract methods for dependency injection (must be implemented by child classes)
+
+  /**
+   * Get JWT service instance
+   * Override this method to provide JWT service
+   */
+  protected abstract getJwtService(): any;
+
+  /**
+   * Get cache service instance
+   * Override this method to provide cache service
+   */
+  protected abstract getCacheService(): any;
+
+  /**
+   * Get config service instance
+   * Override this method to provide config service
+   */
+  protected abstract getConfigService(): any;
 
   /**
    * Handles WebSocket disconnections
@@ -81,11 +253,13 @@ export abstract class BaseGateway<T = Record<string, any>>
       await this.cleanupClientRooms(clientId);
 
       // Call custom disconnection logic
-      await this.onClientDisconnected(client);
+      const authPayload = this.authenticatedClients.get(clientId);
+      await this.onClientDisconnected(client, authPayload);
 
       // Clean up client data
       this.connectedClients.delete(clientId);
       this.clientMetadata.delete(clientId);
+      this.authenticatedClients.delete(clientId);
 
       this.logger.log(`Client ${clientId} disconnected successfully`);
     } catch (error) {
@@ -97,7 +271,37 @@ export abstract class BaseGateway<T = Record<string, any>>
   }
 
   /**
+   * Checks if a client is authenticated
+   *
+   * @param clientId - The client ID to check
+   * @returns True if authenticated, false otherwise
+   */
+  isClientAuthenticated(clientId: string): boolean {
+    return this.authenticatedClients.has(clientId);
+  }
+
+  /**
+   * Gets the JWT payload for a client
+   *
+   * @param clientId - The client ID
+   * @returns JWT payload or undefined if not authenticated
+   */
+  getClientAuthPayload(clientId: string): U | undefined {
+    return this.authenticatedClients.get(clientId);
+  }
+
+  /**
+   * Gets all authenticated clients
+   *
+   * @returns Map of client ID to JWT payload
+   */
+  getAllAuthenticatedClients(): Map<string, U> {
+    return new Map(this.authenticatedClients);
+  }
+
+  /**
    * Joins a client to a room and tracks the subscription
+   * Only authenticated clients can join rooms
    *
    * @param clientId - The client ID
    * @param roomName - The room name to join
@@ -110,6 +314,14 @@ export abstract class BaseGateway<T = Record<string, any>>
     client?: Socket,
   ): Promise<boolean> {
     try {
+      // Check if client is authenticated
+      if (!this.isClientAuthenticated(clientId)) {
+        this.logger.warn(
+          `Unauthenticated client ${clientId} attempted to join room ${roomName}`,
+        );
+        return false;
+      }
+
       // Join the room if client is provided
       if (client) {
         await client.join(roomName);
@@ -233,16 +445,19 @@ export abstract class BaseGateway<T = Record<string, any>>
   }
 
   /**
-   * Gets connection statistics
+   * Gets connection statistics including authentication info
    *
    * @returns Object containing connection statistics
    */
   getConnectionStats(): {
     totalClients: number;
+    authenticatedClients: number;
     totalRooms: number;
     clientRooms: Record<string, string[]>;
+    authenticatedClientRooms: Record<string, string[]>;
   } {
     const totalClients = this.connectedClients.size;
+    const authenticatedClients = this.authenticatedClients.size;
     const allRooms = new Set<string>();
 
     // Collect all unique rooms
@@ -256,14 +471,24 @@ export abstract class BaseGateway<T = Record<string, any>>
 
     // Build client-room mapping
     const clientRooms: Record<string, string[]> = {};
+    const authenticatedClientRooms: Record<string, string[]> = {};
+
     for (const [clientId, rooms] of this.connectedClients.entries()) {
-      clientRooms[clientId] = Array.from(rooms);
+      const roomArray = Array.from(rooms);
+      clientRooms[clientId] = roomArray;
+
+      // Separate authenticated clients
+      if (this.isClientAuthenticated(clientId)) {
+        authenticatedClientRooms[clientId] = roomArray;
+      }
     }
 
     return {
       totalClients,
+      authenticatedClients,
       totalRooms,
       clientRooms,
+      authenticatedClientRooms,
     };
   }
 
@@ -279,6 +504,19 @@ export abstract class BaseGateway<T = Record<string, any>>
       return [];
     }
     return Array.from(room);
+  }
+
+  /**
+   * Gets all authenticated clients in a specific room
+   *
+   * @param roomName - The room name
+   * @returns Array of authenticated client IDs in the room
+   */
+  getAuthenticatedClientsInRoom(roomName: string): string[] {
+    const allClients = this.getClientsInRoom(roomName);
+    return allClients.filter((clientId) =>
+      this.isClientAuthenticated(clientId),
+    );
   }
 
   /**
@@ -314,29 +552,6 @@ export abstract class BaseGateway<T = Record<string, any>>
     return clientRooms ? clientRooms.has(roomName) : false;
   }
 
-  // Abstract methods that child classes must implement
-
-  /**
-   * Extract client metadata from the connection
-   * Override this method to extract user info, permissions, etc.
-   *
-   * @param client - The socket client
-   * @returns Client metadata
-   */
-  protected abstract extractClientMetadata(client: Socket): Promise<T>;
-
-  /**
-   * Send connection confirmation to the client
-   * Override this method to customize the connection message
-   *
-   * @param client - The socket client
-   * @param metadata - The extracted client metadata
-   */
-  protected abstract sendConnectionConfirmation(
-    client: Socket,
-    metadata: T,
-  ): Promise<void>;
-
   // Optional hooks that child classes can override
 
   /**
@@ -345,10 +560,12 @@ export abstract class BaseGateway<T = Record<string, any>>
    *
    * @param client - The socket client
    * @param metadata - The extracted client metadata
+   * @param authPayload - The authenticated JWT payload
    */
   protected async onClientConnected(
     client: Socket,
     metadata: T,
+    authPayload: U,
   ): Promise<void> {
     // Default implementation - do nothing
   }
@@ -358,8 +575,12 @@ export abstract class BaseGateway<T = Record<string, any>>
    * Override this method to add custom disconnection logic
    *
    * @param client - The socket client
+   * @param authPayload - The JWT payload (may be undefined if auth failed)
    */
-  protected async onClientDisconnected(client: Socket): Promise<void> {
+  protected async onClientDisconnected(
+    client: Socket,
+    authPayload?: U,
+  ): Promise<void> {
     // Default implementation - do nothing
   }
 

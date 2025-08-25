@@ -1,4 +1,6 @@
 import { Server, Socket } from 'socket.io';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import {
   QR_ROOM_PREFIX,
   QR_WS_EVENTS,
@@ -6,6 +8,8 @@ import {
   QrTicketStatus,
 } from 'src/shared/constants';
 import { BaseGateway } from 'src/common/gateways/base.gateway';
+import { AuthPayload } from 'src/common/interface';
+import { CacheService } from 'src/shared/services';
 
 import {
   ConnectedSocket,
@@ -17,16 +21,17 @@ import {
 import { QrService } from './qr.service';
 
 /**
- * QR WebSocket Gateway
+ * QR WebSocket Gateway with JWT Authentication using existing AuthGuard
  *
  * This gateway handles real-time communication between web clients and the QR system.
  * It allows clients to subscribe to ticket status updates and receive real-time
  * notifications when ticket states change.
  *
  * Features:
+ * - JWT-based authentication using existing AuthGuard
  * - Room-based subscription per ticket ID
  * - Real-time status updates
- * - Connection management
+ * - Connection management with user context
  * - Event broadcasting
  */
 @WebSocketGateway({
@@ -37,30 +42,59 @@ import { QrService } from './qr.service';
   },
   transports: ['websocket', 'polling'],
 })
-export class QrGateway extends BaseGateway<{
-  userId?: string;
-  permissions?: string[];
-}> {
-  constructor(private readonly qrService: QrService) {
+export class QrGateway extends BaseGateway<
+  { userId: string; permissions: string[]; email?: string },
+  AuthPayload
+> {
+  constructor(
+    private readonly qrService: QrService,
+    private readonly jwtService: JwtService,
+    private readonly cacheService: CacheService,
+    private readonly configService: ConfigService,
+  ) {
     super();
+    // Use existing AuthGuard instead of custom authentication
+    this.useCustomAuthentication = false;
+  }
+
+  /**
+   * Get JWT service instance
+   */
+  protected getJwtService(): JwtService {
+    return this.jwtService;
+  }
+
+  /**
+   * Get cache service instance
+   */
+  protected getCacheService(): CacheService {
+    return this.cacheService;
+  }
+
+  /**
+   * Get config service instance
+   */
+  protected getConfigService(): ConfigService {
+    return this.configService;
   }
 
   /**
    * Extract client metadata from the connection
-   * For QR gateway, we extract user ID and permissions if available
+   * For QR gateway, we extract user ID, permissions, and email from JWT payload
    *
    * @param client - The socket client
+   * @param authPayload - The authenticated JWT payload
    * @returns Client metadata
    */
   protected async extractClientMetadata(
     client: Socket,
-  ): Promise<{ userId?: string; permissions?: string[] }> {
-    // Extract user ID from handshake auth if available
-    const userId = (client.handshake.auth as { userId?: string })?.userId;
-    const permissions =
-      (client.handshake.auth as { permissions?: string[] })?.permissions || [];
-
-    return { userId, permissions };
+    authPayload: AuthPayload,
+  ): Promise<{ userId: string; permissions: string[]; email?: string }> {
+    return {
+      userId: authPayload.uid,
+      permissions: [],
+      email: (authPayload as { email?: string }).email,
+    };
   }
 
   /**
@@ -68,22 +102,36 @@ export class QrGateway extends BaseGateway<{
    *
    * @param client - The socket client
    * @param metadata - The extracted client metadata
+   * @param authPayload - The authenticated JWT payload
    */
   protected async sendConnectionConfirmation(
     client: Socket,
-    metadata: { userId?: string; permissions?: string[] },
+    metadata: { userId: string; permissions: string[]; email?: string },
+    authPayload: AuthPayload,
   ): Promise<void> {
     client.emit('qr:connected', {
       clientId: client.id,
+      userId: metadata.userId,
+      email: metadata.email,
+      permissions: metadata.permissions,
       timestamp: Date.now(),
       message: 'Connected to QR WebSocket gateway',
-      userId: metadata.userId,
-      permissions: metadata.permissions,
     });
   }
 
   /**
+   * Gets the user ID from the JWT payload
+   *
+   * @param authPayload - The JWT payload
+   * @returns User ID string
+   */
+  protected getUserId(authPayload: AuthPayload): string {
+    return authPayload.uid;
+  }
+
+  /**
    * Handles subscription to a ticket's status updates
+   * Only authenticated clients can subscribe
    *
    * @param client - The socket client
    * @param data - Object containing ticket ID
@@ -252,22 +300,29 @@ export class QrGateway extends BaseGateway<{
   }
 
   /**
-   * Gets QR-specific connection statistics
+   * Gets QR-specific connection statistics with authentication info
    *
    * @returns Object containing QR connection statistics
    */
   getQrConnectionStats(): {
     totalClients: number;
+    authenticatedClients: number;
     totalRooms: number;
     clientRooms: Record<string, string[]>;
+    authenticatedClientRooms: Record<string, string[]>;
     qrRooms: string[];
     nonQrRooms: string[];
+    userStats: Record<string, { rooms: string[]; permissions: string[] }>;
   } {
     const baseStats = this.getConnectionStats();
     const qrRooms: string[] = [];
     const nonQrRooms: string[] = [];
+    const userStats: Record<
+      string,
+      { rooms: string[]; permissions: string[] }
+    > = {};
 
-    // Categorize rooms
+    // Categorize rooms and build user statistics
     for (const [clientId, rooms] of Object.entries(baseStats.clientRooms)) {
       for (const room of rooms) {
         if (room.startsWith(QR_ROOM_PREFIX)) {
@@ -276,12 +331,30 @@ export class QrGateway extends BaseGateway<{
           nonQrRooms.push(room);
         }
       }
+
+      // Build user statistics for authenticated clients
+      if (this.isClientAuthenticated(clientId)) {
+        const authPayload = this.getClientAuthPayload(clientId);
+        const metadata = this.clientMetadata.get(clientId);
+
+        if (authPayload && metadata) {
+          const userId = this.getUserId(authPayload);
+          if (!userStats[userId]) {
+            userStats[userId] = {
+              rooms: [],
+              permissions: metadata.permissions || [],
+            };
+          }
+          userStats[userId].rooms.push(...rooms);
+        }
+      }
     }
 
     return {
       ...baseStats,
       qrRooms: [...new Set(qrRooms)], // Remove duplicates
       nonQrRooms: [...new Set(nonQrRooms)], // Remove duplicates
+      userStats,
     };
   }
 
@@ -297,6 +370,17 @@ export class QrGateway extends BaseGateway<{
   }
 
   /**
+   * Gets all authenticated clients subscribed to a specific ticket
+   *
+   * @param ticketId - The ticket ID
+   * @returns Array of authenticated client IDs
+   */
+  getAuthenticatedTicketSubscribers(ticketId: string): string[] {
+    const roomName = `${QR_ROOM_PREFIX}${ticketId}`;
+    return this.getAuthenticatedClientsInRoom(roomName);
+  }
+
+  /**
    * Checks if a client is subscribed to a specific ticket
    *
    * @param clientId - The client ID
@@ -306,5 +390,29 @@ export class QrGateway extends BaseGateway<{
   isClientSubscribedToTicket(clientId: string, ticketId: string): boolean {
     const roomName = `${QR_ROOM_PREFIX}${ticketId}`;
     return this.isClientInRoom(clientId, roomName);
+  }
+
+  /**
+   * Gets all tickets a user is subscribed to
+   *
+   * @param userId - The user ID
+   * @returns Array of ticket IDs
+   */
+  getUserSubscribedTickets(userId: string): string[] {
+    const tickets: string[] = [];
+
+    for (const [clientId, authPayload] of this.authenticatedClients.entries()) {
+      if (this.getUserId(authPayload) === userId) {
+        const rooms = this.getClientRooms(clientId);
+        for (const room of rooms) {
+          if (room.startsWith(QR_ROOM_PREFIX)) {
+            const ticketId = room.replace(QR_ROOM_PREFIX, '');
+            tickets.push(ticketId);
+          }
+        }
+      }
+    }
+
+    return [...new Set(tickets)]; // Remove duplicates
   }
 }
