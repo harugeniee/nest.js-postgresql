@@ -5,16 +5,13 @@ import {
   QrStatusEvent,
   QrTicketStatus,
 } from 'src/shared/constants';
+import { BaseGateway } from 'src/common/gateways/base.gateway';
 
-import { Logger } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
-  WebSocketServer,
 } from '@nestjs/websockets';
 
 import { QrService } from './qr.service';
@@ -40,53 +37,49 @@ import { QrService } from './qr.service';
   },
   transports: ['websocket', 'polling'],
 })
-export class QrGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  @WebSocketServer()
-  server: Server;
-
-  private readonly logger = new Logger(QrGateway.name);
-  private readonly connectedClients = new Map<string, Set<string>>(); // clientId -> Set<roomNames>
-
-  constructor(private readonly qrService: QrService) {}
-
-  /**
-   * Handles new WebSocket connections
-   *
-   * @param client - The connected socket client
-   */
-  async handleConnection(client: Socket): Promise<void> {
-    const clientId = client.id;
-    this.logger.log(`Client connected: ${clientId}`);
-
-    // Initialize client's room tracking
-    this.connectedClients.set(clientId, new Set());
-
-    // Send connection confirmation
-    client.emit('qr:connected', {
-      clientId,
-      timestamp: Date.now(),
-      message: 'Connected to QR WebSocket gateway',
-    });
+export class QrGateway extends BaseGateway<{
+  userId?: string;
+  permissions?: string[];
+}> {
+  constructor(private readonly qrService: QrService) {
+    super();
   }
 
   /**
-   * Handles WebSocket disconnections
+   * Extract client metadata from the connection
+   * For QR gateway, we extract user ID and permissions if available
    *
-   * @param client - The disconnected socket client
+   * @param client - The socket client
+   * @returns Client metadata
    */
-  async handleDisconnect(client: Socket): Promise<void> {
-    const clientId = client.id;
-    this.logger.log(`Client disconnected: ${clientId}`);
+  protected async extractClientMetadata(
+    client: Socket,
+  ): Promise<{ userId?: string; permissions?: string[] }> {
+    // Extract user ID from handshake auth if available
+    const userId = (client.handshake.auth as { userId?: string })?.userId;
+    const permissions =
+      (client.handshake.auth as { permissions?: string[] })?.permissions || [];
 
-    // Clean up client's room subscriptions
-    const clientRooms = this.connectedClients.get(clientId);
-    if (clientRooms) {
-      for (const roomName of clientRooms) {
-        await client.leave(roomName);
-        this.logger.debug(`Client ${clientId} left room: ${roomName}`);
-      }
-      this.connectedClients.delete(clientId);
-    }
+    return { userId, permissions };
+  }
+
+  /**
+   * Send connection confirmation to the client
+   *
+   * @param client - The socket client
+   * @param metadata - The extracted client metadata
+   */
+  protected async sendConnectionConfirmation(
+    client: Socket,
+    metadata: { userId?: string; permissions?: string[] },
+  ): Promise<void> {
+    client.emit('qr:connected', {
+      clientId: client.id,
+      timestamp: Date.now(),
+      message: 'Connected to QR WebSocket gateway',
+      userId: metadata.userId,
+      permissions: metadata.permissions,
+    });
   }
 
   /**
@@ -112,7 +105,7 @@ export class QrGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      // Validate ticket exists
+      // Verify the ticket exists
       const ticket = await this.qrService.getTicket(ticketId);
       if (!ticket) {
         client.emit('qr:error', {
@@ -123,39 +116,42 @@ export class QrGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      // Join the ticket's room
+      // Join the ticket room
       const roomName = `${QR_ROOM_PREFIX}${ticketId}`;
-      await client.join(roomName);
+      const success = await this.joinRoom(clientId, roomName, client);
 
-      // Track client's room subscription
-      const clientRooms = this.connectedClients.get(clientId) || new Set();
-      clientRooms.add(roomName);
-      this.connectedClients.set(clientId, clientRooms);
+      if (success) {
+        // Send confirmation
+        client.emit('qr:subscribed', {
+          ticketId,
+          roomName,
+          timestamp: Date.now(),
+          message: 'Successfully subscribed to ticket updates',
+        });
 
-      // Send confirmation
-      client.emit('qr:subscribed', {
-        ticketId,
-        roomName,
-        timestamp: Date.now(),
-        message: `Subscribed to ticket ${ticketId}`,
-      });
+        // Send current ticket status
+        client.emit(QR_WS_EVENTS.STATUS_UPDATE, {
+          tid: ticketId,
+          status: ticket.status,
+          timestamp: Date.now(),
+          message: 'Current ticket status',
+        });
 
-      // Send current ticket status
-      client.emit('qr:status:update', {
-        tid: ticketId,
-        status: ticket.status,
-        timestamp: Date.now(),
-        message: `Current status: ${ticket.status}`,
-      });
-
-      this.logger.log(`Client ${clientId} subscribed to ticket ${ticketId}`);
+        this.logger.log(`Client ${clientId} subscribed to ticket ${ticketId}`);
+      } else {
+        client.emit('qr:error', {
+          message: 'Failed to subscribe to ticket',
+          ticketId,
+          timestamp: Date.now(),
+        });
+      }
     } catch (error) {
       this.logger.error(
-        `Error subscribing client ${clientId} to ticket ${ticketId}:`,
+        `Failed to subscribe client ${clientId} to ticket ${ticketId}:`,
         error,
       );
       client.emit('qr:error', {
-        message: 'Failed to subscribe to ticket',
+        message: 'Internal server error during subscription',
         ticketId,
         timestamp: Date.now(),
       });
@@ -185,34 +181,36 @@ export class QrGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      // Leave the ticket's room
+      // Leave the ticket room
       const roomName = `${QR_ROOM_PREFIX}${ticketId}`;
-      await client.leave(roomName);
+      const success = await this.leaveRoom(clientId, roomName, client);
 
-      // Update client's room tracking
-      const clientRooms = this.connectedClients.get(clientId);
-      if (clientRooms) {
-        clientRooms.delete(roomName);
+      if (success) {
+        // Send confirmation
+        client.emit('qr:unsubscribed', {
+          ticketId,
+          roomName,
+          timestamp: Date.now(),
+          message: 'Successfully unsubscribed from ticket updates',
+        });
+
+        this.logger.log(
+          `Client ${clientId} unsubscribed from ticket ${ticketId}`,
+        );
+      } else {
+        client.emit('qr:error', {
+          message: 'Failed to unsubscribe from ticket',
+          ticketId,
+          timestamp: Date.now(),
+        });
       }
-
-      // Send confirmation
-      client.emit('qr:unsubscribed', {
-        ticketId,
-        roomName,
-        timestamp: Date.now(),
-        message: `Unsubscribed from ticket ${ticketId}`,
-      });
-
-      this.logger.log(
-        `Client ${clientId} unsubscribed from ticket ${ticketId}`,
-      );
     } catch (error) {
       this.logger.error(
-        `Error unsubscribing client ${clientId} from ticket ${ticketId}:`,
+        `Failed to unsubscribe client ${clientId} from ticket ${ticketId}:`,
         error,
       );
       client.emit('qr:error', {
-        message: 'Failed to unsubscribe from ticket',
+        message: 'Internal server error during unsubscription',
         ticketId,
         timestamp: Date.now(),
       });
@@ -222,137 +220,91 @@ export class QrGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * Broadcasts a status update to all clients subscribed to a specific ticket
    *
-   * @param ticketId - The ticket ID to broadcast to
-   * @param statusEvent - The status event to broadcast
-   */
-  async broadcastStatusUpdate(
-    ticketId: string,
-    statusEvent: QrStatusEvent,
-  ): Promise<void> {
-    const roomName = `${QR_ROOM_PREFIX}${ticketId}`;
-
-    try {
-      // Emit to all clients in the room
-      this.server.to(roomName).emit(QR_WS_EVENTS.STATUS_UPDATE, statusEvent);
-
-      this.logger.debug(
-        `Status update broadcasted to room ${roomName}:`,
-        statusEvent,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Error broadcasting status update to room ${roomName}:`,
-        error,
-      );
-    }
-  }
-
-  /**
-   * Broadcasts a status update to all clients subscribed to a specific ticket
-   * This is a convenience method that creates the status event object
-   *
-   * @param ticketId - The ticket ID to broadcast to
+   * @param ticketId - The ticket ID
    * @param status - The new status
    * @param message - Optional message describing the status change
+   * @returns Number of clients that received the update
    */
   async broadcastStatus(
     ticketId: string,
     status: QrTicketStatus,
     message?: string,
-  ): Promise<void> {
-    const statusEvent: QrStatusEvent = {
+  ): Promise<number> {
+    const roomName = `${QR_ROOM_PREFIX}${ticketId}`;
+    const eventData: QrStatusEvent = {
       tid: ticketId,
       status,
-      message: message || `Status changed to: ${status}`,
+      message,
       timestamp: Date.now(),
     };
 
-    await this.broadcastStatusUpdate(ticketId, statusEvent);
+    const clientCount = await this.broadcastToRoom(
+      roomName,
+      QR_WS_EVENTS.STATUS_UPDATE,
+      eventData,
+    );
+
+    this.logger.log(
+      `Broadcasted status update for ticket ${ticketId} to ${clientCount} clients: ${status}`,
+    );
+
+    return clientCount;
   }
 
   /**
-   * Gets information about connected clients and their subscriptions
+   * Gets QR-specific connection statistics
    *
-   * @returns Object containing connection statistics
+   * @returns Object containing QR connection statistics
    */
-  getConnectionStats(): {
+  getQrConnectionStats(): {
     totalClients: number;
     totalRooms: number;
-    clientSubscriptions: Record<string, string[]>;
+    clientRooms: Record<string, string[]>;
+    qrRooms: string[];
+    nonQrRooms: string[];
   } {
-    const totalClients = this.connectedClients.size;
-    const allRooms = new Set<string>();
-    const clientSubscriptions: Record<string, string[]> = {};
+    const baseStats = this.getConnectionStats();
+    const qrRooms: string[] = [];
+    const nonQrRooms: string[] = [];
 
-    for (const [clientId, rooms] of this.connectedClients.entries()) {
-      const roomArray = Array.from(rooms);
-      clientSubscriptions[clientId] = roomArray;
-      roomArray.forEach((room) => allRooms.add(room));
+    // Categorize rooms
+    for (const [clientId, rooms] of Object.entries(baseStats.clientRooms)) {
+      for (const room of rooms) {
+        if (room.startsWith(QR_ROOM_PREFIX)) {
+          qrRooms.push(room);
+        } else {
+          nonQrRooms.push(room);
+        }
+      }
     }
 
     return {
-      totalClients,
-      totalRooms: allRooms.size,
-      clientSubscriptions,
+      ...baseStats,
+      qrRooms: [...new Set(qrRooms)], // Remove duplicates
+      nonQrRooms: [...new Set(nonQrRooms)], // Remove duplicates
     };
   }
 
   /**
-   * Gets the number of clients subscribed to a specific ticket
+   * Gets all clients subscribed to a specific ticket
    *
-   * @param ticketId - The ticket ID to check
-   * @returns Number of subscribed clients
+   * @param ticketId - The ticket ID
+   * @returns Array of client IDs
    */
-  getTicketSubscriberCount(ticketId: string): number {
+  getTicketSubscribers(ticketId: string): string[] {
     const roomName = `${QR_ROOM_PREFIX}${ticketId}`;
-    const room = this.server.sockets.adapter.rooms.get(roomName);
-    return room ? room.size : 0;
+    return this.getClientsInRoom(roomName);
   }
 
   /**
-   * Disconnects all clients from a specific ticket room
-   * Useful for cleanup when a ticket is completed or expired
+   * Checks if a client is subscribed to a specific ticket
    *
-   * @param ticketId - The ticket ID to disconnect clients from
+   * @param clientId - The client ID
+   * @param ticketId - The ticket ID
+   * @returns True if subscribed, false otherwise
    */
-  async disconnectTicketClients(ticketId: string): Promise<void> {
+  isClientSubscribedToTicket(clientId: string, ticketId: string): boolean {
     const roomName = `${QR_ROOM_PREFIX}${ticketId}`;
-
-    try {
-      // Get all clients in the room
-      const room = this.server.sockets.adapter.rooms.get(roomName);
-      if (room) {
-        // Send final status update before disconnecting
-        const finalEvent: QrStatusEvent = {
-          tid: ticketId,
-          status: 'USED',
-          message: 'Ticket completed, disconnecting clients',
-          timestamp: Date.now(),
-        };
-
-        this.server.to(roomName).emit(QR_WS_EVENTS.STATUS_UPDATE, finalEvent);
-
-        // Disconnect all clients from the room
-        for (const clientId of room) {
-          const client = this.server.sockets.sockets.get(clientId);
-          if (client) {
-            await client.leave(roomName);
-
-            // Update client's room tracking
-            const clientRooms = this.connectedClients.get(clientId);
-            if (clientRooms) {
-              clientRooms.delete(roomName);
-            }
-          }
-        }
-      }
-
-      this.logger.log(`Disconnected all clients from ticket ${ticketId}`);
-    } catch (error) {
-      this.logger.error(
-        `Error disconnecting clients from ticket ${ticketId}:`,
-        error,
-      );
-    }
+    return this.isClientInRoom(clientId, roomName);
   }
 }
