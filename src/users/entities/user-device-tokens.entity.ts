@@ -2,7 +2,9 @@ import { instanceToPlain } from 'class-transformer';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column, Entity, Index } from 'typeorm';
 
-@Entity('user_device_tokens')
+@Entity({
+  name: 'user_device_tokens',
+})
 export class UserDeviceToken extends BaseEntityCustom {
   @Column('bigint')
   @Index()

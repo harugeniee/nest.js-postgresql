@@ -3,7 +3,9 @@ import { AuthType, USER_CONSTANTS } from 'src/shared/constants/user.constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column, Entity, Index } from 'typeorm';
 
-@Entity('user_sessions')
+@Entity({
+  name: 'user_sessions',
+})
 @Index(['userId', 'revoked'])
 @Index(['expiresAt'])
 export class UserSession extends BaseEntityCustom {

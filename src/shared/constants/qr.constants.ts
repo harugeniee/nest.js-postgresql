@@ -166,28 +166,6 @@ export const QR_SENSITIVE_KEYS = [
 ] as const;
 
 /**
- * QR action type constants
- */
-export const QR_ACTION_TYPES = {
-  LOGIN: 'LOGIN',
-  ADD_FRIEND: 'ADD_FRIEND',
-  JOIN_ORG: 'JOIN_ORG',
-  PAIR: 'PAIR',
-} as const;
-
-/**
- * QR ticket status constants
- */
-export const QR_TICKET_STATUSES = {
-  PENDING: 'PENDING',
-  SCANNED: 'SCANNED',
-  APPROVED: 'APPROVED',
-  REJECTED: 'REJECTED',
-  EXPIRED: 'EXPIRED',
-  USED: 'USED',
-} as const;
-
-/**
  * QR HTTP status codes for different scenarios
  */
 export const QR_HTTP_STATUS_CODES = {
@@ -254,23 +232,24 @@ export const QR_METRICS = {
 /**
  * QR Action Types - Defines the different types of actions that can be performed via QR codes
  */
-export enum QrActionType {
-  LOGIN = 'LOGIN',
-  ADD_FRIEND = 'ADD_FRIEND',
-  JOIN_ORG = 'JOIN_ORG',
-  PAIR = 'PAIR',
-}
+export const QR_ACTION_TYPES = {
+  LOGIN: 'LOGIN',
+  ADD_FRIEND: 'ADD_FRIEND',
+  JOIN_ORG: 'JOIN_ORG',
+  PAIR: 'PAIR',
+} as const;
 
 /**
  * QR Ticket Status - Represents the current state of a QR ticket in its lifecycle
  */
-export type QrTicketStatus =
-  | 'PENDING'
-  | 'SCANNED'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'EXPIRED'
-  | 'USED';
+export const QR_TICKET_STATUSES = {
+  PENDING: 'PENDING', // The ticket is waiting to be scanned
+  SCANNED: 'SCANNED',
+  APPROVED: 'APPROVED', // The ticket has been approved by the user
+  REJECTED: 'REJECTED', // The ticket has been rejected by the user
+  EXPIRED: 'EXPIRED', // The ticket has expired
+  USED: 'USED', // The ticket has been used
+} as const;
 
 /**
  * QR Ticket Interface - Represents a QR ticket with all its properties and metadata
@@ -363,3 +342,10 @@ export interface QrDeepLinkOptions {
   /** Custom path for the QR handler */
   path?: string;
 }
+
+// Type definitions for better TypeScript support
+export type QrActionType =
+  (typeof QR_ACTION_TYPES)[keyof typeof QR_ACTION_TYPES];
+
+export type QrTicketStatus =
+  (typeof QR_TICKET_STATUSES)[keyof typeof QR_TICKET_STATUSES];

@@ -3,7 +3,9 @@ import { USER_CONSTANTS, UserRole, UserStatus } from 'src/shared/constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column, Entity, Index } from 'typeorm';
 
-@Entity('users')
+@Entity({
+  name: 'users',
+})
 @Index(['oauthProvider', 'oauthId'], { unique: true }) // Composite unique index cho OAuth
 @Index(['status', 'role']) // Composite index cho filtering
 @Index(['isEmailVerified', 'isPhoneVerified']) // Composite index cho verification

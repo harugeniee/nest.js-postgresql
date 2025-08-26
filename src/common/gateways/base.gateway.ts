@@ -12,7 +12,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 
-import { WebSocketAuthGuard } from '../guards/websocket-auth.guard';
+import { WebSocketAuthGuard } from 'src/auth/guard';
 
 /**
  * Base WebSocket Gateway with JWT Authentication Support

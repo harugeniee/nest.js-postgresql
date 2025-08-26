@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'crypto';
-import { QR_CRYPTO_CONFIG } from 'src/shared/constants';
+import { QR_CRYPTO_CONFIG } from 'src/shared/constants/qr.constants';
 
 /**
  * QR Utilities - Cryptographic and utility functions for the QR Actions feature
@@ -182,7 +182,7 @@ export function parseDeepLink(
     }
 
     return null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -218,14 +218,14 @@ export function isValidCodeVerifier(codeVerifier: string): boolean {
  * @returns Sanitized payload object
  */
 export function sanitizePayload(
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   maxDepth: number = 2,
-): Record<string, any> {
+): Record<string, unknown> {
   if (!payload || typeof payload !== 'object') {
     return {};
   }
 
-  const sanitized: Record<string, any> = {};
+  const sanitized: Record<string, unknown> = {};
   const sensitiveKeys = [
     'password',
     'token',
@@ -237,23 +237,13 @@ export function sanitizePayload(
     'user_id',
   ];
 
-  function sanitizeValue(
-    value: any,
-    depth: number,
-  ):
-    | string
-    | number
-    | boolean
-    | null
-    | undefined
-    | Record<string, any>
-    | (string | number | boolean | Record<string, any>)[] {
+  function sanitizeValue(value: unknown, depth: number): unknown {
     if (depth > maxDepth) {
       return '[Nested Object]';
     }
 
     if (value === null || value === undefined) {
-      return value as null | undefined;
+      return value;
     }
 
     if (typeof value === 'string') {
@@ -270,18 +260,11 @@ export function sanitizePayload(
     }
 
     if (Array.isArray(value)) {
-      return value
-        .slice(0, 10)
-        .map((item) => sanitizeValue(item, depth + 1)) as (
-        | string
-        | number
-        | boolean
-        | Record<string, any>
-      )[];
+      return value.slice(0, 10).map((item) => sanitizeValue(item, depth + 1));
     }
 
     if (typeof value === 'object') {
-      const sanitizedObj: Record<string, any> = {};
+      const sanitizedObj: Record<string, unknown> = {};
       for (const [key, val] of Object.entries(value)) {
         // Skip sensitive keys
         if (

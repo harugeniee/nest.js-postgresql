@@ -4,7 +4,7 @@ import { AddFriendAction } from './actions/add-friend.action';
 import { JoinOrgAction } from './actions/join-org.action';
 import { LoginAction } from './actions/login.action';
 import { PairAction } from './actions/pair.action';
-import { QrActionType } from 'src/shared/constants';
+import { QR_ACTION_TYPES, QrActionType } from 'src/shared/constants';
 
 /**
  * QR Action Executor Service
@@ -29,10 +29,10 @@ export class QrActionExecutorService {
   ) {
     // Initialize the action registry
     this.actions = new Map<QrActionType, BaseQrAction>([
-      [QrActionType.LOGIN, this.loginAction],
-      [QrActionType.ADD_FRIEND, this.addFriendAction],
-      [QrActionType.JOIN_ORG, this.joinOrgAction],
-      [QrActionType.PAIR, this.pairAction],
+      [QR_ACTION_TYPES.LOGIN, this.loginAction],
+      [QR_ACTION_TYPES.ADD_FRIEND, this.addFriendAction],
+      [QR_ACTION_TYPES.JOIN_ORG, this.joinOrgAction],
+      [QR_ACTION_TYPES.PAIR, this.pairAction],
     ]);
 
     this.logger.log(
@@ -137,7 +137,7 @@ export class QrActionExecutorService {
    * @throws Error if any required actions are missing
    */
   validateActionRegistry(): boolean {
-    const requiredActions = Object.values(QrActionType);
+    const requiredActions = Object.values(QR_ACTION_TYPES);
     const missingActions = requiredActions.filter(
       (actionType) => !this.actions.has(actionType),
     );

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseQrAction, QrActionContext } from './base-action';
-import { QrActionType } from 'src/shared/constants';
+import { QR_ACTION_TYPES, QrActionType } from 'src/shared/constants';
 
 /**
  * Login Action - Handles QR-based login requests
@@ -23,7 +23,7 @@ export class LoginAction extends BaseQrAction {
    * Returns the action type this class handles
    */
   type(): QrActionType {
-    return QrActionType.LOGIN;
+    return QR_ACTION_TYPES.LOGIN;
   }
 
   /**

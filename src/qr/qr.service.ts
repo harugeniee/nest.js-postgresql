@@ -2,6 +2,7 @@ import {
   QR_ERROR_MESSAGES,
   QR_REDIS_PREFIXES,
   QR_TTL_DEFAULTS,
+  QR_ACTION_TYPES,
   QrActionType,
   QrGrant,
   QrTicket,
@@ -460,10 +461,10 @@ export class QrService {
       // Get detailed ticket information for statistics
       let activeTickets = 0;
       const actionTypeBreakdown: Record<QrActionType, number> = {
-        [QrActionType.LOGIN]: 0,
-        [QrActionType.ADD_FRIEND]: 0,
-        [QrActionType.JOIN_ORG]: 0,
-        [QrActionType.PAIR]: 0,
+        [QR_ACTION_TYPES.LOGIN]: 0,
+        [QR_ACTION_TYPES.ADD_FRIEND]: 0,
+        [QR_ACTION_TYPES.JOIN_ORG]: 0,
+        [QR_ACTION_TYPES.PAIR]: 0,
       };
 
       for (const ticketKey of ticketKeys) {
@@ -502,10 +503,10 @@ export class QrService {
         totalGrants: 0,
         activeGrants: 0,
         actionTypeBreakdown: {
-          [QrActionType.LOGIN]: 0,
-          [QrActionType.ADD_FRIEND]: 0,
-          [QrActionType.JOIN_ORG]: 0,
-          [QrActionType.PAIR]: 0,
+          [QR_ACTION_TYPES.LOGIN]: 0,
+          [QR_ACTION_TYPES.ADD_FRIEND]: 0,
+          [QR_ACTION_TYPES.JOIN_ORG]: 0,
+          [QR_ACTION_TYPES.PAIR]: 0,
         },
       };
     }

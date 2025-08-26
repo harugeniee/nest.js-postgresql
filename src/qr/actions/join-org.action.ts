@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseQrAction, QrActionContext } from './base-action';
-import { QrActionType } from 'src/shared/constants';
+import { QR_ACTION_TYPES, QrActionType } from 'src/shared/constants';
 
 /**
  * Join Organization Action - Handles QR-based organization membership requests
@@ -21,7 +21,7 @@ export class JoinOrgAction extends BaseQrAction {
    * Returns the action type this class handles
    */
   type(): QrActionType {
-    return QrActionType.JOIN_ORG;
+    return QR_ACTION_TYPES.JOIN_ORG;
   }
 
   /**
@@ -47,9 +47,9 @@ export class JoinOrgAction extends BaseQrAction {
       throw new Error('Organization ID is required for JOIN_ORG action');
     }
 
-    const orgId = ctx.payload.orgId;
-    const role = ctx.payload.role || 'MEMBER';
-    const permissions = ctx.payload.permissions || [];
+    // const orgId = ctx.payload.orgId;
+    // const role = ctx.payload.role || 'MEMBER';
+    // const permissions = ctx.payload.permissions || [];
 
     // TODO: Implement actual join organization logic
     // Examples of what should be implemented:
