@@ -8,6 +8,8 @@ import { LoginAction } from './actions/login.action';
 import { AddFriendAction } from './actions/add-friend.action';
 import { JoinOrgAction } from './actions/join-org.action';
 import { PairAction } from './actions/pair.action';
+import { QrTicket } from './entities/qr.entity';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 /**
  * QR Module - Complete QR Actions feature implementation
@@ -28,6 +30,7 @@ import { PairAction } from './actions/pair.action';
   imports: [
     // Import ConfigModule to access environment variables
     ConfigModule,
+    TypeOrmModule.forFeature([QrTicket]),
   ],
   controllers: [QrController],
   providers: [

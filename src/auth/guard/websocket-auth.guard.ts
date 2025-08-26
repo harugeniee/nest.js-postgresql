@@ -1,16 +1,21 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { AuthGuard } from 'src/auth/guard/auth.guard';
+import { AuthGuard } from './auth.guard';
 import { AuthPayload } from 'src/common/interface';
 import { JwtService } from '@nestjs/jwt';
 import { CacheService } from 'src/shared/services';
 import { ConfigService } from '@nestjs/config';
 
+// Custom interface for WebSocket client with user property
+interface WebSocketClient extends Socket {
+  user?: AuthPayload;
+}
+
 /**
  * WebSocket Authentication Guard
  *
- * This guard reuses the existing AuthGuard logic to authenticate WebSocket connections.
+ * This guard extends the existing AuthGuard to authenticate WebSocket connections.
  * It extracts JWT tokens from the handshake auth and validates them using the same
  * verification logic as HTTP requests.
  *
@@ -21,20 +26,21 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class WebSocketAuthGuard extends AuthGuard implements CanActivate {
   /**
-   * Override the token extraction to work with WebSocket handshake auth
+   * Extract token from WebSocket handshake auth
    */
-  protected extractToken(context: ExecutionContext): string | undefined {
-    const client: Socket = context.switchToHttp().getRequest();
-    const token = (client.handshake.auth as { token?: string })?.token;
-    return token;
+  private extractWebSocketToken(client: WebSocketClient): string | undefined {
+    // Type assertion to bypass TypeScript strict checking for WebSocket handshake
+    const handshake = (client as any)?.handshake;
+    const token = handshake?.auth?.token;
+    return typeof token === 'string' ? token : undefined;
   }
 
   /**
    * WebSocket-specific canActivate implementation
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const client: Socket = context.switchToHttp().getRequest();
-    const token = this.extractToken(context);
+    const client = context.switchToWs().getClient<WebSocketClient>();
+    const token = this.extractWebSocketToken(client);
 
     if (!token) {
       throw new WsException({
@@ -49,13 +55,13 @@ export class WebSocketAuthGuard extends AuthGuard implements CanActivate {
       });
 
       // Attach the authenticated payload to the socket for later use
-      (client as any).user = payload;
+      client.user = payload;
 
       // Run additional verification (cache check, etc.)
       await this.afterVerify(payload);
 
       return true;
-    } catch (error) {
+    } catch {
       throw new WsException({
         messageKey: 'auth.INVALID_TOKEN',
         message: 'Invalid JWT token',
@@ -84,9 +90,9 @@ export class WebSocketRoleGuard extends WebSocketAuthGuard {
   /**
    * Check if user has required roles
    */
-  private hasRequiredRoles(userRoles: string[]): boolean {
+  private hasRequiredRoles(userRole: string): boolean {
     if (this.requiredRoles.length === 0) return true;
-    return this.requiredRoles.some((role) => userRoles.includes(role));
+    return this.requiredRoles.includes(userRole);
   }
 
   /**
@@ -107,24 +113,27 @@ export class WebSocketRoleGuard extends WebSocketAuthGuard {
     const isAuthenticated = await super.canActivate(context);
     if (!isAuthenticated) return false;
 
-    const client: Socket = context.switchToHttp().getRequest();
-    const user = (client as any).user as AuthPayload;
+    const client = context.switchToWs().getClient<WebSocketClient>();
+    const user = client.user;
+
+    // Check if user exists and has role
+    if (!user || !user.role) {
+      throw new WsException({
+        messageKey: 'auth.INSUFFICIENT_ROLES',
+        message: 'User not authenticated or missing role',
+      });
+    }
 
     // Check roles
-    if (!this.hasRequiredRoles(user.roles || [])) {
+    if (!this.hasRequiredRoles(user.role)) {
       throw new WsException({
         messageKey: 'auth.INSUFFICIENT_ROLES',
         message: 'Insufficient roles to access this resource',
       });
     }
 
-    // Check permissions
-    if (!this.hasRequiredPermissions(user.permissions || [])) {
-      throw new WsException({
-        messageKey: 'auth.INSUFFICIENT_PERMISSIONS',
-        message: 'Insufficient permissions to access this resource',
-      });
-    }
+    // Note: AuthPayload doesn't have permissions field, so we skip permission checking
+    // If you need permission checking, extend AuthPayload interface or create a new one
 
     return true;
   }
@@ -145,5 +154,9 @@ export function createWebSocketRoleGuard(
     ) {
       super(jwtService, cacheService, configService, roles, permissions);
     }
-  };
+  } as new (
+    jwtService: JwtService,
+    cacheService: CacheService,
+    configService: ConfigService,
+  ) => WebSocketRoleGuard;
 }

@@ -5,7 +5,7 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
-import { QrActionType } from 'src/shared/constants';
+import { QR_ACTION_TYPES, QrActionType } from 'src/shared/constants';
 
 /**
  * DTO for creating a new QR ticket
@@ -16,7 +16,7 @@ export class CreateTicketDto {
    * Type of action this QR ticket represents
    * Must be one of the predefined QrActionType values
    */
-  @IsEnum(QrActionType, {
+  @IsEnum(QR_ACTION_TYPES, {
     message: 'Action type must be one of: LOGIN, ADD_FRIEND, JOIN_ORG, PAIR',
   })
   type: QrActionType;

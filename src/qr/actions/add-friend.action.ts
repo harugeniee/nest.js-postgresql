@@ -1,4 +1,4 @@
-import { QrActionType } from 'src/shared/constants';
+import { QR_ACTION_TYPES, QrActionType } from 'src/shared/constants';
 
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -22,7 +22,7 @@ export class AddFriendAction extends BaseQrAction {
    * Returns the action type this class handles
    */
   type(): QrActionType {
-    return QrActionType.ADD_FRIEND;
+    return QR_ACTION_TYPES.ADD_FRIEND;
   }
 
   /**

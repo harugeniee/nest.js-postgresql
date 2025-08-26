@@ -1,7 +1,7 @@
 import { Request } from 'express';
 import { JwtAccessTokenGuard } from 'src/auth/guard';
 import { AuthPayload } from 'src/common/interface';
-import { QrActionType } from 'src/shared/constants';
+import { QrActionType, QR_ACTION_TYPES } from 'src/shared/constants';
 import { buildResponse } from 'src/shared/helpers/build-response';
 
 import {
@@ -320,7 +320,7 @@ export class QrController {
    */
   @Get('actions')
   async getSupportedActions() {
-    const actions = Object.values(QrActionType).map((type) => ({
+    const actions = Object.values(QR_ACTION_TYPES).map((type) => ({
       type,
       description: this.getActionDescription(type),
       requiresPayload: this.actionRequiresPayload(type),
@@ -340,10 +340,11 @@ export class QrController {
    */
   private getActionDescription(actionType: QrActionType): string {
     const descriptions = {
-      [QrActionType.LOGIN]: 'Login to the application via QR code',
-      [QrActionType.ADD_FRIEND]: 'Add a new friend to your network',
-      [QrActionType.JOIN_ORG]: 'Join an organization or group',
-      [QrActionType.PAIR]: 'Pair with another device for secure communication',
+      [QR_ACTION_TYPES.LOGIN]: 'Login to the application via QR code',
+      [QR_ACTION_TYPES.ADD_FRIEND]: 'Add a new friend to your network',
+      [QR_ACTION_TYPES.JOIN_ORG]: 'Join an organization or group',
+      [QR_ACTION_TYPES.PAIR]:
+        'Pair with another device for secure communication',
     };
 
     return descriptions[actionType] || 'Unknown action type';
@@ -357,10 +358,10 @@ export class QrController {
    */
   private actionRequiresPayload(actionType: QrActionType): boolean {
     const requiresPayload = {
-      [QrActionType.LOGIN]: false,
-      [QrActionType.ADD_FRIEND]: true,
-      [QrActionType.JOIN_ORG]: true,
-      [QrActionType.PAIR]: true,
+      [QR_ACTION_TYPES.LOGIN]: false,
+      [QR_ACTION_TYPES.ADD_FRIEND]: true,
+      [QR_ACTION_TYPES.JOIN_ORG]: true,
+      [QR_ACTION_TYPES.PAIR]: true,
     };
 
     return requiresPayload[actionType] || false;

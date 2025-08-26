@@ -1,8 +1,9 @@
 import { instanceToPlain } from 'class-transformer';
-import { Column, Entity, Index } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 
 import { FILE_CONSTANTS, FileStatus, FileType } from 'src/shared/constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
+import { User } from 'src/users/entities/user.entity';
 
 @Entity({
   name: 'files',
@@ -69,8 +70,12 @@ export class File extends BaseEntityCustom {
   @Column('text', { nullable: true })
   originalName: string;
 
-  @Column('int', { nullable: false })
-  userId: number;
+  @Column('bigint', { nullable: true, default: null })
+  userId: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'userId', referencedColumnName: 'id' })
+  user: User;
 
   @Column('text', { nullable: true })
   metadata: string; // JSON string for additional file metadata

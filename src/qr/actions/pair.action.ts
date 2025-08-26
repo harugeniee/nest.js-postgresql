@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseQrAction, QrActionContext } from './base-action';
-import { QrActionType } from 'src/shared/constants';
+import { QR_ACTION_TYPES, QrActionType } from 'src/shared/constants';
 
 /**
  * Device Pairing Action - Handles QR-based device pairing requests
@@ -23,7 +23,7 @@ export class PairAction extends BaseQrAction {
    * Returns the action type this class handles
    */
   type(): QrActionType {
-    return QrActionType.PAIR;
+    return QR_ACTION_TYPES.PAIR;
   }
 
   /**
@@ -51,10 +51,10 @@ export class PairAction extends BaseQrAction {
       );
     }
 
-    const deviceInfo = ctx.payload.deviceInfo || {};
-    const pubKey = ctx.payload.pubKey;
-    const deviceType = ctx.payload.deviceType || 'unknown';
-    const permissions = ctx.payload.permissions || [];
+    // const deviceInfo = ctx.payload.deviceInfo || {};
+    // const pubKey = ctx.payload.pubKey;
+    // const deviceType = ctx.payload.deviceType || 'unknown';
+    // const permissions = ctx.payload.permissions || [];
 
     // TODO: Implement actual device pairing logic
     // Examples of what should be implemented:
