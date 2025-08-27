@@ -1,6 +1,6 @@
 import {
   QR_REDIS_PREFIXES,
-  QrActionType,
+  QR_ACTION_TYPES,
   QrGrant,
   QrTicket,
 } from 'src/shared/constants';
@@ -107,7 +107,7 @@ describe('QrService', () => {
   describe('createTicket', () => {
     it('should create a ticket successfully', async () => {
       const createTicketDto: CreateTicketDto = {
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         payload: {},
       };
 
@@ -122,7 +122,7 @@ describe('QrService', () => {
       expect(mockCacheService.set).toHaveBeenCalledWith(
         expect.stringContaining(QR_REDIS_PREFIXES.TICKET),
         expect.objectContaining({
-          type: QrActionType.LOGIN,
+          type: QR_ACTION_TYPES.LOGIN,
           status: 'PENDING',
         }),
         180,
@@ -131,7 +131,7 @@ describe('QrService', () => {
 
     it('should create a ticket with web session ID', async () => {
       const createTicketDto: CreateTicketDto = {
-        type: QrActionType.ADD_FRIEND,
+        type: QR_ACTION_TYPES.ADD_FRIEND,
         payload: { friendUserId: '123' },
         webSessionId: 'session_123',
       };
@@ -149,7 +149,7 @@ describe('QrService', () => {
 
     it('should generate unique ticket IDs for different requests', async () => {
       const createTicketDto: CreateTicketDto = {
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
       };
 
       const result1 = await service.createTicket(createTicketDto);
@@ -166,7 +166,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'PENDING',
         codeChallenge: validChallenge,
         createdAt: Date.now(),
@@ -198,7 +198,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'PENDING',
         codeChallenge: validChallenge,
         createdAt: Date.now() - 200000, // 200 seconds ago
@@ -225,7 +225,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.ADD_FRIEND,
+        type: QR_ACTION_TYPES.ADD_FRIEND,
         status: 'PENDING',
         codeChallenge: validChallenge,
         payload: { friendUserId: '123', friendName: 'John Doe' },
@@ -237,7 +237,7 @@ describe('QrService', () => {
 
       const result = await service.getTicketPreview(validTid);
 
-      expect(result.type).toBe(QrActionType.ADD_FRIEND);
+      expect(result.type).toBe(QR_ACTION_TYPES.ADD_FRIEND);
       expect(result.status).toBe('PENDING');
       expect(result.isExpired).toBe(false);
       expect(result.payloadPreview).toBeDefined();
@@ -261,7 +261,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'PENDING',
         codeChallenge: validChallenge,
         createdAt: Date.now(),
@@ -278,7 +278,7 @@ describe('QrService', () => {
         expect.objectContaining({
           status: 'SCANNED',
           scannedBy: 'user123',
-          scannedAt: expect.any(Number) as number,
+          scannedAt: expect.any(Number),
         }),
         180,
       );
@@ -297,7 +297,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'SCANNED',
         codeChallenge: validChallenge,
         createdAt: Date.now(),
@@ -315,7 +315,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'PENDING',
         codeChallenge: validChallenge,
         createdAt: Date.now() - 200000,
@@ -337,7 +337,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'SCANNED',
         codeChallenge: validChallenge,
         scannedBy: 'user123',
@@ -362,12 +362,12 @@ describe('QrService', () => {
         expect.objectContaining({
           status: 'APPROVED',
           approvedBy: 'user123',
-          approvedAt: expect.any(Number) as number,
+          approvedAt: expect.any(Number),
         }),
         180,
       );
       expect(mockActionExecutor.execute).toHaveBeenCalledWith(
-        QrActionType.LOGIN,
+        QR_ACTION_TYPES.LOGIN,
         expect.objectContaining({
           tid: validTid,
           userId: 'user123',
@@ -383,7 +383,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'SCANNED',
         codeChallenge: validChallenge,
         scannedBy: 'user123',
@@ -407,7 +407,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'SCANNED',
         codeChallenge: validChallenge,
         scannedBy: 'user123',
@@ -439,7 +439,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'SCANNED',
         codeChallenge: validChallenge,
         scannedBy: 'user123',
@@ -470,7 +470,7 @@ describe('QrService', () => {
 
       const mockGrant: QrGrant = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         userId: 'user123',
         createdAt: Date.now(),
         expiresAt: Date.now() + 30000,
@@ -478,7 +478,7 @@ describe('QrService', () => {
 
       const mockTicket: QrTicket = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         status: 'APPROVED',
         codeChallenge: validChallenge,
         approvedBy: 'user123',
@@ -517,7 +517,7 @@ describe('QrService', () => {
 
       const mockGrant: QrGrant = {
         tid: validTid,
-        type: QrActionType.LOGIN,
+        type: QR_ACTION_TYPES.LOGIN,
         userId: 'user123',
         createdAt: Date.now() - 40000,
         expiresAt: Date.now() - 10000, // expired
@@ -543,9 +543,9 @@ describe('QrService', () => {
 
       // Mock expired tickets
       mockCacheService.get
-        .mockResolvedValueOnce({ expiresAt: Date.now() - 10000 }) // expired
-        .mockResolvedValueOnce({ expiresAt: Date.now() - 10000 }) // expired
-        .mockResolvedValueOnce({ expiresAt: Date.now() - 10000 }); // expired grant
+        .mockResolvedValueOnce({ expiresAt: Date.now() - 10000 } as QrTicket) // expired
+        .mockResolvedValueOnce({ expiresAt: Date.now() - 10000 } as QrTicket) // expired
+        .mockResolvedValueOnce({ expiresAt: Date.now() - 10000 } as QrGrant); // expired grant
 
       const result = await service.cleanupExpired();
 
@@ -570,20 +570,20 @@ describe('QrService', () => {
       // Mock tickets
       mockCacheService.get
         .mockResolvedValueOnce({
-          type: QrActionType.LOGIN,
+          type: QR_ACTION_TYPES.LOGIN,
           expiresAt: Date.now() + 100000,
           status: 'PENDING',
-        })
+        } as QrTicket)
         .mockResolvedValueOnce({
-          type: QrActionType.ADD_FRIEND,
+          type: QR_ACTION_TYPES.ADD_FRIEND,
           expiresAt: Date.now() + 100000,
           status: 'APPROVED',
-        });
+        } as QrTicket);
 
       // Mock grant
       mockCacheService.get.mockResolvedValueOnce({
         expiresAt: Date.now() + 10000,
-      });
+      } as QrGrant);
 
       const result = await service.getStats();
 
@@ -591,8 +591,56 @@ describe('QrService', () => {
       expect(result.activeTickets).toBe(2);
       expect(result.totalGrants).toBe(1);
       expect(result.activeGrants).toBe(1);
-      expect(result.actionTypeBreakdown[QrActionType.LOGIN]).toBe(1);
-      expect(result.actionTypeBreakdown[QrActionType.ADD_FRIEND]).toBe(1);
+      expect(result.actionTypeBreakdown[QR_ACTION_TYPES.LOGIN]).toBe(1);
+      expect(result.actionTypeBreakdown[QR_ACTION_TYPES.ADD_FRIEND]).toBe(1);
+    });
+  });
+
+  // Additional test cases for better coverage
+  describe('error handling', () => {
+    it('should handle cache service errors gracefully', async () => {
+      const validTid = createValidTicketId('test');
+      mockCacheService.get.mockRejectedValue(new Error('Cache error'));
+
+      await expect(service.getTicket(validTid)).rejects.toThrow('Cache error');
+    });
+
+    it('should throw BadRequestException for invalid ticket ID format', async () => {
+      const invalidTid = 'invalid@ticket#id'; // Contains invalid characters
+
+      // The service should throw BadRequestException for invalid ID format
+      await expect(service.getTicket(invalidTid)).rejects.toThrow(
+        'Invalid ticket ID format',
+      );
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle empty payload in createTicket', async () => {
+      const createTicketDto: CreateTicketDto = {
+        type: QR_ACTION_TYPES.LOGIN,
+        payload: {},
+      };
+
+      const result = await service.createTicket(createTicketDto);
+      // Check that the method returns the expected structure
+      expect(result).toHaveProperty('ticketId');
+      expect(result).toHaveProperty('codeChallenge');
+      expect(result).toHaveProperty('qrContent');
+      expect(result).toHaveProperty('status');
+    });
+
+    it('should handle null payload in createTicket', async () => {
+      const createTicketDto: CreateTicketDto = {
+        type: QR_ACTION_TYPES.LOGIN,
+      };
+
+      const result = await service.createTicket(createTicketDto);
+      // Check that the method returns the expected structure
+      expect(result).toHaveProperty('ticketId');
+      expect(result).toHaveProperty('codeChallenge');
+      expect(result).toHaveProperty('qrContent');
+      expect(result).toHaveProperty('status');
     });
   });
 });
