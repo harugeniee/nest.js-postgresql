@@ -1,271 +1,216 @@
-# WebSocket Gateway với JWT Authentication
+# BaseGateway
 
-## Tổng quan
+BaseGateway là một abstract class cung cấp common functionality cho WebSocket gateways trong NestJS application.
 
-`BaseGateway` cung cấp một foundation hoàn chỉnh cho việc xây dựng WebSocket gateway với JWT authentication. **Điểm đặc biệt**: Nó có thể tái sử dụng logic authentication từ `AuthGuard` hiện có, đảm bảo tính nhất quán giữa HTTP và WebSocket.
+## **🔑 Tính năng chính**
 
-## Tính năng chính
+- **Connection Management**: Quản lý cả authenticated và anonymous connections
+- **Client Tracking**: Theo dõi clients, metadata và room subscriptions
+- **Room Management**: Join/leave rooms và broadcasting
+- **Error Handling**: Xử lý lỗi với I18nWsExceptionFilter
+- **Flexible Authentication**: Cho phép child gateway quyết định method nào cần auth
 
-- ✅ **JWT Authentication** - Xác thực client bằng JWT token
-- ✅ **AuthGuard Integration** - Tái sử dụng logic từ `JwtAccessTokenGuard`
-- ✅ **Connection Management** - Quản lý kết nối với user context
-- ✅ **Room Management** - Quản lý phòng với authentication
-- ✅ **Event Broadcasting** - Gửi tin nhắn đến phòng hoặc client cụ thể
-- ✅ **Error Handling** - Xử lý lỗi tập trung
-- ✅ **Logging** - Logging pattern nhất quán
-- ✅ **Statistics** - Thống kê kết nối với thông tin authentication
+## **🚀 Cách sử dụng**
 
-## Cách sử dụng
-
-### 1. Sử dụng AuthGuard có sẵn (Khuyến nghị)
+### **1. Extend BaseGateway**
 
 ```typescript
-@WebSocketGateway({ namespace: 'my-feature' })
-export class MyGateway extends BaseGateway<
-  { userId: string; permissions: string[] }, // Client metadata type
-  AuthPayload // JWT payload type
-> {
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly cacheService: CacheService,
-    private readonly configService: ConfigService,
-    private readonly myService: MyService,
-  ) {
-    super();
-    // Sử dụng AuthGuard có sẵn thay vì custom authentication
-    this.useCustomAuthentication = false;
-  }
-
-  // Implement abstract methods để cung cấp services
-  protected getJwtService(): JwtService {
-    return this.jwtService;
-  }
-
-  protected getCacheService(): CacheService {
-    return this.cacheService;
-  }
-
-  protected getConfigService(): ConfigService {
-    return this.configService;
-  }
-
-  // Implement các method bắt buộc
+@WebSocketGateway()
+export class MyGateway extends BaseGateway<MyMetadata, AuthPayload> {
+  
+  // Implement abstract methods
   protected async extractClientMetadata(
     client: Socket,
     authPayload: AuthPayload,
-  ): Promise<{ userId: string; permissions: string[] }> {
+  ): Promise<MyMetadata> {
+    // Extract metadata from authenticated client
     return {
       userId: authPayload.uid,
-      permissions: authPayload.permissions || [],
+      permissions: authPayload.permissions,
     };
   }
 
   protected async sendConnectionConfirmation(
     client: Socket,
-    metadata: { userId: string; permissions: string[] },
+    metadata: MyMetadata,
     authPayload: AuthPayload,
   ): Promise<void> {
-    client.emit('connected', {
-      userId: metadata.userId,
-      permissions: metadata.permissions,
-      message: 'Successfully connected',
+    client.emit('connected', { 
+      message: 'Connected successfully',
+      user: authPayload.uid 
     });
   }
+
+  // Override connection hooks
+  protected async onClientConnected(
+    client: Socket,
+    metadata: MyMetadata,
+    authPayload: AuthPayload,
+  ): Promise<void> {
+    // Handle authenticated client connection
+    this.logger.log(`User ${authPayload.uid} connected`);
+  }
+
+  protected async onAnonymousClientConnected(client: Socket): Promise<void> {
+    // Handle anonymous client connection
+    this.logger.log(`Anonymous client ${client.id} connected`);
+  }
 }
 ```
 
-### 2. Sử dụng Custom Authentication (Nếu cần)
+### **2. Authentication Strategies**
+
+#### **Method Level Authentication (Recommended)**
 
 ```typescript
-@WebSocketGateway({ namespace: 'my-feature' })
-export class MyCustomGateway extends BaseGateway<
-  { userId: string; customField: string },
-  AuthPayload
-> {
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly myService: MyService,
-  ) {
-    super();
-    // Sử dụng custom authentication
-    this.useCustomAuthentication = true;
+@WebSocketGateway()
+export class QrGateway extends BaseGateway<Metadata, AuthPayload> {
+  
+  // Method cần JWT authentication
+  @UseGuards(WebSocketAuthGuard)
+  @SubscribeMessage('qr_action')
+  async handleQrAction(client: Socket, payload: any) {
+    const user = this.getUser(client); // User đã được authenticate
+    // Handle authenticated action
   }
-
-  // Override authentication method
-  protected async authenticateClient(client: Socket): Promise<AuthPayload | null> {
-    // Custom authentication logic
-    const token = (client.handshake.auth as { token?: string })?.token;
-    if (!token) return null;
-
-    try {
-      const payload = await this.jwtService.verifyAsync(token);
-      return payload?.uid ? payload : null;
-    } catch {
-      return null;
-    }
+  
+  // Method KHÔNG cần JWT (anonymous)
+  @SubscribeMessage('wait_qr_approval')
+  async handleWaitQrApproval(client: Socket, payload: any) {
+    // Anonymous client có thể gọi method này
+    // Perfect cho QR login waiting
   }
-
-  // Implement các method khác...
+  
+  // Method cần JWT
+  @UseGuards(WebSocketAuthGuard)
+  @SubscribeMessage('authenticated_action')
+  async handleAuthenticatedAction(client: Socket, payload: any) {
+    const user = this.getUser(client);
+    // Handle authenticated action
+  }
 }
 ```
 
-### 3. Client kết nối với JWT token
-
-```javascript
-// Client-side JavaScript
-const socket = io('ws://localhost:3000/my-feature', {
-  auth: {
-    token: 'your-jwt-token-here'
-  }
-});
-
-socket.on('connected', (data) => {
-  console.log('Connected as user:', data.userId);
-  console.log('Permissions:', data.permissions);
-});
-
-socket.on('auth:error', (error) => {
-  console.error('Authentication failed:', error.message);
-});
-```
-
-### 4. Sử dụng các method có sẵn
+#### **Class Level Authentication (Legacy)**
 
 ```typescript
-// Join room (chỉ authenticated clients)
-await this.joinRoom(clientId, 'room-name', client);
+@WebSocketGateway()
+@UseGuards(WebSocketAuthGuard) // Tất cả methods đều cần JWT
+export class SecureGateway extends BaseGateway<Metadata, AuthPayload> {
+  // Tất cả methods đều yêu cầu authentication
+}
+```
+
+## **🔧 Helper Methods**
+
+### **Authentication Helpers**
+
+```typescript
+// Check if client is authenticated
+const isAuth = this.isAuthenticated(client);
+
+// Get authenticated user
+const user = this.getUser(client);
+
+// Check if specific client ID is authenticated
+const isAuth = this.isClientAuthenticated(clientId);
+const user = this.getClientAuthPayload(clientId);
+```
+
+### **Room Management**
+
+```typescript
+// Join room
+await this.joinRoom(clientId, 'room_name', client);
 
 // Leave room
-await this.leaveRoom(clientId, 'room-name', client);
+await this.leaveRoom(clientId, 'room_name', client);
 
 // Broadcast to room
-await this.broadcastToRoom('room-name', 'event-name', data);
+await this.broadcastToRoom('room_name', 'event', data);
 
 // Send to specific client
-await this.sendToClient(clientId, 'event-name', data);
+await this.sendToClient(clientId, 'event', data);
+```
 
-// Check authentication status
-const isAuth = this.isClientAuthenticated(clientId);
-const authPayload = this.getClientAuthPayload(clientId);
+### **Connection Statistics**
 
-// Get statistics
+```typescript
 const stats = this.getConnectionStats();
+console.log(`Total clients: ${stats.totalClients}`);
+console.log(`Authenticated clients: ${stats.authenticatedClients}`);
+console.log(`Total rooms: ${stats.totalRooms}`);
 ```
 
-## Tích hợp với AuthGuard hiện có
+## **📋 Abstract Methods**
 
-### Lợi ích của việc tái sử dụng AuthGuard:
+Child gateway **PHẢI** implement các methods sau:
 
-1. **Tính nhất quán** - Cùng logic JWT verification cho HTTP và WebSocket
-2. **Cache validation** - Tự động kiểm tra token trong cache (nếu sử dụng `JwtAccessTokenGuard`)
-3. **Error handling** - Cùng pattern xử lý lỗi
-4. **Maintenance** - Chỉ cần update một chỗ khi thay đổi logic authentication
-5. **Testing** - Có thể reuse test cases từ HTTP guards
-
-### Cách hoạt động:
-
-1. **Client kết nối** với JWT token trong `handshake.auth.token`
-2. **BaseGateway** tạo mock execution context
-3. **WebSocketAuthGuard** verify JWT token sử dụng logic từ `AuthGuard`
-4. **Nếu valid** - Client được authenticate và có thể join room
-5. **Nếu invalid** - Client bị disconnect với error message
-
-## Cấu trúc JWT Payload
-
-JWT payload phải có ít nhất một trong các field sau để `getUserId()` hoạt động:
-
+### **extractClientMetadata**
 ```typescript
-interface AuthPayload {
-  uid: string;        // User ID (required)
-  userId?: string;    // Alternative user ID field
-  email?: string;     // User email
-  permissions?: string[]; // User permissions
-  roles?: string[];   // User roles
-  // ... other fields
-}
+protected abstract extractClientMetadata(
+  client: Socket,
+  authPayload: U,
+): Promise<T>;
 ```
+- Extract metadata từ authenticated client
+- Return metadata object
 
-## Error Handling
-
-Gateway tự động xử lý các trường hợp lỗi:
-
-- **Authentication failed** - Client bị disconnect với error message
-- **Invalid JWT** - Token không hợp lệ
-- **Missing token** - Không có token trong handshake auth
-- **Cache validation failed** - Token hết hạn hoặc bị revoke
-- **Connection errors** - Lỗi kết nối được log và xử lý
-
-## Security Features
-
-- **JWT validation** - Mỗi connection đều được xác thực
-- **Cache validation** - Kiểm tra token trong cache (nếu sử dụng `JwtAccessTokenGuard`)
-- **Room access control** - Chỉ authenticated clients mới có thể join room
-- **User isolation** - Mỗi client được track với user context riêng biệt
-- **Permission tracking** - Permissions được extract và store
-
-## Monitoring & Debugging
-
+### **sendConnectionConfirmation**
 ```typescript
-// Get connection statistics
-const stats = this.getConnectionStats();
-console.log('Total clients:', stats.totalClients);
-console.log('Authenticated clients:', stats.authenticatedClients);
-console.log('Total rooms:', stats.totalRooms);
-
-// Get user-specific information
-const userRooms = this.getUserSubscribedTickets(userId);
-const roomClients = this.getAuthenticatedClientsInRoom(roomName);
-
-// Check authentication status
-const isAuth = this.isClientAuthenticated(clientId);
-const authPayload = this.getClientAuthPayload(clientId);
+protected abstract sendConnectionConfirmation(
+  client: Socket,
+  metadata: T,
+  authPayload: U,
+): Promise<void>;
 ```
+- Gửi confirmation message khi client connect
+- Customize connection response
 
-## Best Practices
+## **🎯 Optional Hooks**
 
-1. **Sử dụng AuthGuard có sẵn** - Đảm bảo tính nhất quán với HTTP endpoints
-2. **Always validate JWT** - Không bao giờ bỏ qua authentication
-3. **Handle errors gracefully** - Luôn có fallback cho authentication failures
-4. **Log authentication events** - Track successful/failed connections
-5. **Use room-based isolation** - Separate different user contexts
-6. **Implement reconnection logic** - Handle token expiration gracefully
+Child gateway **CÓ THỂ** override các hooks sau:
 
-## Example Implementation
-
-### Sử dụng AuthGuard (Khuyến nghị):
-Xem `QrGateway` trong `src/qr/qr.gateway.ts`
-
-### Sử dụng Custom Authentication:
-Xem ví dụ trong phần "Sử dụng Custom Authentication" ở trên
-
-## Migration từ Custom Authentication
-
-Nếu bạn đã có gateway với custom authentication, migration rất đơn giản:
-
+### **onClientConnected**
 ```typescript
-// Trước (Custom authentication)
-export class MyGateway extends BaseGateway {
-  protected async authenticateClient(client: Socket): Promise<AuthPayload | null> {
-    // Custom logic...
-  }
-}
-
-// Sau (Sử dụng AuthGuard)
-export class MyGateway extends BaseGateway {
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly cacheService: CacheService,
-    private readonly configService: ConfigService,
-  ) {
-    super();
-    this.useCustomAuthentication = false; // Sử dụng AuthGuard
-  }
-
-  // Implement các method bắt buộc
-  protected getJwtService() { return this.jwtService; }
-  protected getCacheService() { return this.cacheService; }
-  protected getConfigService() { return this.configService; }
-  
-  // Xóa authenticateClient method - không cần nữa!
-}
+protected async onClientConnected(
+  client: Socket,
+  metadata: T,
+  authPayload: U,
+): Promise<void>
 ```
+- Được gọi khi authenticated client connect thành công
+
+### **onAnonymousClientConnected**
+```typescript
+protected async onAnonymousClientConnected(client: Socket): Promise<void>
+```
+- Được gọi khi anonymous client connect
+
+### **onClientDisconnected**
+```typescript
+protected async onClientDisconnected(
+  client: Socket,
+  authPayload?: U,
+): Promise<void>
+```
+- Được gọi khi client disconnect
+
+## **💡 Best Practices**
+
+1. **Sử dụng Method Level Authentication** thay vì Class Level
+2. **Override hooks** để customize connection logic
+3. **Sử dụng helper methods** thay vì truy cập trực tiếp properties
+4. **Handle errors gracefully** trong custom methods
+5. **Log important events** để debugging
+
+## **🔒 Security Considerations**
+
+- **Anonymous connections** có thể join rooms và nhận broadcasts
+- **Sensitive operations** nên sử dụng `@UseGuards(WebSocketAuthGuard)`
+- **Validate data** trong tất cả message handlers
+- **Rate limiting** có thể cần thiết cho anonymous connections
+
+## **📚 Examples**
+
+Xem `src/qr/qr.gateway.ts` để biết cách implement cụ thể.

@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 
-import { Logger, ExecutionContext, UseFilters } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -9,27 +9,25 @@ import {
 } from '@nestjs/websockets';
 
 import { I18nWsExceptionFilter } from '../filters/ws-exception.filter';
-
-import { WebSocketAuthGuard } from 'src/auth/guard';
 import { AuthPayload } from 'src/common/interface';
 
-// Extend Socket interface to include user property
+// Extend Socket interface to include user property set by guards
 interface AuthenticatedSocket extends Socket {
   user?: AuthPayload;
 }
 
 /**
- * Base WebSocket Gateway with JWT Authentication Support
+ * Base WebSocket Gateway with Flexible Authentication
  *
  * This abstract class provides common WebSocket functionality that can be
  * inherited by specific gateway implementations. It handles:
- * - JWT authentication and validation (using existing AuthGuard)
- * - Connection management with auth
- * - Client tracking with user context
- * - Room management
- * - Event broadcasting
- * - Error handling
- * - Logging
+ * - Connection management (both authenticated and anonymous)
+ * - Client tracking and metadata storage
+ * - Room management and broadcasting
+ * - Error handling and logging
+ *
+ * Authentication is handled at method level using @UseGuards decorators
+ * in child gateways, allowing flexible auth strategies per method.
  *
  * @template T - Type for client metadata (e.g., user info, permissions)
  * @template U - Type for JWT payload (e.g., AuthPayload)
@@ -48,176 +46,75 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
   protected readonly authenticatedClients = new Map<string, U>(); // clientId -> JWT payload
 
   /**
-   * Optional: Override this to use custom authentication logic
-   * If not overridden, will use the default AuthGuard-based authentication
-   */
-  protected useCustomAuthentication = false;
-
-  /**
-   * Handles new WebSocket connections with JWT authentication
+   * Handles new WebSocket connections
+   * Allows both authenticated and anonymous connections
    * Override this method to add custom connection logic
    *
-   * @param client - The connected socket client
+   * @param client - The socket client
    */
   async handleConnection(client: Socket): Promise<void> {
     const clientId = client.id;
     this.logger.log(`Client connecting: ${clientId}`);
 
     try {
-      let authPayload: U | null = null;
+      // Check if client is authenticated
+      const isAuth = this.isAuthenticated(client);
+      const user = this.getUser(client);
 
-      // Choose authentication method
-      if (this.useCustomAuthentication) {
-        // Use custom authentication logic
-        authPayload = await this.authenticateClient(client);
+      if (isAuth && user) {
+        // Store authenticated client
+        this.authenticatedClients.set(clientId, user);
+
+        // Extract and store client metadata
+        const metadata = await this.extractClientMetadata(client, user);
+        this.clientMetadata.set(clientId, metadata);
+
+        // Send connection confirmation
+        await this.sendConnectionConfirmation(client, metadata, user);
+
+        // Call custom connection logic
+        await this.onClientConnected(client, metadata, user);
+
+        this.logger.log(
+          `Client ${clientId} connected successfully as user ${this.getUserId(user)}`,
+        );
       } else {
-        // Use existing AuthGuard logic
-        authPayload = await this.authenticateWithGuard(client);
+        // Handle anonymous connection
+        this.logger.log(`Client ${clientId} connected anonymously`);
+
+        // Call custom anonymous connection logic
+        await this.onAnonymousClientConnected(client);
       }
 
-      if (!authPayload) {
-        this.logger.warn(`Authentication failed for client ${clientId}`);
-        client.emit('auth:error', {
-          message: 'Authentication failed',
-          timestamp: Date.now(),
-        });
-        client.disconnect();
-        return;
-      }
-
-      // Store authenticated client
-      this.authenticatedClients.set(clientId, authPayload);
-
-      // Initialize client's room tracking
+      // Initialize client's room tracking (for both auth and anonymous)
       this.connectedClients.set(clientId, new Set());
-
-      // Extract and store client metadata
-      const metadata = await this.extractClientMetadata(client, authPayload);
-      this.clientMetadata.set(clientId, metadata);
-
-      // Send connection confirmation
-      await this.sendConnectionConfirmation(client, metadata, authPayload);
-
-      // Call custom connection logic
-      await this.onClientConnected(client, metadata, authPayload);
-
-      this.logger.log(
-        `Client ${clientId} connected successfully as user ${this.getUserId(authPayload)}`,
-      );
     } catch (error) {
       this.logger.error(
         `Failed to handle connection for client ${clientId}:`,
         error,
       );
-
-      // Send error to client before disconnecting
-      const errorMessage =
-        error instanceof Error ? error.message : 'Authentication failed';
-      client.emit('auth:error', {
-        message: errorMessage,
-        timestamp: Date.now(),
-      });
-
       client.disconnect();
     }
   }
 
   /**
-   * Authenticates a client using the existing AuthGuard logic
-   * This method reuses the same JWT verification logic as HTTP endpoints
+   * Check if a client is authenticated
    *
    * @param client - The socket client
-   * @returns JWT payload if valid, null if invalid
+   * @returns True if authenticated, false otherwise
    */
-  protected async authenticateWithGuard(client: Socket): Promise<U | null> {
-    try {
-      const mockContext = this.createMockExecutionContext(client);
-      const authGuard = this.createAuthGuard();
-
-      const isAuthenticated = await authGuard.canActivate(mockContext);
-
-      if (isAuthenticated) {
-        return this.extractUserFromSocket(client);
-      }
-
-      return null;
-    } catch (error) {
-      this.logger.warn(
-        `Guard-based authentication failed for client ${client.id}:`,
-        error,
-      );
-      return null;
-    }
+  protected isAuthenticated(client: Socket): boolean {
+    return !!(client as AuthenticatedSocket).user;
   }
 
   /**
-   * Creates a mock execution context for the WebSocket guard
+   * Get the authenticated user from client
    *
    * @param client - The socket client
-   * @returns Mock execution context
+   * @returns User object or null if not authenticated
    */
-  private createMockExecutionContext(client: Socket): ExecutionContext {
-    return {
-      switchToHttp: () => ({
-        getRequest: () => client as any,
-        getResponse: () => ({}) as any,
-        getNext: () => (() => {}) as any,
-      }),
-      switchToRpc: () => ({
-        getData: () => ({}) as any,
-        getContext: () => ({}) as any,
-      }),
-      switchToWs: () => ({
-        getClient: () => client as any,
-        getData: () => ({}) as any,
-        getPattern: () => 'websocket' as any,
-      }),
-      getClass: () => ({}) as any,
-      getHandler: () => ({}) as any,
-      getType: () => 'ws' as any,
-      getArgs: () => [] as any,
-      getArgByIndex: () => undefined as any,
-    };
-  }
-
-  /**
-   * Creates a new instance of WebSocketAuthGuard
-   *
-   * @returns Configured auth guard instance
-   */
-  private createAuthGuard(): WebSocketAuthGuard {
-    return new WebSocketAuthGuard(
-      this.getJwtService(),
-      this.getCacheService(),
-      this.getConfigService(),
-    );
-  }
-
-  /**
-   * Extracts user information from the authenticated socket
-   *
-   * @param client - The socket client
-   * @returns User payload or null
-   */
-  private extractUserFromSocket(client: Socket): U | null {
-    // The WebSocketAuthGuard should have set the user property on the socket
-    const authenticatedClient = client as AuthenticatedSocket;
-    return (authenticatedClient.user as U) || null;
-  }
-
-  /**
-   * Authenticates a client using custom JWT validation logic
-   * Override this method to implement custom authentication
-   * Only called when useCustomAuthentication = true
-   *
-   * @param client - The socket client
-   * @returns JWT payload if valid, null if invalid
-   */
-  protected async authenticateClient(client: Socket): Promise<U | null> {
-    // Default implementation - should be overridden if useCustomAuthentication = true
-    throw new Error(
-      'Custom authentication not implemented. Override authenticateClient() method.',
-    );
+  protected getUser(client: Socket): U | null {
+    return ((client as AuthenticatedSocket).user as U) || null;
   }
 
   /**
@@ -256,29 +153,11 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
    */
   protected getUserId(authPayload: U): string {
     // Default implementation - assume payload has 'uid' or 'userId' property
-    const payload = authPayload as Record<string, any>;
-    return payload?.uid || payload?.userId || 'unknown';
+    const payload = authPayload as Record<string, unknown>;
+    const uid = payload?.uid as string | undefined;
+    const userId = payload?.userId as string | undefined;
+    return uid || userId || 'unknown';
   }
-
-  // Abstract methods for dependency injection (must be implemented by child classes)
-
-  /**
-   * Get JWT service instance
-   * Override this method to provide JWT service
-   */
-  protected abstract getJwtService(): any;
-
-  /**
-   * Get cache service instance
-   * Override this method to provide cache service
-   */
-  protected abstract getCacheService(): any;
-
-  /**
-   * Get config service instance
-   * Override this method to provide config service
-   */
-  protected abstract getConfigService(): any;
 
   /**
    * Handles WebSocket disconnections
@@ -343,7 +222,7 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
 
   /**
    * Joins a client to a room and tracks the subscription
-   * Only authenticated clients can join rooms
+   * Both authenticated and anonymous clients can join rooms
    *
    * @param clientId - The client ID
    * @param roomName - The room name to join
@@ -356,14 +235,6 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
     client?: Socket,
   ): Promise<boolean> {
     try {
-      // Check if client is authenticated
-      if (!this.isClientAuthenticated(clientId)) {
-        this.logger.warn(
-          `Unauthenticated client ${clientId} attempted to join room ${roomName}`,
-        );
-        return false;
-      }
-
       // Join the room if client is provided
       if (client) {
         await client.join(roomName);
@@ -609,6 +480,16 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
     metadata: T,
     authPayload: U,
   ): Promise<void> {
+    // Default implementation - do nothing
+  }
+
+  /**
+   * Called when an anonymous client connects
+   * Override this method to handle anonymous connections
+   *
+   * @param client - The socket client
+   */
+  protected async onAnonymousClientConnected(client: Socket): Promise<void> {
     // Default implementation - do nothing
   }
 

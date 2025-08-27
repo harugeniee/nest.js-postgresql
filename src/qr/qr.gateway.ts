@@ -18,18 +18,21 @@ import {
   WebSocketGateway,
   WsException,
 } from '@nestjs/websockets';
+import { UseGuards } from '@nestjs/common';
 
 import { QrService } from './qr.service';
+import { WebSocketAuthGuard } from 'src/auth/guard';
 
 /**
- * QR WebSocket Gateway with JWT Authentication using existing AuthGuard
+ * QR WebSocket Gateway with Flexible Authentication
  *
  * This gateway handles real-time communication between web clients and the QR system.
- * It allows clients to subscribe to ticket status updates and receive real-time
- * notifications when ticket states change.
+ * It allows both authenticated and anonymous connections for different use cases.
  *
  * Features:
- * - JWT-based authentication using existing AuthGuard
+ * - Flexible authentication (method-level guards)
+ * - Anonymous connections for QR login waiting
+ * - Authenticated connections for QR actions
  * - Room-based subscription per ticket ID
  * - Real-time status updates
  * - Connection management with user context
@@ -54,29 +57,6 @@ export class QrGateway extends BaseGateway<
     private readonly configService: ConfigService,
   ) {
     super();
-    // Use existing AuthGuard instead of custom authentication
-    this.useCustomAuthentication = false;
-  }
-
-  /**
-   * Get JWT service instance
-   */
-  protected getJwtService(): JwtService {
-    return this.jwtService;
-  }
-
-  /**
-   * Get cache service instance
-   */
-  protected getCacheService(): CacheService {
-    return this.cacheService;
-  }
-
-  /**
-   * Get config service instance
-   */
-  protected getConfigService(): ConfigService {
-    return this.configService;
   }
 
   /**
@@ -131,12 +111,137 @@ export class QrGateway extends BaseGateway<
   }
 
   /**
-   * Handles subscription to a ticket's status updates
-   * Only authenticated clients can subscribe
+   * Handle anonymous client connection for QR login waiting
+   * This method is called when an anonymous client connects
+   *
+   * @param client - The socket client
+   */
+  protected async onAnonymousClientConnected(client: Socket): Promise<void> {
+    this.logger.log(
+      `Anonymous client ${client.id} connected for QR login waiting`,
+    );
+
+    // Send welcome message for anonymous clients
+    client.emit('qr:anonymous_connected', {
+      clientId: client.id,
+      message: 'Connected anonymously. Waiting for QR approval...',
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Handle authenticated client connection
+   * This method is called when an authenticated client connects
+   *
+   * @param client - The socket client
+   * @param metadata - The extracted client metadata
+   * @param authPayload - The authenticated JWT payload
+   */
+  protected async onClientConnected(
+    client: Socket,
+    metadata: { userId: string; permissions: string[]; email?: string },
+    _authPayload: AuthPayload,
+  ): Promise<void> {
+    this.logger.log(
+      `Authenticated user ${metadata.userId} connected to QR gateway`,
+    );
+
+    // Send welcome message for authenticated clients
+    client.emit('qr:authenticated_connected', {
+      clientId: client.id,
+      userId: metadata.userId,
+      email: metadata.email,
+      message: 'Connected as authenticated user',
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Wait for QR approval (Anonymous method - no JWT required)
+   * Web browser can call this to wait for mobile approval
    *
    * @param client - The socket client
    * @param data - Object containing ticket ID
    */
+  @SubscribeMessage('qr:wait_approval')
+  async handleWaitQrApproval(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { ticketId: string },
+  ): Promise<void> {
+    const { ticketId } = data;
+    const clientId = client.id;
+
+    if (!ticketId) {
+      client.emit('qr:error', {
+        message: 'Ticket ID is required',
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    try {
+      // Verify the ticket exists
+      const ticket = await this.qrService.getTicket(ticketId);
+      if (!ticket) {
+        client.emit('qr:error', {
+          message: 'Ticket not found',
+          ticketId,
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
+      // Join the ticket room to receive updates
+      const roomName = `${QR_ROOM_PREFIX}${ticketId}`;
+      const success = await this.joinRoom(clientId, roomName, client);
+
+      if (success) {
+        // Send confirmation
+        client.emit('qr:waiting', {
+          ticketId,
+          roomName,
+          timestamp: Date.now(),
+          message: 'Waiting for QR approval...',
+        });
+
+        // Send current ticket status
+        client.emit(QR_WS_EVENTS.STATUS_UPDATE, {
+          tid: ticketId,
+          status: ticket.status,
+          timestamp: Date.now(),
+          message: 'Current ticket status',
+        });
+
+        this.logger.log(
+          `Anonymous client ${clientId} waiting for QR approval on ticket ${ticketId}`,
+        );
+      } else {
+        client.emit('qr:error', {
+          message: 'Failed to wait for approval',
+          ticketId,
+          timestamp: Date.now(),
+        });
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to wait for QR approval on ticket ${ticketId}:`,
+        error,
+      );
+      client.emit('qr:error', {
+        message: 'Internal server error',
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  /**
+   * Subscribe to ticket updates (Authenticated method - JWT required)
+   * Only authenticated users can subscribe to ticket updates
+   *
+   * @param client - The socket client
+   * @param data - Object containing ticket ID
+   */
+  @UseGuards(WebSocketAuthGuard)
   @SubscribeMessage('qr:subscribe')
   async handleSubscribe(
     @ConnectedSocket() client: Socket,
@@ -186,7 +291,9 @@ export class QrGateway extends BaseGateway<
           message: 'Current ticket status',
         });
 
-        this.logger.log(`Client ${clientId} subscribed to ticket ${ticketId}`);
+        this.logger.log(
+          `Authenticated client ${clientId} subscribed to ticket ${ticketId}`,
+        );
       } else {
         client.emit('qr:error', {
           message: 'Failed to subscribe to ticket',
@@ -200,8 +307,7 @@ export class QrGateway extends BaseGateway<
         error,
       );
       client.emit('qr:error', {
-        message: 'Internal server error during subscription',
-        ticketId,
+        message: 'Internal server error',
         timestamp: Date.now(),
       });
     }
@@ -459,5 +565,33 @@ export class QrGateway extends BaseGateway<
           message: 'Unknown test type',
         });
     }
+  }
+
+  /**
+   * Test method to verify BaseGateway functionality
+   *
+   * @param client - The socket client
+   * @returns Object with gateway information
+   */
+  @SubscribeMessage('get_gateway_info')
+  async getGatewayInfo(@ConnectedSocket() client: Socket): Promise<{
+    clientId: string;
+    isAuthenticated: boolean;
+    userInfo?: any;
+    connectionStats: any;
+  }> {
+    const clientId = client.id;
+    const isAuthenticated = this.isClientAuthenticated(clientId);
+    const userInfo = isAuthenticated
+      ? this.getClientAuthPayload(clientId)
+      : undefined;
+    const connectionStats = this.getConnectionStats();
+
+    return {
+      clientId,
+      isAuthenticated,
+      userInfo,
+      connectionStats,
+    };
   }
 }
