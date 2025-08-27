@@ -7,8 +7,8 @@ import { JwtService } from '@nestjs/jwt';
 import { CacheService } from 'src/shared/services';
 import { ConfigService } from '@nestjs/config';
 
-// Custom interface for WebSocket client with user property
-interface WebSocketClient extends Socket {
+// Extend Socket interface to include user property
+interface AuthenticatedSocket extends Socket {
   user?: AuthPayload;
 }
 
@@ -28,10 +28,8 @@ export class WebSocketAuthGuard extends AuthGuard implements CanActivate {
   /**
    * Extract token from WebSocket handshake auth
    */
-  private extractWebSocketToken(client: WebSocketClient): string | undefined {
-    // Type assertion to bypass TypeScript strict checking for WebSocket handshake
-    const handshake = (client as any)?.handshake;
-    const token = handshake?.auth?.token;
+  private extractWebSocketToken(client: Socket): string | undefined {
+    const token: string | undefined = client.handshake?.auth?.token;
     return typeof token === 'string' ? token : undefined;
   }
 
@@ -39,7 +37,7 @@ export class WebSocketAuthGuard extends AuthGuard implements CanActivate {
    * WebSocket-specific canActivate implementation
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const client = context.switchToWs().getClient<WebSocketClient>();
+    const client = context.switchToWs().getClient<AuthenticatedSocket>();
     const token = this.extractWebSocketToken(client);
 
     if (!token) {
@@ -113,7 +111,7 @@ export class WebSocketRoleGuard extends WebSocketAuthGuard {
     const isAuthenticated = await super.canActivate(context);
     if (!isAuthenticated) return false;
 
-    const client = context.switchToWs().getClient<WebSocketClient>();
+    const client = context.switchToWs().getClient<AuthenticatedSocket>();
     const user = client.user;
 
     // Check if user exists and has role

@@ -1,10 +1,6 @@
 import { Server, Socket } from 'socket.io';
 
-import {
-  Logger,
-  UnauthorizedException,
-  ExecutionContext,
-} from '@nestjs/common';
+import { Logger, ExecutionContext } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -13,6 +9,12 @@ import {
 } from '@nestjs/websockets';
 
 import { WebSocketAuthGuard } from 'src/auth/guard';
+import { AuthPayload } from 'src/common/interface';
+
+// Extend Socket interface to include user property
+interface AuthenticatedSocket extends Socket {
+  user?: AuthPayload;
+}
 
 /**
  * Base WebSocket Gateway with JWT Authentication Support
@@ -106,8 +108,10 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
       );
 
       // Send error to client before disconnecting
+      const errorMessage =
+        error instanceof Error ? error.message : 'Authentication failed';
       client.emit('auth:error', {
-        message: error.message || 'Authentication failed',
+        message: errorMessage,
         timestamp: Date.now(),
       });
 
@@ -124,32 +128,13 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
    */
   protected async authenticateWithGuard(client: Socket): Promise<U | null> {
     try {
-      // Create a mock execution context for the guard
-      const mockContext: ExecutionContext = {
-        switchToHttp: () => ({
-          getRequest: () => client,
-        }),
-        getClass: () => ({}) as any,
-        getHandler: () => ({}) as any,
-        getType: () => 'ws',
-        getArgs: () => [],
-        getArgByIndex: () => undefined,
-        getArg: () => undefined,
-      };
-
-      // Use the WebSocketAuthGuard to authenticate
-      const authGuard = new WebSocketAuthGuard(
-        this.getJwtService(),
-        this.getCacheService(),
-        this.getConfigService(),
-      );
+      const mockContext = this.createMockExecutionContext(client);
+      const authGuard = this.createAuthGuard();
 
       const isAuthenticated = await authGuard.canActivate(mockContext);
 
       if (isAuthenticated) {
-        // Extract the authenticated user from the socket
-        const user = (client as any).user;
-        return user || null;
+        return this.extractUserFromSocket(client);
       }
 
       return null;
@@ -160,6 +145,61 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
       );
       return null;
     }
+  }
+
+  /**
+   * Creates a mock execution context for the WebSocket guard
+   *
+   * @param client - The socket client
+   * @returns Mock execution context
+   */
+  private createMockExecutionContext(client: Socket): ExecutionContext {
+    return {
+      switchToHttp: () => ({
+        getRequest: () => client as any,
+        getResponse: () => ({}) as any,
+        getNext: () => (() => {}) as any,
+      }),
+      switchToRpc: () => ({
+        getData: () => ({} as any),
+        getContext: () => ({} as any),
+      }),
+      switchToWs: () => ({
+        getClient: () => client as any,
+        getData: () => ({} as any),
+        getPattern: () => 'websocket' as any,
+      }),
+      getClass: () => ({}) as any,
+      getHandler: () => ({}) as any,
+      getType: () => 'ws' as any,
+      getArgs: () => [] as any,
+      getArgByIndex: () => undefined as any,
+    };
+  }
+
+  /**
+   * Creates a new instance of WebSocketAuthGuard
+   *
+   * @returns Configured auth guard instance
+   */
+  private createAuthGuard(): WebSocketAuthGuard {
+    return new WebSocketAuthGuard(
+      this.getJwtService(),
+      this.getCacheService(),
+      this.getConfigService(),
+    );
+  }
+
+  /**
+   * Extracts user information from the authenticated socket
+   *
+   * @param client - The socket client
+   * @returns User payload or null
+   */
+  private extractUserFromSocket(client: Socket): U | null {
+    // The WebSocketAuthGuard should have set the user property on the socket
+    const authenticatedClient = client as AuthenticatedSocket;
+    return (authenticatedClient.user as U) || null;
   }
 
   /**
@@ -213,9 +253,8 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
    */
   protected getUserId(authPayload: U): string {
     // Default implementation - assume payload has 'uid' or 'userId' property
-    return (
-      (authPayload as any)?.uid || (authPayload as any)?.userId || 'unknown'
-    );
+    const payload = authPayload as Record<string, any>;
+    return payload?.uid || payload?.userId || 'unknown';
   }
 
   // Abstract methods for dependency injection (must be implemented by child classes)
