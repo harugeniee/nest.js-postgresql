@@ -16,5 +16,7 @@
   "INVALID_ACTION_TYPE": "Invalid action type specified",
   "MISSING_ACTION_IMPLEMENTATION": "Action implementation not found",
   "INVALID_TICKET_ID": "Invalid ticket ID format",
-  "INVALID_CODE_CHALLENGE": "Invalid code challenge format"
+  "INVALID_CODE_CHALLENGE": "Invalid code challenge format",
+  "TEST_ERROR": "Test error occurred for action: {{action}} and type: {{type}}",
+  "TEST_UNKNOWN": "Unknown test type encountered"
 }

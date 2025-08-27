@@ -1,21 +1,22 @@
-import { Server, Socket } from 'socket.io';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+import { Socket } from 'socket.io';
+import { BaseGateway } from 'src/common/gateways/base.gateway';
+import { AuthPayload } from 'src/common/interface';
 import {
   QR_ROOM_PREFIX,
   QR_WS_EVENTS,
   QrStatusEvent,
   QrTicketStatus,
 } from 'src/shared/constants';
-import { BaseGateway } from 'src/common/gateways/base.gateway';
-import { AuthPayload } from 'src/common/interface';
 import { CacheService } from 'src/shared/services';
 
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   MessageBody,
   SubscribeMessage,
   WebSocketGateway,
+  WsException,
 } from '@nestjs/websockets';
 
 import { QrService } from './qr.service';
@@ -414,5 +415,49 @@ export class QrGateway extends BaseGateway<
     }
 
     return [...new Set(tickets)]; // Remove duplicates
+  }
+
+  /**
+   * Test method to verify WebSocket exception filter functionality
+   * This method throws different types of exceptions to test the filter
+   *
+   * @param client - The socket client
+   * @param payload - Test payload
+   */
+  @SubscribeMessage('test_exception')
+  async testException(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { type: string; messageKey?: string },
+  ): Promise<void> {
+    const { type, messageKey } = payload;
+
+    switch (type) {
+      case 'i18n':
+        // Test exception with internationalization
+        throw new WsException({
+          messageKey: messageKey || 'qr.test.error',
+          messageArgs: { action: 'test', type: 'i18n' },
+          code: 'TEST_I18N_ERROR',
+        });
+
+      case 'simple':
+        // Test simple exception
+        throw new WsException('Simple test error message');
+
+      case 'detailed':
+        // Test detailed exception
+        throw new WsException({
+          message: 'Detailed test error',
+          code: 'TEST_DETAILED_ERROR',
+          data: { timestamp: Date.now(), clientId: client.id },
+        });
+
+      default:
+        // Test default exception
+        throw new WsException({
+          messageKey: 'qr.test.unknown',
+          message: 'Unknown test type',
+        });
+    }
   }
 }

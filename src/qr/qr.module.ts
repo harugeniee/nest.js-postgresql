@@ -10,6 +10,7 @@ import { JoinOrgAction } from './actions/join-org.action';
 import { PairAction } from './actions/pair.action';
 import { QrTicket } from './entities/qr.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { I18nWsExceptionFilter } from '../common/filters/ws-exception.filter';
 
 /**
  * QR Module - Complete QR Actions feature implementation
@@ -38,6 +39,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     QrService,
     QrGateway,
     QrActionExecutorService,
+
+    // WebSocket exception filter
+    I18nWsExceptionFilter,
 
     // Action implementations
     LoginAction,

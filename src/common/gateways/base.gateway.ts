@@ -1,12 +1,14 @@
 import { Server, Socket } from 'socket.io';
 
-import { Logger, ExecutionContext } from '@nestjs/common';
+import { Logger, ExecutionContext, UseFilters } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+
+import { I18nWsExceptionFilter } from '../filters/ws-exception.filter';
 
 import { WebSocketAuthGuard } from 'src/auth/guard';
 import { AuthPayload } from 'src/common/interface';
@@ -33,6 +35,7 @@ interface AuthenticatedSocket extends Socket {
  * @template U - Type for JWT payload (e.g., AuthPayload)
  */
 @WebSocketGateway()
+@UseFilters(I18nWsExceptionFilter) // Apply WebSocket exception filter to all child gateways
 export abstract class BaseGateway<T = Record<string, any>, U = any>
   implements OnGatewayConnection, OnGatewayDisconnect
 {
@@ -161,12 +164,12 @@ export abstract class BaseGateway<T = Record<string, any>, U = any>
         getNext: () => (() => {}) as any,
       }),
       switchToRpc: () => ({
-        getData: () => ({} as any),
-        getContext: () => ({} as any),
+        getData: () => ({}) as any,
+        getContext: () => ({}) as any,
       }),
       switchToWs: () => ({
         getClient: () => client as any,
-        getData: () => ({} as any),
+        getData: () => ({}) as any,
         getPattern: () => 'websocket' as any,
       }),
       getClass: () => ({}) as any,

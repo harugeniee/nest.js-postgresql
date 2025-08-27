@@ -1,6 +1,8 @@
 import helmet from 'helmet';
 import * as morgan from 'morgan';
 import { I18nService } from 'nestjs-i18n';
+import { I18nHttpExceptionFilter } from 'src/common/filters/http-exception.filter';
+import { ResponseInterceptor } from 'src/shared/interceptors/response.interceptor';
 
 import { ConsoleLogger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -8,8 +10,6 @@ import { NestApplication, NestFactory } from '@nestjs/core';
 import { RmqOptions, Transport } from '@nestjs/microservices';
 
 import { AppModule } from './app.module';
-import { I18nHttpExceptionFilter } from './common/filters/http-exception.filter';
-import { ResponseInterceptor } from './shared/interceptors/response.interceptor';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestApplication>(AppModule, {
