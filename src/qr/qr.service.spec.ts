@@ -278,7 +278,7 @@ describe('QrService', () => {
         expect.objectContaining({
           status: 'SCANNED',
           scannedBy: 'user123',
-          scannedAt: expect.any(Number),
+          scannedAt: expect.any(Number) as number,
         }),
         180,
       );
@@ -362,7 +362,7 @@ describe('QrService', () => {
         expect.objectContaining({
           status: 'APPROVED',
           approvedBy: 'user123',
-          approvedAt: expect.any(Number),
+          approvedAt: expect.any(Number) as number,
         }),
         180,
       );
