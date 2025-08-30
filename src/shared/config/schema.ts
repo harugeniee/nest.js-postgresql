@@ -86,4 +86,7 @@ export const configValidationSchema = Joi.object({
   // APPLE_AUTH_KEY_URL: Joi.string().uri().optional(),
   // APPLE_URL: Joi.string().uri().optional(),
   // APPLE_CLIENT_ID: Joi.string().optional(),
+
+  // WebSocket configuration
+  WS_ADAPTER_ENABLED: Joi.boolean().default(false),
 });

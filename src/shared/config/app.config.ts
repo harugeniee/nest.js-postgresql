@@ -18,4 +18,7 @@ export const appConfig = () => ({
   cursor: {
     hmacSecret: process.env.CURSOR_HMAC_SECRET,
   },
+  ws: {
+    isAdapterEnabled: process.env.WS_ADAPTER_ENABLED || false,
+  },
 });

@@ -4,12 +4,19 @@ import { I18nService } from 'nestjs-i18n';
 import { I18nHttpExceptionFilter } from 'src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from 'src/shared/interceptors/response.interceptor';
 
-import { ConsoleLogger, ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  ConsoleLogger,
+  Logger,
+  ValidationPipe,
+  VersioningType,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestApplication, NestFactory } from '@nestjs/core';
 import { RmqOptions, Transport } from '@nestjs/microservices';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 
 import { AppModule } from './app.module';
+import { RedisIoAdapter } from './common/gateways/socket.adapter';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestApplication>(AppModule, {
@@ -21,6 +28,9 @@ async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService);
   const port =
     (configService.get<number>('PORT', { infer: true }) as number) || 3000;
+
+  // Get the logger instance from the app
+  const logger = new Logger();
   app.enableCors();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   app.use(morgan('dev'));
@@ -65,6 +75,36 @@ async function bootstrap(): Promise<void> {
       prefetchCount: 1,
     },
   });
+
+  // WebSocket adapter
+  if (configService.get<boolean>('WS_ADAPTER_ENABLED', { infer: true })) {
+    // Setup WebSocket adapter with Redis support
+    try {
+      logger.log('🔧 Setting up WebSocket adapter...');
+      const redisIoAdapter = new RedisIoAdapter(app);
+
+      // Initialize Redis connection for the adapter
+      await redisIoAdapter.connectToRedis();
+
+      app.useWebSocketAdapter(redisIoAdapter);
+      logger.log('✅ WebSocket adapter configured successfully with Redis');
+    } catch (error) {
+      logger.error(
+        '❌ Failed to configure WebSocket adapter with Redis:',
+        error,
+      );
+      logger.warn(
+        '⚠️  WebSocket will work with default in-memory adapter (no clustering support)',
+      );
+
+      // Fallback to default adapter
+      const defaultAdapter = new IoAdapter(app);
+      app.useWebSocketAdapter(defaultAdapter);
+      logger.log(
+        '✅ WebSocket adapter configured with default in-memory adapter',
+      );
+    }
+  }
 
   await Promise.all([app.startAllMicroservices(), app.listen(port)]);
 }

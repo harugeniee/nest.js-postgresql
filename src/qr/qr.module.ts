@@ -1,16 +1,17 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { QrController } from './qr.controller';
-import { QrService } from './qr.service';
-import { QrGateway } from './qr.gateway';
-import { QrActionExecutorService } from './qr-action-executor.service';
-import { LoginAction } from './actions/login.action';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { I18nWsExceptionFilter } from '../common/filters/ws-exception.filter';
 import { AddFriendAction } from './actions/add-friend.action';
 import { JoinOrgAction } from './actions/join-org.action';
+import { LoginAction } from './actions/login.action';
 import { PairAction } from './actions/pair.action';
 import { QrTicket } from './entities/qr.entity';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { I18nWsExceptionFilter } from '../common/filters/ws-exception.filter';
+import { QrActionExecutorService } from './qr-action-executor.service';
+import { QrController } from './qr.controller';
+import { QrGateway } from './qr.gateway';
+import { QrService } from './qr.service';
 
 /**
  * QR Module - Complete QR Actions feature implementation
@@ -57,6 +58,8 @@ import { I18nWsExceptionFilter } from '../common/filters/ws-exception.filter';
   ],
 })
 export class QrModule implements OnModuleInit {
+  private readonly logger = new Logger(QrModule.name);
+
   constructor(private readonly actionExecutor: QrActionExecutorService) {}
 
   /**
@@ -68,13 +71,13 @@ export class QrModule implements OnModuleInit {
       // Validate the action registry
       this.actionExecutor.validateActionRegistry();
 
-      console.log('✅ QR Module initialized successfully');
-      console.log(
+      this.logger.log('✅ QR Module initialized successfully');
+      this.logger.log(
         '📱 Supported actions:',
         this.actionExecutor.getSupportedActionTypes(),
       );
     } catch (error) {
-      console.error('❌ QR Module initialization failed:', error);
+      this.logger.error('❌ QR Module initialization failed:', error);
       throw error;
     }
   }
