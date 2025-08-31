@@ -25,7 +25,7 @@ export interface CacheOptions {
 /**
  * CacheService provides Redis-based caching functionality with advanced features
  * including distributed locks, atomic operations, and pattern-based key management.
- * 
+ *
  * Features:
  * - Basic CRUD operations (get, set, delete)
  * - Pattern-based key operations using SCAN
@@ -33,7 +33,7 @@ export interface CacheOptions {
  * - Atomic operations using Lua scripts
  * - Rate limiting with atomic increments
  * - Cache-aside pattern implementation
- * 
+ *
  * @class CacheService
  * @implements {OnModuleInit}
  * @implements {OnModuleDestroy}
