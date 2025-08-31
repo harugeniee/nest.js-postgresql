@@ -31,7 +31,9 @@ async function bootstrap(): Promise<void> {
 
   // Get the logger instance from the app
   const logger = new Logger();
-  app.enableCors();
+  app.enableCors({
+    credentials: true, // Allow credentials
+  });
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   app.use(morgan('dev'));
   app.use(helmet());

@@ -46,7 +46,11 @@ export class UsersController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAccessTokenGuard)
+  /**
+   * Retrieve a user by their ID.
+   * @param id The ID of the user to retrieve.
+   * @returns The user with the specified ID.
+   */
   async getUserById(@Param('id', new SnowflakeIdPipe()) id: string) {
     return await this.usersService.findById(id);
   }

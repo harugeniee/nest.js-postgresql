@@ -80,8 +80,8 @@ export class AuthService {
       metadata: { ...clientInfo, uuid },
       ipAddress: clientInfo.ipAddress || 'unknown',
       userAgent: clientInfo.userAgent || 'unknown',
-      expiresAt: new Date(Date.now() + 60 * 60 * 24 * 7),
-    });
+      expiresAt: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000),
+    }); // 7 days in seconds
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.sign(
@@ -103,12 +103,12 @@ export class AuthService {
       this.cacheService.set(
         `auth:user:${id}:accessToken:${session.id}`,
         id,
-        60 * 60,
+        60 * 60, // 1 hour in seconds
       ),
       this.cacheService.set(
         `auth:user:${id}:refreshToken:${session.id}`,
         id,
-        60 * 60 * 24 * 7,
+        60 * 60 * 24 * 7, // 7 days in seconds
       ),
     ]);
 
@@ -192,7 +192,7 @@ export class AuthService {
     await this.cacheService.set(
       `auth:user:${session.userId}:accessToken:${session.id}`,
       accessToken,
-      60 * 60,
+      60 * 60, // 1 hour in seconds
     );
     return buildResponse({
       data: {
