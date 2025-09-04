@@ -8,16 +8,14 @@ import {
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
 import { USER_CONSTANTS } from 'src/shared/constants';
-import { CacheService } from 'src/shared/services/cache/cache.service';
+import { CacheService } from 'src/shared/services';
 import {
   CreateDeviceTokenDto,
   CreateSessionDto,
   RegisterDto,
+  UpdateUserDto,
 } from 'src/users/dto';
-import { UpdateUserDto } from 'src/users/dto/update-user.dto';
-import { UserDeviceToken } from 'src/users/entities/user-device-tokens.entity';
-import { UserSession } from 'src/users/entities/user-sessions.entity';
-import { User } from 'src/users/entities/user.entity';
+import { User, UserDeviceToken, UserSession } from 'src/users/entities';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
