@@ -11,31 +11,51 @@ This project includes a complete Docker setup for running the NestJS application
 
 ### 1. Environment Configuration
 
-Copy the environment template and configure your variables:
+Create a `.env` file with the required environment variables:
 
 ```bash
-cp env.example .env
+# Copy from example or create new
+cp .env.example .env
 ```
 
 Edit the `.env` file with your desired configuration values.
 
-### 2. Start All Services
+### 2. Start Infrastructure Services
+
+First, start the supporting services (PostgreSQL, Redis, RabbitMQ):
 
 ```bash
-# Build and start all services
+# Start infrastructure services
+cd service
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
 
 # View logs for specific service
+docker-compose logs -f postgres
+```
+
+### 3. Start Application
+
+In the root directory, start the NestJS application:
+
+```bash
+# Start the application
+docker-compose up -d
+
+# View logs
 docker-compose logs -f app
 ```
 
-### 3. Stop Services
+### 4. Stop Services
 
 ```bash
-# Stop all services
+# Stop application
+docker-compose down
+
+# Stop infrastructure services
+cd service
 docker-compose down
 
 # Stop and remove volumes (WARNING: This will delete all data)
@@ -47,23 +67,29 @@ docker-compose down -v
 ### 1. NestJS Application (`app`)
 - **Port**: 3000 (configurable via `APP_PORT`)
 - **Health Check**: Available at `http://localhost:3000/health`
-- **Dependencies**: Waits for PostgreSQL, Redis, and RabbitMQ to be healthy
+- **Dependencies**: Requires PostgreSQL, Redis, and RabbitMQ to be running
+- **Configuration**: Uses environment variables for database and service connections
 
-### 2. PostgreSQL Database (`postgres`)
+### 2. PostgreSQL Database (`postgres`) - Infrastructure Service
 - **Port**: 5432 (configurable via `POSTGRES_PORT`)
-- **Database**: Configurable via environment variables
+- **Database**: Configurable via `POSTGRES_DB` environment variable
+- **User**: Configurable via `POSTGRES_USER` environment variable
+- **Password**: Configurable via `POSTGRES_PASSWORD` environment variable
 - **Data Persistence**: Stored in `postgres_data` volume
 - **Initialization**: Uses scripts from `./service/init-scripts/`
 
-### 3. Redis Cache (`redis`)
+### 3. Redis Cache (`redis`) - Infrastructure Service
 - **Port**: 6379 (configurable via `REDIS_PORT`)
 - **Password**: Configurable via `REDIS_PASSWORD`
 - **Data Persistence**: Stored in `redis_data` volume
+- **Configuration**: Redis server with append-only file enabled
 
-### 4. RabbitMQ Message Broker (`rabbitmq`)
+### 4. RabbitMQ Message Broker (`rabbitmq`) - Infrastructure Service
 - **AMQP Port**: 5672 (configurable via `RABBITMQ_PORT`)
 - **Management UI**: 15672 (configurable via `RABBITMQ_MANAGEMENT_PORT`)
-- **Credentials**: Configurable via environment variables
+- **User**: Configurable via `RABBITMQ_USER` environment variable
+- **Password**: Configurable via `RABBITMQ_PASSWORD` environment variable
+- **Virtual Host**: Configurable via `RABBITMQ_VHOST` environment variable
 - **Management UI**: Access at `http://localhost:15672`
 
 ## Environment Variables
@@ -97,6 +123,11 @@ docker-compose up -d --build app
 
 ### View Service Status
 ```bash
+# Check application status
+docker-compose ps
+
+# Check infrastructure services status
+cd service
 docker-compose ps
 ```
 
@@ -107,12 +138,23 @@ docker-compose exec app sh
 
 ### Access Database
 ```bash
-docker-compose exec postgres psql -U nestjs_user -d nestjs_db
+# Access PostgreSQL (from service directory)
+cd service
+docker-compose exec postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}
 ```
 
 ### Access Redis CLI
 ```bash
-docker-compose exec redis redis-cli -a redis_password
+# Access Redis (from service directory)
+cd service
+docker-compose exec redis redis-cli -a ${REDIS_PASSWORD}
+```
+
+### Access RabbitMQ Management
+```bash
+# Open browser to RabbitMQ Management UI
+open http://localhost:15672
+# Login with credentials from environment variables
 ```
 
 ## Health Checks

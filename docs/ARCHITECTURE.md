@@ -27,22 +27,57 @@ This is an enterprise-grade NestJS application built with modern best practices,
 ```
 src/
 ├── auth/                 # Authentication & Authorization
-├── common/              # Shared utilities & decorators
+│   ├── guard/           # Authentication guards
+│   ├── auth.controller.ts
+│   ├── auth.service.ts
+│   └── auth.module.ts
+├── common/              # Shared utilities & cross-cutting concerns
 │   ├── decorators/     # Custom decorators
-│   ├── dto/           # Data Transfer Objects
-│   ├── filters/       # Exception filters
-│   ├── guards/        # Route guards
-│   ├── interceptors/  # Response interceptors
-│   ├── pipes/         # Validation pipes
-│   └── repositories/  # Base repository patterns
+│   ├── dto/            # Data Transfer Objects
+│   ├── events/         # Domain events
+│   ├── filters/        # Exception filters
+│   ├── gateways/       # WebSocket gateways
+│   ├── interface/      # Shared interfaces
+│   ├── pipes/          # Validation pipes
+│   ├── repositories/   # Base repository patterns
+│   ├── services/       # Base service patterns
+│   ├── subscribers/    # TypeORM subscribers
+│   └── utils/          # Utility functions
 ├── files/              # File management
+│   ├── entities/       # File entities
+│   ├── files.controller.ts
+│   ├── files.service.ts
+│   └── files.module.ts
+├── i18n/               # Internationalization
+│   ├── en/             # English translations
+│   └── vi/             # Vietnamese translations
+├── qr/                 # QR Actions feature
+│   ├── actions/        # Action implementations
+│   ├── dto/            # QR DTOs
+│   ├── entities/       # QR entities
+│   ├── qr.controller.ts
+│   ├── qr.gateway.ts
+│   ├── qr.service.ts
+│   └── qr.module.ts
 ├── shared/             # Shared services & configurations
-│   ├── config/        # Environment configuration
-│   ├── entities/      # Base entities
-│   ├── services/      # Core services (Cache, RabbitMQ)
-│   └── libs/          # External library integrations
+│   ├── config/         # Environment configuration
+│   ├── constants/      # Application constants
+│   ├── entities/       # Base entities
+│   ├── helpers/        # Helper functions
+│   ├── interceptors/   # Response interceptors
+│   ├── libs/           # External library integrations
+│   └── services/       # Core services (Cache, RabbitMQ, Firebase, etc.)
 ├── users/              # User management
+│   ├── dto/            # User DTOs
+│   ├── entities/       # User entities
+│   ├── services/       # User services
+│   ├── users.controller.ts
+│   ├── users.service.ts
+│   └── users.module.ts
 └── workers/            # Background job processing
+    ├── worker.controller.ts
+    ├── worker.service.ts
+    └── worker.module.ts
 ```
 
 ## Key Components
@@ -89,6 +124,19 @@ export abstract class BaseEntityCustom extends BaseEntity {
 - **Error Handling**: Structured error responses
 - **Logging**: Structured logging with different levels
 
+### 5. **QR Actions System**
+- **PKCE Security**: Proof Key for Code Exchange implementation
+- **Real-time Updates**: WebSocket-based status notifications
+- **Action Framework**: Pluggable action system for different operations
+- **Redis State Management**: Ephemeral ticket and grant storage
+- **Multi-language Support**: Internationalized error messages
+
+### 6. **WebSocket Support**
+- **Redis Adapter**: Scalable WebSocket communication
+- **Real-time Features**: Live updates for QR actions and notifications
+- **Authentication**: JWT-based WebSocket authentication
+- **Exception Handling**: Dedicated WebSocket exception filters
+
 ## Configuration Management
 
 ### Environment Variables
@@ -100,24 +148,54 @@ TZ=UTC
 
 # Security
 JWT_SECRET=your-32-char-secret
-SESSION_SECRET=your-32-char-secret
-COOKIE_SECRET=your-32-char-secret
+JWT_ACCESS_TOKEN_EXPIRES_IN=15m
+JWT_REFRESH_TOKEN_EXPIRES_IN=7d
+
+# Internationalization
+I18N_FALLBACK_LANGUAGE=en
+I18N_SUPPORTED_LANGUAGES=en,vi
+
+# QR Configuration
+QR_HMAC_SECRET=your-hmac-secret
+CURSOR_HMAC_SECRET=your-cursor-hmac-secret
+QR_TICKET_TTL_SECONDS=180
+QR_GRANT_TTL_SECONDS=30
 
 # Database
+DATABASE_TYPE=postgres
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=postgres
 DATABASE_PASSWORD=password
 DATABASE_NAME=nest_app
+DATABASE_URL=postgresql://postgres:password@localhost:5432/nest_app
+DATABASE_SYNCHRONIZE=false
 
 # Redis
 REDIS_URL=redis://localhost:6379
 REDIS_HOST=localhost
 REDIS_PORT=6379
+REDIS_PASSWORD=redis_password
+REDIS_DB=0
 
 # RabbitMQ
 RABBITMQ_URL=amqp://localhost:5672
 RABBITMQ_QUEUE=nest_app_queue
+RABBITMQ_USERNAME=admin
+RABBITMQ_PASSWORD=admin_password
+
+# CORS
+CORS_ORIGINS=http://localhost:3000
+
+# Rate Limiting
+RATE_LIMIT_TTL=60
+RATE_LIMIT_LIMIT=100
+
+# Logging
+LOG_LEVEL=info
+
+# WebSocket
+WS_ADAPTER_ENABLED=false
 ```
 
 ### Configuration Validation
@@ -131,15 +209,15 @@ RABBITMQ_QUEUE=nest_app_queue
 ```bash
 # Linting
 yarn lint              # Fix auto-fixable issues
-yarn lint:check        # Check without fixing
 
 # Formatting
 yarn format            # Format all files
-yarn format:check      # Check formatting
 
 # Testing
 yarn test              # Unit tests
+yarn test:watch        # Watch mode for tests
 yarn test:cov          # Coverage report
+yarn test:debug        # Debug mode for tests
 yarn test:e2e          # End-to-end tests
 ```
 
@@ -149,23 +227,21 @@ yarn test:e2e          # End-to-end tests
 yarn migration:generate # Generate new migration
 yarn migration:run      # Apply migrations
 yarn migration:revert   # Revert last migration
-yarn migration:show     # Show migration status
 
-# Database
-yarn db:seed           # Seed database
-yarn db:reset          # Reset database
+# TypeORM CLI
+yarn typeorm           # Access TypeORM CLI
+yarn mg                # Generate migration script
 ```
 
-### 3. **Docker Operations**
+### 3. **Application Management**
 ```bash
 # Development
-yarn docker:compose:up    # Start services
-yarn docker:compose:down  # Stop services
-yarn docker:compose:logs  # View logs
+yarn start:dev           # Start in development mode with watch
+yarn start:debug         # Start in debug mode
+yarn start:prod          # Start in production mode
 
-# Production
-yarn docker:build         # Build image
-yarn docker:run           # Run container
+# Building
+yarn build               # Build the application
 ```
 
 ## Performance Considerations

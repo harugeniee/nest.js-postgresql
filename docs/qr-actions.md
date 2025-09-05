@@ -79,7 +79,7 @@ Authorization: Bearer {jwt_token}
 
 #### Exchange Grant for Tokens
 ```http
-POST /auth/qr/grant
+POST /qr/auth/qr/grant
 Content-Type: application/json
 
 {
@@ -204,7 +204,7 @@ The WebSocket connection receives:
 ### 8. Web Client Exchanges Grant for Tokens
 
 ```bash
-curl -X POST http://localhost:3000/auth/qr/grant \
+curl -X POST http://localhost:3000/qr/auth/qr/grant \
   -H "Content-Type: application/json" \
   -d '{
     "tid": "base64url_ticket_id",
