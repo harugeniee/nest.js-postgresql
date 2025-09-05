@@ -351,7 +351,7 @@ export abstract class BaseService<T extends { id: string }> {
             [String(this.idKey)]: lastRecord?.[String(this.idKey)] as unknown,
           },
         })
-      : undefined;
+      : null;
 
     return {
       result: data,
