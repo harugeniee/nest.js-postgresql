@@ -8,6 +8,8 @@ import { User } from './entities/user.entity';
 import { UserSession } from './entities/user-sessions.entity';
 import { UserDeviceToken } from './entities/user-device-tokens.entity';
 import { CacheService } from 'src/shared/services/cache/cache.service';
+import { UserSessionsService } from './services/user-sessions.service';
+import { UserDeviceTokensService } from './services/user-device-tokens.service';
 import { RegisterDto } from './dto/register.dto';
 import { CreateSessionDto } from './dto/session.dto';
 import { CreateDeviceTokenDto } from './dto/create-device-token.dto';
@@ -17,6 +19,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 
 describe('UsersService', () => {
   let service: UsersService;
+  let module: TestingModule;
   let userRepository: jest.Mocked<Repository<User>>;
   let userSessionRepository: jest.Mocked<Repository<UserSession>>;
   let userDeviceTokenRepository: jest.Mocked<Repository<UserDeviceToken>>;
@@ -86,7 +89,20 @@ describe('UsersService', () => {
       deleteKeysBySuffix: jest.fn(),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
+    const mockUserSessionsService = {
+      create: jest.fn(),
+      findById: jest.fn(),
+      findOne: jest.fn(),
+      revoke: jest.fn(),
+      revokeByUserId: jest.fn(),
+    };
+
+    const mockUserDeviceTokensService = {
+      create: jest.fn(),
+      updateBySessionId: jest.fn(),
+    };
+
+    module = await Test.createTestingModule({
       providers: [
         UsersService,
         {
@@ -100,6 +116,14 @@ describe('UsersService', () => {
         {
           provide: getRepositoryToken(UserDeviceToken),
           useValue: mockUserDeviceTokenRepo,
+        },
+        {
+          provide: UserSessionsService,
+          useValue: mockUserSessionsService,
+        },
+        {
+          provide: UserDeviceTokensService,
+          useValue: mockUserDeviceTokensService,
         },
         {
           provide: CacheService,
@@ -239,21 +263,28 @@ describe('UsersService', () => {
   describe('findSessionById', () => {
     it('should find active session by id', async () => {
       const sessionId = 'session123';
-      userSessionRepository.findOne.mockResolvedValue(
+      const mockUserSessionsService = module.get(
+        UserSessionsService,
+      ) as jest.Mocked<UserSessionsService>;
+      mockUserSessionsService.findOne.mockResolvedValue(
         mockUserSession as UserSession,
       );
 
       const result = await service.findSessionById(sessionId);
 
-      expect(userSessionRepository.findOne).toHaveBeenCalledWith({
-        where: { id: sessionId, revoked: false },
+      expect(mockUserSessionsService.findOne).toHaveBeenCalledWith({
+        id: sessionId,
+        revoked: false,
       });
       expect(result).toEqual(mockUserSession);
     });
 
     it('should return null if session not found', async () => {
       const sessionId = 'nonexistent';
-      userSessionRepository.findOne.mockResolvedValue(null);
+      const mockUserSessionsService = module.get(
+        UserSessionsService,
+      ) as jest.Mocked<UserSessionsService>;
+      mockUserSessionsService.findOne.mockResolvedValue(null);
 
       const result = await service.findSessionById(sessionId);
 

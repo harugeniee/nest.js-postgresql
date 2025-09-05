@@ -1,4 +1,3 @@
-import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
 import { Auth } from 'src/common/decorators';
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { AuthPayload } from 'src/common/interface';
@@ -15,7 +14,6 @@ import {
   Post,
   Query,
   Request,
-  UseGuards,
 } from '@nestjs/common';
 
 @Controller('users')

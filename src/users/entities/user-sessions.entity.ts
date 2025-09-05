@@ -1,5 +1,9 @@
 import { instanceToPlain } from 'class-transformer';
-import { AuthType, USER_CONSTANTS } from 'src/shared/constants/user.constants';
+import {
+  AuthType,
+  USER_CONSTANTS,
+  UserStatus,
+} from 'src/shared/constants/user.constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column, Entity, Index } from 'typeorm';
 
@@ -9,6 +13,14 @@ import { Column, Entity, Index } from 'typeorm';
 @Index(['userId', 'revoked'])
 @Index(['expiresAt'])
 export class UserSession extends BaseEntityCustom {
+  @Column({
+    type: 'enum',
+    nullable: false,
+    enum: USER_CONSTANTS.STATUS,
+    default: USER_CONSTANTS.STATUS.ACTIVE,
+  })
+  status: UserStatus;
+
   @Column('bigint')
   @Index()
   userId: string;

@@ -33,6 +33,13 @@ export const COMMON_CONSTANTS = {
     PASSWORD_MIN_LENGTH: 8,
     SESSION_TIMEOUT: 24 * 60 * 60, // 24 hours in seconds
   },
+
+  // Status values
+  STATUS: {
+    ACTIVE: 'active',
+    INACTIVE: 'inactive',
+    REMOVED: 'removed',
+  },
 } as const;
 
 // Database related constants

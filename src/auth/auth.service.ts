@@ -1,10 +1,15 @@
 import * as bcrypt from 'bcrypt';
+import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { buildResponse } from 'src/shared/helpers/build-response';
 import { CacheService } from 'src/shared/services';
-import { CreateDeviceTokenDto, LoginDto, RegisterDto } from 'src/users/dto';
-import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
+import {
+  CreateDeviceTokenDto,
+  LoginDto,
+  RegisterDto,
+  UpdatePasswordDto,
+} from 'src/users/dto';
 import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
 
@@ -210,5 +215,17 @@ export class AuthService {
       createDeviceTokenDto,
       authPayload,
     );
+  }
+
+  async getSessions(paginationDto: AdvancedPaginationDto) {
+    return await this.usersService.findSessionsByUserId(paginationDto);
+  }
+
+  async getSessionsCursor(paginationDto: CursorPaginationDto) {
+    return await this.usersService.findSessionsByUserIdCursor(paginationDto);
+  }
+
+  async getSessionById(id: string) {
+    return await this.usersService.findSessionById(id);
   }
 }
