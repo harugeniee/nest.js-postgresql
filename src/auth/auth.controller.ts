@@ -1,4 +1,4 @@
-import { ClientInfo } from 'src/common/decorators';
+import { Auth, ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { CreateDeviceTokenDto, LoginDto, RegisterDto } from 'src/users/dto';
 import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
@@ -8,15 +8,19 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
+  Get,
   Post,
   Put,
+  Query,
   Request,
   UseGuards,
+  Param,
 } from '@nestjs/common';
 
 import { AuthService } from './auth.service';
 import { JwtAccessTokenGuard } from './guard/jwt-access-token.guard';
 import { JwtRefreshTokenGuard } from './guard/jwt-refresh-token.guard';
+import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 
 @Controller('auth')
 export class AuthController {
@@ -86,5 +90,34 @@ export class AuthController {
       createDeviceTokenDto,
       authPayload,
     );
+  }
+
+  @Get('sessions')
+  @HttpCode(HttpStatus.OK)
+  @Auth()
+  async getSessions(
+    @Request() req: Request & { user: AuthPayload },
+    @Query() paginationDto: AdvancedPaginationDto,
+  ) {
+    Object.assign(paginationDto, { userId: req.user.uid });
+    return this.authService.getSessions(paginationDto);
+  }
+
+  @Get('sessions-cursor')
+  @HttpCode(HttpStatus.OK)
+  @Auth()
+  async getSessionsCursor(
+    @Request() req: Request & { user: AuthPayload },
+    @Query() paginationDto: CursorPaginationDto,
+  ) {
+    Object.assign(paginationDto, { userId: req.user.uid });
+    return this.authService.getSessionsCursor(paginationDto);
+  }
+
+  @Get('sessions/:id')
+  @HttpCode(HttpStatus.OK)
+  @Auth()
+  async getSessionById(@Param('id') id: string) {
+    return this.authService.getSessionById(id);
   }
 }

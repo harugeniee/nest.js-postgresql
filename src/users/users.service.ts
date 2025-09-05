@@ -19,8 +19,14 @@ import { User, UserDeviceToken, UserSession } from 'src/users/entities';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { UserDeviceTokensService, UserSessionsService } from './services';
 
 @Injectable()
 export class UsersService extends BaseService<User> {
@@ -33,6 +39,10 @@ export class UsersService extends BaseService<User> {
 
     @InjectRepository(UserDeviceToken)
     private readonly userDeviceTokenRepository: Repository<UserDeviceToken>,
+
+    private readonly userSessionService: UserSessionsService,
+    private readonly userDeviceTokenService: UserDeviceTokensService,
+
     cacheService: CacheService,
   ) {
     super(
@@ -104,12 +114,6 @@ export class UsersService extends BaseService<User> {
     return await this.userSessionRepository.save(session);
   }
 
-  async findSessionById(id: string): Promise<UserSession | null> {
-    return await this.userSessionRepository.findOne({
-      where: { id, revoked: false },
-    });
-  }
-
   async revokeSession(id: string): Promise<void> {
     const session = await this.userSessionRepository.findOne({ where: { id } });
     if (!session) {
@@ -176,5 +180,36 @@ export class UsersService extends BaseService<User> {
     update: QueryDeepPartialEntity<UserDeviceToken>,
   ) {
     return await this.userDeviceTokenRepository.update({ sessionId }, update);
+  }
+
+  async findSessionsByUserId(
+    paginationDto: AdvancedPaginationDto,
+  ): Promise<IPagination<UserSession>> {
+    return await this.userSessionService.listOffset(paginationDto);
+  }
+
+  async findSessionsByUserIdCursor(
+    paginationDto: CursorPaginationDto,
+  ): Promise<IPaginationCursor<UserSession>> {
+    return await this.userSessionService.listCursor(paginationDto);
+  }
+
+  async findSessionById(id: string): Promise<UserSession | null> {
+    return await this.userSessionService.findOne({ id, revoked: false });
+  }
+
+  async hasPermission(
+    userId: string,
+    authPayload: AuthPayload,
+  ): Promise<boolean> {
+    if (authPayload.role === USER_CONSTANTS.ROLES.ADMIN) {
+      return true;
+    }
+    if (userId !== authPayload.uid) {
+      throw new ForbiddenException({
+        messageKey: 'auth.FORBIDDEN',
+      });
+    }
+    return true;
   }
 }

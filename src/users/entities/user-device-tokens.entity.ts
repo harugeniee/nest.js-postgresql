@@ -1,4 +1,5 @@
 import { instanceToPlain } from 'class-transformer';
+import { USER_CONSTANTS, UserStatus } from 'src/shared/constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column, Entity, Index } from 'typeorm';
 
@@ -6,6 +7,14 @@ import { Column, Entity, Index } from 'typeorm';
   name: 'user_device_tokens',
 })
 export class UserDeviceToken extends BaseEntityCustom {
+  @Column({
+    type: 'enum',
+    nullable: false,
+    enum: USER_CONSTANTS.STATUS,
+    default: USER_CONSTANTS.STATUS.ACTIVE,
+  })
+  status: UserStatus;
+
   @Column('bigint')
   @Index()
   userId: string;
