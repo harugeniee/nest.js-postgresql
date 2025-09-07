@@ -56,7 +56,10 @@ export class RateLimitGuard implements CanActivate {
           `Rate limit exceeded for ${rateLimitContext.ip} on ${rateLimitContext.routeKey}`,
         );
         throw new HttpException(
-          `Rate limit exceeded. Try again in ${result.retryAfter || 60} seconds.`,
+          {
+            messageKey: 'auth.RATE_LIMIT_EXCEEDED',
+            messageArgs: { retryAfter: result.retryAfter || 60 },
+          },
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }

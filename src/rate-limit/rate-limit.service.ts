@@ -28,16 +28,29 @@ import { RateLimitPolicy } from './entities/rate-limit-policy.entity';
 export class RateLimitService {
   private readonly logger = new Logger(RateLimitService.name);
   private readonly CACHE_TTL = 300; // 5 minutes
+  private readonly ANONYMOUS_PLAN = 'anonymous';
+  private readonly ANONYMOUS_PLAN_DEFAULT = {
+    name: 'anonymous',
+    limitPerMin: 5,
+    ttlSec: 60,
+    active: true,
+    displayOrder: 1,
+    description: 'Dummy plan for anonymous users',
+  };
 
   constructor(
     @InjectRepository(Plan)
     private readonly plansRepo: Repository<Plan>,
+
     @InjectRepository(ApiKey)
     private readonly apiKeyRepo: Repository<ApiKey>,
+
     @InjectRepository(IpWhitelist)
     private readonly ipRepo: Repository<IpWhitelist>,
+
     @InjectRepository(RateLimitPolicy)
     private readonly policyRepo: Repository<RateLimitPolicy>,
+
     @InjectRedis() private readonly redis: Redis,
   ) {
     this.setupCacheInvalidation();
@@ -228,8 +241,17 @@ export class RateLimitService {
       });
 
       if (!plan) {
+        // If requested plan is anonymous and not found, use default
+        if (name === this.ANONYMOUS_PLAN) {
+          this.logger.warn(
+            `Anonymous plan not found in DB, using default configuration`,
+          );
+          return this.ANONYMOUS_PLAN_DEFAULT as Plan;
+        }
+
+        // For other plans, fallback to anonymous
         this.logger.warn(`Plan not found: ${name}, falling back to anonymous`);
-        return this.getPlan('anonymous');
+        return this.getPlan(this.ANONYMOUS_PLAN);
       }
 
       await this.redis.set(
@@ -241,7 +263,17 @@ export class RateLimitService {
       return plan;
     } catch (error: unknown) {
       this.logger.error(`Error getting plan ${name}:`, error);
-      return this.getPlan('anonymous');
+
+      // If error occurs and we're trying to get anonymous, use default
+      if (name === this.ANONYMOUS_PLAN) {
+        this.logger.warn(
+          `Error getting anonymous plan, using default configuration`,
+        );
+        return this.ANONYMOUS_PLAN_DEFAULT as Plan;
+      }
+
+      // For other plans, fallback to anonymous
+      return this.getPlan(this.ANONYMOUS_PLAN);
     }
   }
 
