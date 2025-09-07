@@ -8,7 +8,7 @@ import {
   mapTypeOrmError,
   normalizeSearchInput,
   notFound,
-  sha1Hex,
+  sha256Hex,
   stableStringify,
 } from 'src/common/utils';
 import { ConditionBuilder, PaginationFormatter } from 'src/shared/helpers';
@@ -210,7 +210,7 @@ export abstract class BaseService<T extends { id: string }> {
     await this.onListQueryBuilt({ where, order: orderObj, dto: pagination });
     console.log('where', where);
     const cacheKey = this.cache
-      ? `${this.cache.prefix}:list:${sha1Hex(
+      ? `${this.cache.prefix}:list:${sha256Hex(
           stableStringify({
             where,
             page,
