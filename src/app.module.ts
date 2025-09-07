@@ -30,6 +30,7 @@ import { configValidationSchema } from './shared/config/schema';
 import { CacheModule, RabbitmqModule } from './shared/services';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
+import { RateLimitModule } from './rate-limit/rate-limit.module';
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { WorkerModule } from './workers/worker.module';
     FilesModule,
     AuthModule,
     QrModule,
+    RateLimitModule,
   ],
   controllers: [AppController],
   providers: [AppService],

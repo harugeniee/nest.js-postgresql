@@ -17,6 +17,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 
 import { AppModule } from './app.module';
 import { RedisIoAdapter } from './common/gateways/socket.adapter';
+import { RateLimitGuard } from './rate-limit/rate-limit.guard';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestApplication>(AppModule, {
@@ -54,6 +55,11 @@ async function bootstrap(): Promise<void> {
   const i18nService = app.get(I18nService) as any;
   app.useGlobalInterceptors(new ResponseInterceptor(i18nService));
   app.useGlobalFilters(new I18nHttpExceptionFilter(i18nService));
+
+  // Configure rate limiting
+  const rateLimitGuard = app.get(RateLimitGuard);
+  app.useGlobalGuards(rateLimitGuard);
+  logger.log('✅ Rate limiting configured with unified rate limit guard');
 
   app.connectMicroservice<RmqOptions>({
     transport: Transport.RMQ,

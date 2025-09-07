@@ -55,6 +55,12 @@ export const configValidationSchema = Joi.object({
   RATE_LIMIT_TTL: Joi.number().default(60),
   RATE_LIMIT_LIMIT: Joi.number().default(100),
 
+  // Dynamic rate limiting
+  RATE_LIMIT_REDIS_URL: Joi.string().uri().optional(),
+  RATE_LIMIT_CACHE_TTL: Joi.number().default(300), // 5 minutes
+  RATE_LIMIT_ENABLED: Joi.boolean().default(true),
+  RATE_LIMIT_DEFAULT_PLAN: Joi.string().default('anonymous'),
+
   // Logging
   LOG_LEVEL: Joi.string()
     .valid('error', 'warn', 'info', 'debug', 'verbose')
