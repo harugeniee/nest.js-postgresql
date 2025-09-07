@@ -1,3 +1,8 @@
+import {
+  ipWhitelistSeed,
+  plansSeed,
+  rateLimitPoliciesSeed,
+} from 'src/db/seed/rate-limit';
 import { COMMON_CONSTANTS } from 'src/shared/constants';
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
 import { Repository } from 'typeorm';
@@ -54,6 +59,56 @@ export class RateLimitService {
     private readonly cacheService: CacheService,
   ) {
     this.setupCacheInvalidation();
+    this.initializeData();
+  }
+
+  /**
+   * Initialize rate limit data if not already exists
+   * Checks for existing data before seeding to avoid duplicates
+   */
+  private async initializeData(): Promise<void> {
+    try {
+      // Check if plans already exist
+      const existingPlansCount = await this.plansRepo.count();
+
+      if (existingPlansCount === 0) {
+        this.logger.log('No plans found, initializing rate limit data...');
+
+        // Initialize plans with their associated API keys
+        const planData = this.plansRepo.create(plansSeed);
+        const plans = await this.plansRepo.save(planData);
+        this.logger.log(`Initialized ${plans.length} rate limit plans`);
+
+        // Initialize IP whitelist entries
+        const ipWhitelistCount = await this.ipRepo.count();
+        if (ipWhitelistCount === 0) {
+          const ipWhitelistData = this.ipRepo.create(ipWhitelistSeed);
+          const ipWhitelist = await this.ipRepo.save(ipWhitelistData);
+          this.logger.log(
+            `Initialized ${ipWhitelist.length} IP whitelist entries`,
+          );
+        }
+
+        // Initialize rate limit policies
+        const policiesCount = await this.policyRepo.count();
+        if (policiesCount === 0) {
+          const policiesData = this.policyRepo.create(rateLimitPoliciesSeed);
+          const policies = await this.policyRepo.save(policiesData);
+          this.logger.log(`Initialized ${policies.length} rate limit policies`);
+        }
+
+        this.logger.log(
+          'Rate limit data initialization completed successfully',
+        );
+      } else {
+        this.logger.log(
+          `Rate limit data already exists (${existingPlansCount} plans found), skipping initialization`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Error initializing rate limit data:', error);
+      throw error;
+    }
   }
 
   /**
