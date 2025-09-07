@@ -1,4 +1,6 @@
 name: CI - NestJS Build Only
+permissions:
+  contents: read
 
 on:
   push:
