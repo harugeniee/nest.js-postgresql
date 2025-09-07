@@ -4,21 +4,34 @@ import {
   rateLimitPoliciesSeed,
 } from 'src/db/seed/rate-limit';
 import { COMMON_CONSTANTS } from 'src/shared/constants';
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
 import { Repository } from 'typeorm';
 
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import {
-  ApiKeyData,
   ApiKeyResolution,
   CacheStats,
-  IpWhitelistData,
   RateLimitContext,
   RateLimitInfo,
   RateLimitResult,
 } from '../common/interface';
+import {
+  CreatePlanDto,
+  UpdatePlanDto,
+  CreateApiKeyDto,
+  UpdateApiKeyDto,
+  CreateIpWhitelistDto,
+  UpdateIpWhitelistDto,
+  CreatePolicyDto,
+  UpdatePolicyDto,
+  PolicyMatchResponseDto,
+} from './dto';
+import {
+  CreateRateLimitPolicyDto,
+  UpdateRateLimitPolicyDto,
+  TestPolicyMatchDto,
+} from './dto/rate-limit-policy.dto';
 import { CacheService } from '../shared/services/cache/cache.service';
 import { ApiKey } from './entities/api-key.entity';
 import { IpWhitelist } from './entities/ip-whitelist.entity';
@@ -59,7 +72,7 @@ export class RateLimitService {
     private readonly cacheService: CacheService,
   ) {
     this.setupCacheInvalidation();
-    this.initializeData();
+    void this.initializeData();
   }
 
   /**
@@ -766,22 +779,22 @@ export class RateLimitService {
     });
   }
 
-  async createApiKey(keyData: ApiKeyData): Promise<ApiKey> {
-    const { plan, ...restData } = keyData;
+  async createApiKey(keyData: CreateApiKeyDto): Promise<ApiKey> {
+    const { planId, ...restData } = keyData;
     const apiKey = this.apiKeyRepo.create({
       ...restData,
-      planId: plan,
+      planId: planId ?? undefined,
     });
     const saved = await this.apiKeyRepo.save(apiKey);
     await this.publishCacheInvalidation();
     return saved;
   }
 
-  async updateApiKey(id: string, updateData: Partial<ApiKey>): Promise<ApiKey> {
-    const { plan, ...restData } = updateData as any;
+  async updateApiKey(id: string, updateData: UpdateApiKeyDto): Promise<ApiKey> {
+    const { planId, ...restData } = updateData;
     const updatePayload = {
       ...restData,
-      ...(plan && { planId: plan }),
+      ...(planId ? { planId } : {}),
     };
     await this.apiKeyRepo.update(id, updatePayload);
     const updated = await this.apiKeyRepo.findOne({ where: { id } });
@@ -790,7 +803,7 @@ export class RateLimitService {
     return updated;
   }
 
-  async addIpToWhitelist(ipData: IpWhitelistData): Promise<IpWhitelist> {
+  async addIpToWhitelist(ipData: CreateIpWhitelistDto): Promise<IpWhitelist> {
     const whitelistEntry = this.ipRepo.create(ipData);
     const saved = await this.ipRepo.save(whitelistEntry);
     await this.publishCacheInvalidation();
@@ -803,21 +816,15 @@ export class RateLimitService {
   }
 
   // Additional CRUD methods for admin
-  async createPlan(planData: {
-    name: string;
-    limitPerMin: number;
-    ttlSec?: number;
-    description?: string;
-    displayOrder?: number;
-  }): Promise<Plan> {
+  async createPlan(planData: CreatePlanDto): Promise<Plan> {
     const plan = this.plansRepo.create(planData);
     const saved = await this.plansRepo.save(plan);
     await this.publishCacheInvalidation();
     return saved;
   }
 
-  async updatePlan(name: string, updateData: Partial<Plan>): Promise<Plan> {
-    await this.plansRepo.update(name, updateData as any);
+  async updatePlan(name: string, updateData: UpdatePlanDto): Promise<Plan> {
+    await this.plansRepo.update(name, updateData);
     const updated = await this.plansRepo.findOne({ where: { name } });
     if (!updated) throw new Error('Plan not found');
     await this.publishCacheInvalidation();
@@ -838,7 +845,7 @@ export class RateLimitService {
 
   async updateIpWhitelist(
     id: string,
-    updateData: Partial<IpWhitelist>,
+    updateData: UpdateIpWhitelistDto,
   ): Promise<IpWhitelist> {
     await this.ipRepo.update(id, updateData);
     const updated = await this.ipRepo.findOne({ where: { id } });
@@ -855,20 +862,9 @@ export class RateLimitService {
     });
   }
 
-  async createPolicy(policyData: {
-    name: string;
-    enabled?: boolean;
-    priority?: number;
-    scope: 'global' | 'route' | 'user' | 'org' | 'ip';
-    routePattern?: string;
-    strategy?: 'fixedWindow' | 'slidingWindow' | 'tokenBucket';
-    limit?: number;
-    windowSec?: number;
-    burst?: number;
-    refillPerSec?: number;
-    extra?: any;
-    description?: string;
-  }): Promise<RateLimitPolicy> {
+  async createPolicy(
+    policyData: CreateRateLimitPolicyDto,
+  ): Promise<RateLimitPolicy> {
     const policy = this.policyRepo.create(policyData);
     const saved = await this.policyRepo.save(policy);
     await this.publishCacheInvalidation();
@@ -877,9 +873,9 @@ export class RateLimitService {
 
   async updatePolicy(
     id: string,
-    updateData: Partial<RateLimitPolicy>,
+    updateData: UpdateRateLimitPolicyDto,
   ): Promise<RateLimitPolicy> {
-    await this.policyRepo.update(id, updateData as any);
+    await this.policyRepo.update(id, updateData);
     const updated = await this.policyRepo.findOne({ where: { id } });
     if (!updated) throw new Error('Policy not found');
     await this.publishCacheInvalidation();
@@ -897,13 +893,8 @@ export class RateLimitService {
 
   async testPolicyMatch(
     policyId: string,
-    context: {
-      userId?: string;
-      orgId?: string;
-      ip?: string;
-      routeKey?: string;
-    },
-  ): Promise<{ matches: boolean; policy: RateLimitPolicy | null }> {
+    context: TestPolicyMatchDto,
+  ): Promise<PolicyMatchResponseDto> {
     const policy = await this.policyRepo.findOne({ where: { id: policyId } });
     if (!policy) {
       return { matches: false, policy: null };
