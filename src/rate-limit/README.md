@@ -224,13 +224,17 @@ graph TD
     F -->|No| G[Use Anonymous Plan]
     F -->|Yes| H{API Key Whitelisted?}
     H -->|Yes| D
-    H -->|No| I[Get Plan Limits]
-    I --> J[Check Redis Counter]
-    J --> K{Within Limits?}
-    K -->|Yes| L[Increment Counter]
-    K -->|No| M[Rate Limit Exceeded]
-    L --> D
-    M --> N[Return 429 Error]
+    H -->|No| I[Check Matching Policies]
+    I --> J{Policy Found?}
+    J -->|Yes| K[Apply Policy Rate Limit]
+    J -->|No| L[Get Plan Limits]
+    L --> M[Check Redis Counter]
+    K --> M
+    M --> N{Within Limits?}
+    N -->|Yes| O[Increment Counter]
+    N -->|No| P[Rate Limit Exceeded]
+    O --> D
+    P --> Q[Return 429 Error]
 ```
 
 ## 🛡️ Rate Limiting Strategies
@@ -321,6 +325,49 @@ PUT /api/v1/admin/rate-limit/ip-whitelist/{id}
 
 # Remove IP from whitelist
 DELETE /api/v1/admin/rate-limit/ip-whitelist/{id}
+```
+
+### Policy Management
+
+```bash
+# Get all policies
+GET /api/v1/admin/rate-limit/policies
+
+# Create new policy
+POST /api/v1/admin/rate-limit/policies
+{
+  "name": "api-upload-policy",
+  "scope": "route",
+  "routePattern": "^POST:/api/v1/upload$",
+  "strategy": "tokenBucket",
+  "burst": 10,
+  "refillPerSec": 2,
+  "priority": 200,
+  "description": "Upload endpoint rate limiting"
+}
+
+# Update policy
+PUT /api/v1/admin/rate-limit/policies/{id}
+{
+  "burst": 20,
+  "refillPerSec": 5,
+  "priority": 300
+}
+
+# Delete policy
+DELETE /api/v1/admin/rate-limit/policies/{id}
+
+# Get policy by name
+GET /api/v1/admin/rate-limit/policies/name/{name}
+
+# Test policy matching
+POST /api/v1/admin/rate-limit/policies/{id}/test
+{
+  "userId": "user_123",
+  "orgId": "org_456",
+  "ip": "192.168.1.100",
+  "routeKey": "POST:/api/v1/upload"
+}
 ```
 
 ### Cache Management

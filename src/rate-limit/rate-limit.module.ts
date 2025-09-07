@@ -5,6 +5,7 @@ import { Plan } from './entities/plan.entity';
 import { ApiKey } from './entities/api-key.entity';
 import { IpWhitelist } from './entities/ip-whitelist.entity';
 import { RateLimitPolicy } from './entities/rate-limit-policy.entity';
+import { RateLimitLog } from './entities/rate-limit-log.entity';
 import { RateLimitService } from './rate-limit.service';
 import { RateLimitGuard } from './rate-limit.guard';
 import { RateLimitAdminController } from './rate-limit-admin.controller';
@@ -24,7 +25,13 @@ import { RateLimitAdminController } from './rate-limit-admin.controller';
 @Module({
   imports: [
     // Register entities with TypeORM
-    TypeOrmModule.forFeature([Plan, ApiKey, IpWhitelist, RateLimitPolicy]),
+    TypeOrmModule.forFeature([
+      Plan,
+      ApiKey,
+      IpWhitelist,
+      RateLimitPolicy,
+      RateLimitLog,
+    ]),
   ],
   providers: [
     // Single rate limit service

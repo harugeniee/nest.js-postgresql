@@ -17,6 +17,7 @@ import { BypassRateLimit } from './rate-limit.decorator';
 import { Plan } from './entities/plan.entity';
 import { ApiKey } from './entities/api-key.entity';
 import { IpWhitelist } from './entities/ip-whitelist.entity';
+import { RateLimitPolicy } from './entities/rate-limit-policy.entity';
 import { CacheStats, RateLimitInfo } from '../common/interface';
 import {
   CreatePlanDto,
@@ -25,6 +26,9 @@ import {
   UpdateApiKeyDto,
   CreateIpWhitelistDto,
   UpdateIpWhitelistDto,
+  CreateRateLimitPolicyDto,
+  UpdateRateLimitPolicyDto,
+  TestPolicyMatchDto,
 } from './dto';
 
 /**
@@ -114,7 +118,7 @@ export class RateLimitAdminController {
     @Body() updateApiKeyDto: UpdateApiKeyDto,
   ): Promise<ApiKey> {
     this.logger.log(`Updating API key: ${id}`);
-    return this.rateLimitService.updateApiKey(id, updateApiKeyDto);
+    return this.rateLimitService.updateApiKey(id, updateApiKeyDto as any);
   }
 
   /**
@@ -243,5 +247,87 @@ export class RateLimitAdminController {
   async getRateLimitInfo(@Param('key') key: string): Promise<RateLimitInfo> {
     this.logger.log(`Getting rate limit info for key: ${key}`);
     return this.rateLimitService.getRateLimitInfo(key);
+  }
+
+  // Policy Management Endpoints
+
+  /**
+   * Get all rate limit policies
+   */
+  @Get('policies')
+  @ApiOperation({ summary: 'Get all rate limit policies' })
+  @ApiResponse({ status: 200, description: 'List of rate limit policies' })
+  async getPolicies(): Promise<RateLimitPolicy[]> {
+    this.logger.log('Getting all rate limit policies');
+    return this.rateLimitService.getAllPolicies();
+  }
+
+  /**
+   * Create a new rate limit policy
+   */
+  @Post('policies')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new rate limit policy' })
+  @ApiResponse({ status: 201, description: 'Policy created successfully' })
+  async createPolicy(
+    @Body() createPolicyDto: CreateRateLimitPolicyDto,
+  ): Promise<RateLimitPolicy> {
+    this.logger.log(`Creating new policy: ${createPolicyDto.name}`);
+    return this.rateLimitService.createPolicy(createPolicyDto);
+  }
+
+  /**
+   * Update a rate limit policy
+   */
+  @Put('policies/:id')
+  @ApiOperation({ summary: 'Update a rate limit policy' })
+  @ApiResponse({ status: 200, description: 'Policy updated successfully' })
+  async updatePolicy(
+    @Param('id') id: string,
+    @Body() updatePolicyDto: UpdateRateLimitPolicyDto,
+  ): Promise<RateLimitPolicy> {
+    this.logger.log(`Updating policy: ${id}`);
+    return this.rateLimitService.updatePolicy(id, updatePolicyDto);
+  }
+
+  /**
+   * Delete a rate limit policy
+   */
+  @Delete('policies/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a rate limit policy' })
+  @ApiResponse({ status: 204, description: 'Policy deleted successfully' })
+  async deletePolicy(@Param('id') id: string): Promise<void> {
+    this.logger.log(`Deleting policy: ${id}`);
+    return this.rateLimitService.deletePolicy(id);
+  }
+
+  /**
+   * Get policy by name
+   */
+  @Get('policies/name/:name')
+  @ApiOperation({ summary: 'Get policy by name' })
+  @ApiResponse({ status: 200, description: 'Policy found' })
+  @ApiResponse({ status: 404, description: 'Policy not found' })
+  async getPolicyByName(
+    @Param('name') name: string,
+  ): Promise<RateLimitPolicy | null> {
+    this.logger.log(`Getting policy by name: ${name}`);
+    return this.rateLimitService.getPolicyByName(name);
+  }
+
+  /**
+   * Test policy matching
+   */
+  @Post('policies/:id/test')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Test policy matching against context' })
+  @ApiResponse({ status: 200, description: 'Policy test result' })
+  async testPolicyMatch(
+    @Param('id') id: string,
+    @Body() testContext: TestPolicyMatchDto,
+  ): Promise<{ matches: boolean; policy: RateLimitPolicy | null }> {
+    this.logger.log(`Testing policy match for policy: ${id}`);
+    return this.rateLimitService.testPolicyMatch(id, testContext);
   }
 }

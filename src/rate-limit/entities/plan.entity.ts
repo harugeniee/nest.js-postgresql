@@ -1,4 +1,7 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { BaseEntityCustom } from 'src/shared/entities/base.entity';
+import { Column, Entity, OneToMany } from 'typeorm';
+import { ApiKey } from './api-key.entity';
+import { RateLimitLog } from './rate-limit-log.entity';
 
 /**
  * Rate limit plan entity
@@ -6,26 +9,26 @@ import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
  * Each plan has specific limits and TTL configurations
  */
 @Entity('plans')
-export class Plan {
+export class Plan extends BaseEntityCustom {
   /**
    * Plan name - serves as primary key
    * Examples: 'anonymous', 'free', 'pro', 'enterprise'
    */
-  @PrimaryColumn({ type: 'varchar', length: 64 })
+  @Column({ type: 'varchar', length: 64 })
   name!: string;
 
   /**
    * Rate limit per minute for this plan
    * Defines how many requests are allowed per minute
    */
-  @Column('int', { name: 'limit_per_min' })
+  @Column('int')
   limitPerMin!: number;
 
   /**
    * Time-to-live in seconds for rate limit counters
    * Default: 60 seconds (1 minute)
    */
-  @Column('int', { name: 'ttl_sec', default: 60 })
+  @Column('int', { default: 60 })
   ttlSec!: number;
 
   /**
@@ -54,19 +57,14 @@ export class Plan {
   displayOrder!: number;
 
   /**
-   * Creation timestamp
+   * API keys associated with this plan
    */
-  @Index()
-  @Column('timestamp', { default: () => 'CURRENT_TIMESTAMP' })
-  createdAt!: Date;
+  @OneToMany(() => ApiKey, (apiKey) => apiKey.planId)
+  apiKeys?: ApiKey[];
 
   /**
-   * Last update timestamp
+   * Rate limit logs for this plan
    */
-  @Index()
-  @Column('timestamp', {
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
-  updatedAt!: Date;
+  @OneToMany(() => RateLimitLog, (log) => log.planId)
+  logs?: RateLimitLog[];
 }

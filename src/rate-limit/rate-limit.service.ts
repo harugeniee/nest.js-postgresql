@@ -88,6 +88,13 @@ export class RateLimitService {
         };
       }
 
+      // Check for matching policies first
+      const matchingPolicy = await this.findMatchingPolicy(context);
+      if (matchingPolicy) {
+        this.logger.debug(`Using policy: ${matchingPolicy.name}`);
+        return await this.applyPolicyRateLimit(matchingPolicy, context);
+      }
+
       // Apply rate limit based on plan
       return await this.applyRateLimit(
         apiKeyResult.plan || 'anonymous',
@@ -262,6 +269,7 @@ export class RateLimitService {
       const apiKey = await this.apiKeyRepo.findOne({
         where: { key, active: true },
         select: ['plan', 'isWhitelist', 'expiresAt', 'deletedAt'],
+        relations: ['plan'],
       });
 
       if (!apiKey || apiKey.isExpired() || !apiKey.isValid()) {
@@ -272,7 +280,7 @@ export class RateLimitService {
 
       const result = {
         kind: 'apiKey' as const,
-        plan: apiKey.plan,
+        plan: apiKey.plan?.name || 'anonymous',
         isWhitelist: apiKey.isWhitelist,
       };
 
@@ -323,6 +331,260 @@ export class RateLimitService {
   }
 
   /**
+   * Find matching policy for the given context
+   */
+  private async findMatchingPolicy(
+    context: RateLimitContext,
+  ): Promise<RateLimitPolicy | null> {
+    try {
+      const cacheKey = `rl:policies:active`;
+      const cached = await this.redis.get(cacheKey);
+
+      let policies: RateLimitPolicy[];
+      if (cached) {
+        policies = JSON.parse(cached);
+      } else {
+        policies = await this.policyRepo.find({
+          where: { enabled: true, status: 'ACTIVE' },
+          order: { priority: 'DESC' },
+        });
+        await this.redis.set(
+          cacheKey,
+          JSON.stringify(policies),
+          'EX',
+          this.CACHE_TTL,
+        );
+      }
+
+      // Find the highest priority policy that matches
+      for (const policy of policies) {
+        if (policy.matches(context)) {
+          return policy;
+        }
+      }
+
+      return null;
+    } catch (error: unknown) {
+      this.logger.error('Error finding matching policy:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Apply rate limit based on policy
+   */
+  private async applyPolicyRateLimit(
+    policy: RateLimitPolicy,
+    context: RateLimitContext,
+  ): Promise<RateLimitResult> {
+    try {
+      const params = policy.getEffectiveParams();
+      const key = this.generatePolicyRateLimitKey(policy, context);
+
+      // Use different Lua scripts based on strategy
+      let luaScript: string;
+      let args: string[];
+
+      switch (params.strategy) {
+        case 'fixedWindow':
+          luaScript = `
+            local key = KEYS[1]
+            local limit = tonumber(ARGV[1])
+            local window = tonumber(ARGV[2])
+            
+            local current = redis.call('GET', key)
+            if current == false then
+              current = 0
+            else
+              current = tonumber(current)
+            end
+            
+            if current >= limit then
+              return {0, current, window}
+            end
+            
+            local newCount = redis.call('INCR', key)
+            if newCount == 1 then
+              redis.call('EXPIRE', key, window)
+            end
+            
+            return {1, newCount, window}
+          `;
+          args = [
+            params.limit?.toString() || '100',
+            params.windowSec?.toString() || '60',
+          ];
+          break;
+
+        case 'slidingWindow':
+          luaScript = `
+            local key = KEYS[1]
+            local limit = tonumber(ARGV[1])
+            local window = tonumber(ARGV[2])
+            local now = tonumber(ARGV[3])
+            
+            -- Remove expired entries
+            redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
+            
+            -- Count current entries
+            local current = redis.call('ZCARD', key)
+            
+            if current >= limit then
+              return {0, current, window}
+            end
+            
+            -- Add current request
+            redis.call('ZADD', key, now, now)
+            redis.call('EXPIRE', key, window)
+            
+            return {1, current + 1, window}
+          `;
+          args = [
+            params.limit?.toString() || '100',
+            params.windowSec?.toString() || '60',
+            Math.floor(Date.now() / 1000).toString(),
+          ];
+          break;
+
+        case 'tokenBucket':
+          luaScript = `
+            local key = KEYS[1]
+            local burst = tonumber(ARGV[1])
+            local refillRate = tonumber(ARGV[2])
+            local now = tonumber(ARGV[3])
+            
+            local bucket = redis.call('HMGET', key, 'tokens', 'lastRefill')
+            local tokens = tonumber(bucket[1]) or burst
+            local lastRefill = tonumber(bucket[2]) or now
+            
+            -- Calculate tokens to add
+            local timePassed = now - lastRefill
+            local tokensToAdd = timePassed * refillRate
+            tokens = math.min(burst, tokens + tokensToAdd)
+            
+            if tokens < 1 then
+              redis.call('HMSET', key, 'tokens', tokens, 'lastRefill', now)
+              redis.call('EXPIRE', key, 3600)
+              return {0, 0, 1}
+            end
+            
+            -- Consume one token
+            tokens = tokens - 1
+            redis.call('HMSET', key, 'tokens', tokens, 'lastRefill', now)
+            redis.call('EXPIRE', key, 3600)
+            
+            return {1, tokens, 1}
+          `;
+          args = [
+            params.burst?.toString() || '20',
+            params.refillPerSec?.toString() || '5',
+            Math.floor(Date.now() / 1000).toString(),
+          ];
+          break;
+
+        default:
+          // Fallback to fixed window
+          luaScript = `
+            local key = KEYS[1]
+            local limit = tonumber(ARGV[1])
+            local window = tonumber(ARGV[2])
+            
+            local current = redis.call('GET', key)
+            if current == false then
+              current = 0
+            else
+              current = tonumber(current)
+            end
+            
+            if current >= limit then
+              return {0, current, window}
+            end
+            
+            local newCount = redis.call('INCR', key)
+            if newCount == 1 then
+              redis.call('EXPIRE', key, window)
+            end
+            
+            return {1, newCount, window}
+          `;
+          args = ['100', '60'];
+      }
+
+      const result = (await this.redis.eval(luaScript, 1, key, ...args)) as [
+        number,
+        number,
+        number,
+      ];
+      const [allowed, current, window] = result;
+
+      const headers = {
+        'X-RateLimit-Limit': (params.limit || params.burst || 100).toString(),
+        'X-RateLimit-Remaining': Math.max(
+          0,
+          (params.limit || params.burst || 100) - current,
+        ).toString(),
+        'X-RateLimit-Reset': (
+          Math.floor(Date.now() / 1000) + window
+        ).toString(),
+        'X-RateLimit-Policy': policy.name,
+        'X-RateLimit-Strategy': params.strategy,
+      };
+
+      if (allowed === 0) {
+        return {
+          allowed: false,
+          headers: {
+            ...headers,
+            'Retry-After': window.toString(),
+          },
+          retryAfter: window,
+        };
+      }
+
+      return { allowed: true, headers };
+    } catch (error: unknown) {
+      this.logger.error(
+        `Error applying policy rate limit for ${policy.name}:`,
+        error,
+      );
+      return {
+        allowed: true,
+        headers: { 'X-RateLimit-Status': 'error-fallback' },
+      };
+    }
+  }
+
+  /**
+   * Generate rate limit key for policy
+   */
+  private generatePolicyRateLimitKey(
+    policy: RateLimitPolicy,
+    context: RateLimitContext,
+  ): string {
+    const parts = ['rl', 'policy', policy.name];
+
+    switch (policy.scope) {
+      case 'global':
+        parts.push('global');
+        break;
+      case 'route':
+        parts.push('route', context.routeKey);
+        break;
+      case 'user':
+        parts.push('user', context.userId || 'anon');
+        break;
+      case 'org':
+        parts.push('org', context.orgId || 'noorg');
+        break;
+      case 'ip':
+        parts.push('ip', context.ip);
+        break;
+    }
+
+    return parts.join(':');
+  }
+
+  /**
    * Clear all cache
    */
   private async clearAllCache(): Promise<void> {
@@ -359,20 +621,27 @@ export class RateLimitService {
    */
   async getCacheStats(): Promise<CacheStats> {
     try {
-      const [planKeys, ipKeys, apiKeyKeys] = await Promise.all([
+      const [planKeys, ipKeys, apiKeyKeys, policyKeys] = await Promise.all([
         this.redis.keys('rl:plan:*'),
         this.redis.keys('rl:ipwl:*'),
         this.redis.keys('rl:apikey:*'),
+        this.redis.keys('rl:policy:*'),
       ]);
 
       return {
         planCount: planKeys.length,
         ipWhitelistCount: ipKeys.length,
         apiKeyCount: apiKeyKeys.length,
+        policyCount: policyKeys.length,
       };
     } catch (error: unknown) {
       this.logger.error('Error getting cache stats:', error);
-      return { planCount: 0, ipWhitelistCount: 0, apiKeyCount: 0 };
+      return {
+        planCount: 0,
+        ipWhitelistCount: 0,
+        apiKeyCount: 0,
+        policyCount: 0,
+      };
     }
   }
 
@@ -437,14 +706,23 @@ export class RateLimitService {
   }
 
   async createApiKey(keyData: ApiKeyData): Promise<ApiKey> {
-    const apiKey = this.apiKeyRepo.create(keyData);
+    const { plan, ...restData } = keyData;
+    const apiKey = this.apiKeyRepo.create({
+      ...restData,
+      planId: plan,
+    });
     const saved = await this.apiKeyRepo.save(apiKey);
     await this.publishCacheInvalidation();
     return saved;
   }
 
   async updateApiKey(id: string, updateData: Partial<ApiKey>): Promise<ApiKey> {
-    await this.apiKeyRepo.update(id, updateData);
+    const { plan, ...restData } = updateData as any;
+    const updatePayload = {
+      ...restData,
+      ...(plan && { planId: plan }),
+    };
+    await this.apiKeyRepo.update(id, updatePayload);
     const updated = await this.apiKeyRepo.findOne({ where: { id } });
     if (!updated) throw new Error('API key not found');
     await this.publishCacheInvalidation();
@@ -506,5 +784,71 @@ export class RateLimitService {
     if (!updated) throw new Error('IP whitelist entry not found');
     await this.publishCacheInvalidation();
     return updated;
+  }
+
+  // Policy CRUD methods
+  async getAllPolicies(): Promise<RateLimitPolicy[]> {
+    return this.policyRepo.find({
+      where: { enabled: true },
+      order: { priority: 'DESC' },
+    });
+  }
+
+  async createPolicy(policyData: {
+    name: string;
+    enabled?: boolean;
+    priority?: number;
+    scope: 'global' | 'route' | 'user' | 'org' | 'ip';
+    routePattern?: string;
+    strategy?: 'fixedWindow' | 'slidingWindow' | 'tokenBucket';
+    limit?: number;
+    windowSec?: number;
+    burst?: number;
+    refillPerSec?: number;
+    extra?: any;
+    description?: string;
+  }): Promise<RateLimitPolicy> {
+    const policy = this.policyRepo.create(policyData);
+    const saved = await this.policyRepo.save(policy);
+    await this.publishCacheInvalidation();
+    return saved;
+  }
+
+  async updatePolicy(
+    id: string,
+    updateData: Partial<RateLimitPolicy>,
+  ): Promise<RateLimitPolicy> {
+    await this.policyRepo.update(id, updateData as any);
+    const updated = await this.policyRepo.findOne({ where: { id } });
+    if (!updated) throw new Error('Policy not found');
+    await this.publishCacheInvalidation();
+    return updated;
+  }
+
+  async deletePolicy(id: string): Promise<void> {
+    await this.policyRepo.softDelete(id);
+    await this.publishCacheInvalidation();
+  }
+
+  async getPolicyByName(name: string): Promise<RateLimitPolicy | null> {
+    return this.policyRepo.findOne({ where: { name } });
+  }
+
+  async testPolicyMatch(
+    policyId: string,
+    context: {
+      userId?: string;
+      orgId?: string;
+      ip?: string;
+      routeKey?: string;
+    },
+  ): Promise<{ matches: boolean; policy: RateLimitPolicy | null }> {
+    const policy = await this.policyRepo.findOne({ where: { id: policyId } });
+    if (!policy) {
+      return { matches: false, policy: null };
+    }
+
+    const matches = policy.matches(context);
+    return { matches, policy };
   }
 }

@@ -1,4 +1,8 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { COMMON_CONSTANTS } from 'src/shared/constants';
+import { BaseEntityCustom } from 'src/shared/entities/base.entity';
+import { User } from 'src/users/entities';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Plan } from './plan.entity';
 
 /**
  * API Key entity for rate limiting
@@ -6,13 +10,7 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  * Supports whitelist functionality for bypassing rate limits
  */
 @Entity('api_keys')
-export class ApiKey {
-  /**
-   * Unique identifier for the API key
-   */
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
-
+export class ApiKey extends BaseEntityCustom {
   /**
    * The actual API key string
    * Should be hashed in production for security
@@ -21,12 +19,12 @@ export class ApiKey {
   @Column({ type: 'varchar', length: 128 })
   key!: string;
 
-  /**
-   * Associated rate limit plan
-   * Foreign key reference to plans.name
-   */
-  @Column({ type: 'varchar', length: 64 })
-  plan!: string;
+  @Column({
+    type: 'enum',
+    enum: COMMON_CONSTANTS.STATUS,
+    default: COMMON_CONSTANTS.STATUS.ACTIVE,
+  })
+  status: string;
 
   /**
    * Whether this API key is currently active
@@ -39,7 +37,7 @@ export class ApiKey {
    * Whether this API key is whitelisted
    * Whitelisted keys bypass all rate limits
    */
-  @Column({ name: 'is_whitelist', type: 'boolean', default: false })
+  @Column({ type: 'boolean', default: false })
   isWhitelist!: boolean;
 
   /**
@@ -53,8 +51,26 @@ export class ApiKey {
    * Optional owner/user identifier
    * Can be used to associate keys with specific users
    */
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  ownerId?: string;
+  @Column({ type: 'varchar', nullable: true })
+  userId?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'userId', referencedColumnName: 'id' })
+  user: User;
+
+  /**
+   * Associated rate limit plan
+   * Foreign key reference to plans.id
+   */
+  @Column({ nullable: true })
+  planId?: string;
+
+  /**
+   * Associated rate limit plan
+   */
+  @ManyToOne(() => Plan, (plan) => plan.apiKeys, { nullable: true })
+  @JoinColumn({ name: 'planId', referencedColumnName: 'id' })
+  plan: Plan;
 
   /**
    * Last time this API key was used
@@ -71,30 +87,6 @@ export class ApiKey {
   @Index()
   @Column('timestamp', { nullable: true })
   expiresAt?: Date;
-
-  /**
-   * Creation timestamp
-   */
-  @Index()
-  @Column('timestamp', { default: () => 'CURRENT_TIMESTAMP' })
-  createdAt!: Date;
-
-  /**
-   * Last update timestamp
-   */
-  @Index()
-  @Column('timestamp', {
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
-  updatedAt!: Date;
-
-  /**
-   * Soft delete timestamp
-   */
-  @Index()
-  @Column('timestamp', { nullable: true })
-  deletedAt?: Date;
 
   /**
    * Check if the API key is expired

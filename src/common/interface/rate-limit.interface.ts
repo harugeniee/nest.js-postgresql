@@ -72,6 +72,7 @@ export interface CacheStats {
   planCount: number;
   ipWhitelistCount: number;
   apiKeyCount: number;
+  policyCount: number;
 }
 
 /**

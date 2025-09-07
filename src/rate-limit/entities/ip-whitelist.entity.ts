@@ -1,4 +1,6 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { COMMON_CONSTANTS } from 'src/shared/constants';
+import { BaseEntityCustom } from 'src/shared/entities/base.entity';
+import { Column, Entity, Index } from 'typeorm';
 
 /**
  * IP Whitelist entity for rate limiting
@@ -6,13 +8,7 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  * Supports both individual IPs and CIDR ranges
  */
 @Entity('ip_whitelist')
-export class IpWhitelist {
-  /**
-   * Unique identifier for the whitelist entry
-   */
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
-
+export class IpWhitelist extends BaseEntityCustom {
   /**
    * IP address or CIDR range
    * Examples: '192.168.1.1', '10.0.0.0/8', '::1'
@@ -35,6 +31,13 @@ export class IpWhitelist {
   @Column('boolean', { default: true })
   active!: boolean;
 
+  @Column({
+    type: 'enum',
+    enum: COMMON_CONSTANTS.STATUS,
+    default: COMMON_CONSTANTS.STATUS.ACTIVE,
+  })
+  status: string;
+
   /**
    * Optional reason for whitelisting
    * Examples: 'internal-service', 'monitoring', 'admin'
@@ -43,33 +46,9 @@ export class IpWhitelist {
   reason?: string;
 
   /**
-   * Creation timestamp
-   */
-  @Index()
-  @Column('timestamp', { default: () => 'CURRENT_TIMESTAMP' })
-  createdAt!: Date;
-
-  /**
-   * Last update timestamp
-   */
-  @Index()
-  @Column('timestamp', {
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
-  updatedAt!: Date;
-
-  /**
-   * Soft delete timestamp
-   */
-  @Index()
-  @Column('timestamp', { nullable: true })
-  deletedAt?: Date;
-
-  /**
    * Check if the whitelist entry is valid (active and not deleted)
    */
   isValid(): boolean {
-    return this.active && !this.deletedAt;
+    return this.active && this.status === COMMON_CONSTANTS.STATUS.ACTIVE;
   }
 }

@@ -1,4 +1,7 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { COMMON_CONSTANTS } from 'src/shared/constants';
+import { BaseEntityCustom } from 'src/shared/entities/base.entity';
+import { Column, Entity, OneToMany } from 'typeorm';
+import { RateLimitLog } from './rate-limit-log.entity';
 
 /**
  * Rate limit policy entity
@@ -6,18 +9,28 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
  * Supports hot-reload with version control
  */
 @Entity('rate_limit_policies')
-export class RateLimitPolicy {
-  /**
-   * Unique identifier for the policy
-   */
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
-
+export class RateLimitPolicy extends BaseEntityCustom {
   /**
    * Policy name for easy reference
    */
   @Column({ type: 'varchar', length: 100, unique: true })
   name!: string;
+
+  /**
+   * Whether this policy is active
+   */
+  @Column({ type: 'boolean', default: true })
+  active!: boolean;
+
+  /**
+   * Whether this policy is enabled
+   */
+  @Column({
+    type: 'enum',
+    enum: COMMON_CONSTANTS.STATUS,
+    default: COMMON_CONSTANTS.STATUS.ACTIVE,
+  })
+  status: string;
 
   /**
    * Whether this policy is enabled
@@ -94,13 +107,6 @@ export class RateLimitPolicy {
   refillPerSec?: number;
 
   /**
-   * Version number for hot-reload support
-   * Incremented when policy is updated
-   */
-  @Column({ type: 'int', default: 1 })
-  version!: number;
-
-  /**
    * Additional configuration as JSON
    * Can include whitelist, user/org IDs, weight multipliers, etc.
    */
@@ -121,34 +127,10 @@ export class RateLimitPolicy {
   description?: string;
 
   /**
-   * Creation timestamp
-   */
-  @Index()
-  @Column('timestamp', { default: () => 'CURRENT_TIMESTAMP' })
-  createdAt!: Date;
-
-  /**
-   * Last update timestamp
-   */
-  @Index()
-  @Column('timestamp', {
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
-  updatedAt!: Date;
-
-  /**
-   * Soft delete timestamp
-   */
-  @Index()
-  @Column('timestamp', { nullable: true })
-  deletedAt?: Date;
-
-  /**
    * Check if the policy is valid and active
    */
   isValid(): boolean {
-    return this.enabled && !this.deletedAt;
+    return this.enabled && this.status === COMMON_CONSTANTS.STATUS.ACTIVE;
   }
 
   /**
@@ -202,4 +184,10 @@ export class RateLimitPolicy {
       refillPerSec: this.refillPerSec,
     };
   }
+
+  /**
+   * Rate limit logs for this policy
+   */
+  @OneToMany(() => RateLimitLog, (log) => log.policyId)
+  logs?: RateLimitLog[];
 }

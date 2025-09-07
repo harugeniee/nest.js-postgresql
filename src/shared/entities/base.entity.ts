@@ -80,7 +80,7 @@ export abstract class BaseEntityCustom extends BaseEntity {
    * Optimistic locking version for concurrency control
    * Automatically incremented on each update
    */
-  @VersionColumn()
+  @VersionColumn({ default: 1 })
   version!: number;
 
   /**
