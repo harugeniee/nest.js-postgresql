@@ -1,8 +1,7 @@
+import { COMMON_CONSTANTS } from 'src/shared/constants';
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
-import Redis from 'ioredis';
 import { Repository } from 'typeorm';
 
-import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -15,6 +14,7 @@ import {
   RateLimitInfo,
   RateLimitResult,
 } from '../common/interface';
+import { CacheService } from '../shared/services/cache/cache.service';
 import { ApiKey } from './entities/api-key.entity';
 import { IpWhitelist } from './entities/ip-whitelist.entity';
 import { Plan } from './entities/plan.entity';
@@ -51,7 +51,7 @@ export class RateLimitService {
     @InjectRepository(RateLimitPolicy)
     private readonly policyRepo: Repository<RateLimitPolicy>,
 
-    @InjectRedis() private readonly redis: Redis,
+    private readonly cacheService: CacheService,
   ) {
     this.setupCacheInvalidation();
   }
@@ -60,7 +60,8 @@ export class RateLimitService {
    * Setup Redis pub/sub for cache invalidation
    */
   private setupCacheInvalidation(): void {
-    const subscriberRedis = this.redis.duplicate();
+    const redis = this.cacheService.getRedisClient();
+    const subscriberRedis = redis.duplicate();
     void subscriberRedis.subscribe('ratelimit:invalidate');
     subscriberRedis.on('message', (channel, _message) => {
       if (channel === 'ratelimit:invalidate') {
@@ -159,13 +160,15 @@ export class RateLimitService {
         return {1, newCount, window}
       `;
 
-      const result = (await this.redis.eval(
-        luaScript,
-        1,
-        key,
-        plan.limitPerMin.toString(),
-        plan.ttlSec.toString(),
-      )) as [number, number, number];
+      const result = (await this.cacheService
+        .getRedisClient()
+        .eval(
+          luaScript,
+          1,
+          key,
+          plan.limitPerMin.toString(),
+          plan.ttlSec.toString(),
+        )) as [number, number, number];
 
       const [allowed, current, window] = result;
 
@@ -230,10 +233,10 @@ export class RateLimitService {
   private async getPlan(name: string): Promise<Plan> {
     try {
       const cacheKey = `rl:plan:${name}`;
-      const cached = await this.redis.get(cacheKey);
+      const cached = await this.cacheService.get<Plan>(cacheKey);
 
       if (cached) {
-        return JSON.parse(cached) as Plan;
+        return cached;
       }
 
       const plan = await this.plansRepo.findOne({
@@ -254,12 +257,7 @@ export class RateLimitService {
         return this.getPlan(this.ANONYMOUS_PLAN);
       }
 
-      await this.redis.set(
-        cacheKey,
-        JSON.stringify(plan),
-        'EX',
-        this.CACHE_TTL,
-      );
+      await this.cacheService.set(cacheKey, plan, this.CACHE_TTL);
       return plan;
     } catch (error: unknown) {
       this.logger.error(`Error getting plan ${name}:`, error);
@@ -292,10 +290,10 @@ export class RateLimitService {
 
     try {
       const cacheKey = `rl:apikey:${key}`;
-      const cached = await this.redis.get(cacheKey);
+      const cached = await this.cacheService.get<ApiKeyResolution>(cacheKey);
 
       if (cached) {
-        return JSON.parse(cached);
+        return cached;
       }
 
       const apiKey = await this.apiKeyRepo.findOne({
@@ -306,7 +304,7 @@ export class RateLimitService {
 
       if (!apiKey || apiKey.isExpired() || !apiKey.isValid()) {
         const result = { kind: 'invalid' as const };
-        await this.redis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+        await this.cacheService.set(cacheKey, result, 60);
         return result;
       }
 
@@ -316,12 +314,7 @@ export class RateLimitService {
         isWhitelist: apiKey.isWhitelist,
       };
 
-      await this.redis.set(
-        cacheKey,
-        JSON.stringify(result),
-        'EX',
-        this.CACHE_TTL,
-      );
+      await this.cacheService.set(cacheKey, result, this.CACHE_TTL);
       return result;
     } catch (error: unknown) {
       this.logger.error('Error resolving API key:', error);
@@ -337,10 +330,10 @@ export class RateLimitService {
 
     try {
       const cacheKey = `rl:ipwl:${ip}`;
-      const cached = await this.redis.get(cacheKey);
+      const cached = await this.cacheService.get<boolean>(cacheKey);
 
       if (cached !== null) {
-        return cached === 'true';
+        return cached;
       }
 
       const whitelistEntry = await this.ipRepo.findOne({
@@ -348,12 +341,7 @@ export class RateLimitService {
       });
 
       const isWhitelisted = whitelistEntry?.isValid() || false;
-      await this.redis.set(
-        cacheKey,
-        isWhitelisted.toString(),
-        'EX',
-        this.CACHE_TTL,
-      );
+      await this.cacheService.set(cacheKey, isWhitelisted, this.CACHE_TTL);
 
       return isWhitelisted;
     } catch (error: unknown) {
@@ -370,22 +358,17 @@ export class RateLimitService {
   ): Promise<RateLimitPolicy | null> {
     try {
       const cacheKey = `rl:policies:active`;
-      const cached = await this.redis.get(cacheKey);
+      const cached = await this.cacheService.get<RateLimitPolicy[]>(cacheKey);
 
       let policies: RateLimitPolicy[];
       if (cached) {
-        policies = JSON.parse(cached);
+        policies = cached;
       } else {
         policies = await this.policyRepo.find({
-          where: { enabled: true, status: 'ACTIVE' },
+          where: { enabled: true, status: COMMON_CONSTANTS.STATUS.ACTIVE },
           order: { priority: 'DESC' },
         });
-        await this.redis.set(
-          cacheKey,
-          JSON.stringify(policies),
-          'EX',
-          this.CACHE_TTL,
-        );
+        await this.cacheService.set(cacheKey, policies, this.CACHE_TTL);
       }
 
       // Find the highest priority policy that matches
@@ -542,11 +525,9 @@ export class RateLimitService {
           args = ['100', '60'];
       }
 
-      const result = (await this.redis.eval(luaScript, 1, key, ...args)) as [
-        number,
-        number,
-        number,
-      ];
+      const result = (await this.cacheService
+        .getRedisClient()
+        .eval(luaScript, 1, key, ...args)) as [number, number, number];
       const [allowed, current, window] = result;
 
       const headers = {
@@ -621,11 +602,8 @@ export class RateLimitService {
    */
   private async clearAllCache(): Promise<void> {
     try {
-      const keys = await this.redis.keys('rl:*');
-      if (keys.length > 0) {
-        await this.redis.del(...keys);
-        this.logger.log(`Cleared ${keys.length} cache entries`);
-      }
+      const deletedCount = await this.cacheService.deleteKeysByPattern('rl:*');
+      this.logger.log(`Cleared ${deletedCount} cache entries`);
     } catch (error: unknown) {
       this.logger.error('Error clearing cache:', error);
     }
@@ -636,7 +614,7 @@ export class RateLimitService {
    */
   async publishCacheInvalidation(): Promise<void> {
     try {
-      await this.redis.publish(
+      await this.cacheService.getRedisClient().publish(
         'ratelimit:invalidate',
         JSON.stringify({
           timestamp: new Date().toISOString(),
@@ -653,18 +631,18 @@ export class RateLimitService {
    */
   async getCacheStats(): Promise<CacheStats> {
     try {
-      const [planKeys, ipKeys, apiKeyKeys, policyKeys] = await Promise.all([
-        this.redis.keys('rl:plan:*'),
-        this.redis.keys('rl:ipwl:*'),
-        this.redis.keys('rl:apikey:*'),
-        this.redis.keys('rl:policy:*'),
+      const [planCount, ipCount, apiKeyCount, policyCount] = await Promise.all([
+        this.cacheService.countKeysByPattern('rl:plan:*'),
+        this.cacheService.countKeysByPattern('rl:ipwl:*'),
+        this.cacheService.countKeysByPattern('rl:apikey:*'),
+        this.cacheService.countKeysByPattern('rl:policy:*'),
       ]);
 
       return {
-        planCount: planKeys.length,
-        ipWhitelistCount: ipKeys.length,
-        apiKeyCount: apiKeyKeys.length,
-        policyCount: policyKeys.length,
+        planCount,
+        ipWhitelistCount: ipCount,
+        apiKeyCount,
+        policyCount,
       };
     } catch (error: unknown) {
       this.logger.error('Error getting cache stats:', error);
@@ -685,14 +663,10 @@ export class RateLimitService {
       const pattern = key.includes(':')
         ? `${key.split(':')[0]}:${key.split(':')[1]}:*`
         : `${key}*`;
-      const keys = await this.redis.keys(pattern);
-
-      if (keys.length > 0) {
-        await this.redis.del(...keys);
-        this.logger.log(
-          `Reset rate limit for pattern: ${pattern} (${keys.length} keys)`,
-        );
-      }
+      const deletedCount = await this.cacheService.deleteKeysByPattern(pattern);
+      this.logger.log(
+        `Reset rate limit for pattern: ${pattern} (${deletedCount} keys)`,
+      );
     } catch (error: unknown) {
       this.logger.error(`Error resetting rate limit for key ${key}:`, error);
     }
@@ -703,13 +677,13 @@ export class RateLimitService {
    */
   async getRateLimitInfo(key: string): Promise<RateLimitInfo> {
     try {
-      const exists = await this.redis.exists(key);
+      const exists = await this.cacheService.exists(key);
       if (!exists) {
         return { current: 0, limit: 0 };
       }
 
-      const ttl = await this.redis.ttl(key);
-      const value = await this.redis.get(key);
+      const ttl = await this.cacheService.getTtl(key);
+      const value = await this.cacheService.get<string>(key);
 
       return {
         current: parseInt(value || '0'),

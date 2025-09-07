@@ -1,14 +1,17 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { Plan } from './entities/plan.entity';
-import { ApiKey } from './entities/api-key.entity';
-import { IpWhitelist } from './entities/ip-whitelist.entity';
-import { RateLimitPolicy } from './entities/rate-limit-policy.entity';
-import { RateLimitLog } from './entities/rate-limit-log.entity';
-import { RateLimitService } from './rate-limit.service';
-import { RateLimitGuard } from './rate-limit.guard';
+import { CacheService } from '../shared/services/cache/cache.service';
+import {
+  ApiKey,
+  IpWhitelist,
+  Plan,
+  RateLimitLog,
+  RateLimitPolicy,
+} from './entities';
 import { RateLimitAdminController } from './rate-limit-admin.controller';
+import { RateLimitGuard } from './rate-limit.guard';
+import { RateLimitService } from './rate-limit.service';
 
 /**
  * Simplified Rate Limit Module
@@ -34,6 +37,8 @@ import { RateLimitAdminController } from './rate-limit-admin.controller';
     ]),
   ],
   providers: [
+    // Cache service for Redis operations
+    CacheService,
     // Single rate limit service
     RateLimitService,
     // Single rate limit guard
