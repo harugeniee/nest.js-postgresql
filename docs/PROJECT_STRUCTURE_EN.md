@@ -133,6 +133,28 @@ nest.js-postgresql/
 │   │   ├── 📄 qr.service.ts
 │   │   └── 📄 qr.utils.ts
 │   │
+│   ├── 📁 rate-limit/                # 🎯 Rate limiting system
+│   │   ├── 📁 admin/                 # Admin management
+│   │   ├── 📁 dto/                   # Rate limit DTOs
+│   │   │   ├── 📄 plan.dto.ts
+│   │   │   ├── 📄 api-key.dto.ts
+│   │   │   ├── 📄 ip-whitelist.dto.ts
+│   │   │   ├── 📄 rate-limit-policy.dto.ts
+│   │   │   └── 📄 index.ts
+│   │   ├── 📁 entities/              # Rate limit entities
+│   │   │   ├── 📄 plan.entity.ts
+│   │   │   ├── 📄 api-key.entity.ts
+│   │   │   ├── 📄 ip-whitelist.entity.ts
+│   │   │   ├── 📄 rate-limit-policy.entity.ts
+│   │   │   ├── 📄 rate-limit-log.entity.ts
+│   │   │   └── 📄 README.md
+│   │   ├── 📄 rate-limit-admin.controller.ts
+│   │   ├── 📄 rate-limit.decorator.ts
+│   │   ├── 📄 rate-limit.guard.ts
+│   │   ├── 📄 rate-limit.module.ts
+│   │   ├── 📄 rate-limit.service.ts
+│   │   └── 📄 README.md
+│   │
 │   ├── 📁 shared/                    # 🎯 Infrastructure & configuration
 │   │   ├── 📁 config/                # Application configuration
 │   │   │   ├── 📄 app.config.ts

@@ -1,28 +1,28 @@
 # 🚀 Hybrid Rate Limiting System Implementation
 
-## 📋 Tổng quan
+## 📋 Overview
 
-Tôi đã triển khai thành công một **hệ thống rate limiting hybrid** kết hợp cả approach cũ và mới, mang lại sự linh hoạt tối đa và tương thích ngược hoàn toàn.
+I have successfully implemented a **hybrid rate limiting system** that combines both old and new approaches, providing maximum flexibility and complete backward compatibility.
 
-## 🏗️ Kiến trúc Hybrid
+## 🏗️ Hybrid Architecture
 
-### 1. **Legacy System** (Hệ thống cũ)
+### 1. **Legacy System** (Old system)
 - ✅ **CustomThrottlerGuard**: Plan-based rate limiting
-- ✅ **API Key Management**: Quản lý API keys với các plan khác nhau
-- ✅ **IP Whitelisting**: Bypass rate limit cho IP tin cậy
-- ✅ **Simple Strategy**: Fixed window đơn giản
+- ✅ **API Key Management**: API key management with different plans
+- ✅ **IP Whitelisting**: Bypass rate limits for trusted IPs
+- ✅ **Simple Strategy**: Simple fixed window
 
-### 2. **Advanced System** (Hệ thống mới)
+### 2. **Advanced System** (New system)
 - ✅ **AdvancedThrottlerGuard**: Policy-based rate limiting
 - ✅ **Multiple Strategies**: Fixed window, sliding window, token bucket
 - ✅ **Flexible Scoping**: Global, route, user, org, IP
-- ✅ **Hot Reload**: Cập nhật policy real-time
-- ✅ **Priority System**: Chọn policy ưu tiên cao nhất
+- ✅ **Hot Reload**: Real-time policy updates
+- ✅ **Priority System**: Select highest priority policy
 
-## 📊 So sánh hai hệ thống
+## 📊 System Comparison
 
-| Tính năng | Legacy System | Advanced System |
-|-----------|---------------|-----------------|
+| Feature | Legacy System | Advanced System |
+|---------|---------------|-----------------|
 | **Strategy** | Fixed window only | Fixed, Sliding, Token bucket |
 | **Scoping** | Plan-based | Global, Route, User, Org, IP |
 | **Configuration** | Static | Dynamic with hot-reload |
@@ -31,7 +31,7 @@ Tôi đã triển khai thành công một **hệ thống rate limiting hybrid** 
 | **Cache** | Basic Redis | Advanced with versioning |
 | **Admin UI** | Basic CRUD | Advanced with testing |
 
-## 🎯 Các tính năng đã triển khai
+## 🎯 Implemented Features
 
 ### 1. **Entities & Database**
 ```typescript
@@ -76,7 +76,7 @@ Tôi đã triển khai thành công một **hệ thống rate limiting hybrid** 
 @RateLimit({ keyBy: ['ip', 'route'] })
 ```
 
-## 🔧 Cấu hình và sử dụng
+## 🔧 Configuration and Usage
 
 ### 1. **Environment Variables**
 ```env
@@ -93,13 +93,13 @@ RATE_LIMIT_DEFAULT_PLAN=anonymous
 
 ### 2. **Database Migration**
 ```bash
-# Chạy migration để tạo bảng mới
+# Run migration to create new tables
 yarn migration:run
 
-# Migration tạo:
+# Migration creates:
 - rate_limit_policies table
 - Default policies (global, route-specific)
-- Indexes và constraints
+- Indexes and constraints
 ```
 
 ### 3. **Module Configuration**
@@ -122,9 +122,9 @@ yarn migration:run
 })
 ```
 
-## 🚀 Cách sử dụng
+## 🚀 Usage
 
-### 1. **Legacy System** (Giữ nguyên)
+### 1. **Legacy System** (Keep existing)
 ```typescript
 @Controller('api')
 export class ApiController {
@@ -142,7 +142,7 @@ export class ApiController {
 }
 ```
 
-### 2. **Advanced System** (Mới)
+### 2. **Advanced System** (New)
 ```typescript
 @Controller('api')
 export class ApiController {
@@ -281,17 +281,17 @@ GET /api/v1/token-bucket
 - `RATE_LIMIT_IMPLEMENTATION.md` - Original implementation
 - `HYBRID_RATE_LIMITING_IMPLEMENTATION.md` - This file
 
-## 🎉 Kết luận
+## 🎉 Conclusion
 
-Hệ thống hybrid rate limiting đã được triển khai thành công với:
+The hybrid rate limiting system has been successfully implemented with:
 
-✅ **Backward Compatibility**: Legacy system vẫn hoạt động bình thường
-✅ **Advanced Features**: Policy-based system với nhiều tính năng mới
-✅ **Hot Reload**: Cập nhật policy real-time
+✅ **Backward Compatibility**: Legacy system still works normally
+✅ **Advanced Features**: Policy-based system with many new features
+✅ **Hot Reload**: Real-time policy updates
 ✅ **Multiple Strategies**: Fixed window, sliding window, token bucket
 ✅ **Flexible Scoping**: Global, route, user, org, IP
-✅ **Admin Interface**: Quản lý policies qua REST API
+✅ **Admin Interface**: Policy management via REST API
 ✅ **Monitoring**: Headers, statistics, testing tools
-✅ **Documentation**: Hướng dẫn chi tiết và examples
+✅ **Documentation**: Detailed guides and examples
 
-Hệ thống sẵn sàng cho production và có thể mở rộng dễ dàng theo nhu cầu! 🚀
+The system is ready for production and can be easily extended as needed! 🚀

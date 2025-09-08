@@ -2,7 +2,7 @@
 
 ## Overview
 
-The QR Actions feature enables secure, one-time actions via QR codes with real-time status updates. It supports login, adding friends, joining organizations, and device pairing through a secure PKCE-based flow.
+The QR Actions feature enables secure, one-time actions via QR codes with real-time status updates. It supports login, adding friends, joining organizations, and device pairing through a secure PKCE-based flow with comprehensive WebSocket integration and Redis-based state management.
 
 ## Supported Actions
 

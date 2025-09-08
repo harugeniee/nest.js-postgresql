@@ -1,23 +1,23 @@
-# 📁 Cấu Trúc Thư Mục Dự Án NestJS
+# 📁 NestJS Project Directory Structure
 
-## 🎯 Nguyên Tắc Tổ Chức
+## 🎯 Organization Principles
 
-### **1. Separation of Concerns (Tách Biệt Mối Quan Tâm)**
-- Mỗi thư mục có một mục đích rõ ràng
-- Tránh lẫn lộn giữa các layer khác nhau
-- Dễ maintain và scale
+### **1. Separation of Concerns**
+- Each directory has a clear purpose
+- Avoid mixing different layers
+- Easy to maintain and scale
 
 ### **2. Domain-Driven Design (DDD)**
-- Tổ chức theo business domain
-- Mỗi domain có thể độc lập
-- Dễ hiểu và phát triển
+- Organize by business domain
+- Each domain can be independent
+- Easy to understand and develop
 
 ### **3. Clean Architecture**
 - Dependency Inversion
-- Business logic độc lập với framework
-- Dễ test và maintain
+- Business logic independent of framework
+- Easy to test and maintain
 
-## 🌳 Cấu Trúc Thư Mục Chi Tiết
+## 🌳 Detailed Directory Structure
 
 ```
 nest.js-postgresql/
@@ -132,6 +132,28 @@ nest.js-postgresql/
 │   │   ├── 📄 qr.service.spec.ts
 │   │   ├── 📄 qr.service.ts
 │   │   └── 📄 qr.utils.ts
+│   │
+│   ├── 📁 rate-limit/                # 🎯 Rate limiting system
+│   │   ├── 📁 admin/                 # Admin management
+│   │   ├── 📁 dto/                   # Rate limit DTOs
+│   │   │   ├── 📄 plan.dto.ts
+│   │   │   ├── 📄 api-key.dto.ts
+│   │   │   ├── 📄 ip-whitelist.dto.ts
+│   │   │   ├── 📄 rate-limit-policy.dto.ts
+│   │   │   └── 📄 index.ts
+│   │   ├── 📁 entities/              # Rate limit entities
+│   │   │   ├── 📄 plan.entity.ts
+│   │   │   ├── 📄 api-key.entity.ts
+│   │   │   ├── 📄 ip-whitelist.entity.ts
+│   │   │   ├── 📄 rate-limit-policy.entity.ts
+│   │   │   ├── 📄 rate-limit-log.entity.ts
+│   │   │   └── 📄 README.md
+│   │   ├── 📄 rate-limit-admin.controller.ts
+│   │   ├── 📄 rate-limit.decorator.ts
+│   │   ├── 📄 rate-limit.guard.ts
+│   │   ├── 📄 rate-limit.module.ts
+│   │   ├── 📄 rate-limit.service.ts
+│   │   └── 📄 README.md
 │   │
 │   ├── 📁 shared/                    # 🎯 Infrastructure & configuration
 │   │   ├── 📁 config/                # Application configuration
@@ -266,18 +288,18 @@ nest.js-postgresql/
 └── 📄 PROJECT_STRUCTURE.md           # This file
 ```
 
-## 🎯 Giải Thích Chi Tiết Từng Thư Mục
+## 🎯 Detailed Explanation of Each Directory
 
 ### **📁 `src/common/` - Cross-Cutting Concerns**
-**Mục đích:** Chứa các utilities và components được sử dụng xuyên suốt ứng dụng
+**Purpose:** Contains utilities and components used throughout the application
 
-**Lý do tổ chức:**
-- ✅ **Reusability**: Có thể tái sử dụng ở nhiều nơi
-- ✅ **Consistency**: Đảm bảo tính nhất quán
-- ✅ **Maintainability**: Dễ maintain và update
-- ✅ **NestJS Convention**: Theo chuẩn của NestJS
+**Reasons for organization:**
+- ✅ **Reusability**: Can be reused in multiple places
+- ✅ **Consistency**: Ensures consistency across the application
+- ✅ **Maintainability**: Easy to maintain and update
+- ✅ **NestJS Convention**: Follows NestJS standards
 
-**Chức năng:**
+**Functions:**
 - `subscribers/`: TypeORM subscribers (global)
 - `guards/`: Authentication & authorization
 - `interceptors/`: Request/Response processing
@@ -287,68 +309,112 @@ nest.js-postgresql/
 - `constants/`: Global constants
 
 ### **📁 `src/shared/` - Infrastructure & Configuration**
-**Mục đích:** Chứa các cấu hình và infrastructure components
+**Purpose:** Contains configuration and infrastructure components
 
-**Lý do tổ chức:**
-- ✅ **Configuration Management**: Tập trung quản lý config
-- ✅ **Infrastructure Separation**: Tách biệt infrastructure
+**Reasons for organization:**
+- ✅ **Configuration Management**: Centralized configuration management
+- ✅ **Infrastructure Separation**: Separates infrastructure concerns
 - ✅ **Reusability**: Shared across modules
-- ✅ **Environment Specific**: Dễ thay đổi theo environment
+- ✅ **Environment Specific**: Easy to change per environment
 
-**Chức năng:**
+**Functions:**
 - `config/`: Application configuration
 - `entities/`: Base entities
 - `libs/`: Shared libraries
 - `interfaces/`: Shared interfaces
 
-### **📁 `src/modules/` - Business Features**
-**Mục đích:** Chứa các business modules theo domain
+### **📁 `src/auth/` - Authentication & Authorization**
+**Purpose:** Handles user authentication and authorization
 
-**Lý do tổ chức:**
-- ✅ **Domain Separation**: Tách biệt theo business domain
-- ✅ **Scalability**: Dễ thêm module mới
-- ✅ **Team Collaboration**: Mỗi team có thể làm module riêng
-- ✅ **Testing**: Dễ test từng module
+**Reasons for organization:**
+- ✅ **Security Focus**: Centralized security concerns
+- ✅ **Guard Management**: All authentication guards in one place
+- ✅ **JWT Handling**: Token-based authentication
+- ✅ **WebSocket Auth**: Specialized WebSocket authentication
 
-**Chức năng:**
-- `auth/`: Authentication & authorization
-- `users/`: User management
-- `posts/`: Post management
-- `media/`: Media handling
-- `notifications/`: Notification system
-- `analytics/`: Analytics & tracking
+**Functions:**
+- `guard/`: Authentication guards (JWT, roles, WebSocket)
+- `auth.controller.ts`: Authentication endpoints
+- `auth.service.ts`: Authentication business logic
+- `auth.module.ts`: Authentication module configuration
 
-### **📁 `src/infrastructure/` - External Services**
-**Mục đích:** Chứa các adapter và external services
+### **📁 `src/users/` - User Management**
+**Purpose:** Manages user data and user-related operations
 
-**Lý do tổ chức:**
-- ✅ **External Dependencies**: Tách biệt external services
-- ✅ **Adapter Pattern**: Implement adapter pattern
-- ✅ **Testability**: Dễ mock external services
-- ✅ **Flexibility**: Dễ thay đổi external providers
+**Reasons for organization:**
+- ✅ **User Domain**: All user-related functionality
+- ✅ **Device Management**: Device token handling
+- ✅ **Session Management**: User session tracking
+- ✅ **OAuth Integration**: Social login support
 
-**Chức năng:**
-- `database/`: Database operations
-- `cache/`: Caching layer
-- `storage/`: File storage
-- `external/`: External APIs
-- `logging/`: Logging services
+**Functions:**
+- `dto/`: User data transfer objects
+- `entities/`: User database entities
+- `services/`: User-related services
+- `users.controller.ts`: User management endpoints
+- `users.service.ts`: User business logic
 
-### **📁 `src/core/` - Core Business Logic**
-**Mục đích:** Chứa core business logic và domain rules
+### **📁 `src/qr/` - QR Actions Feature**
+**Purpose:** Implements QR code-based secure actions
 
-**Lý do tổ chức:**
-- ✅ **Clean Architecture**: Theo nguyên tắc Clean Architecture
-- ✅ **Domain-Driven Design**: Tập trung vào business domain
-- ✅ **Independence**: Độc lập với framework
-- ✅ **Testability**: Dễ test business logic
+**Reasons for organization:**
+- ✅ **Security**: PKCE-based secure QR actions
+- ✅ **Real-time**: WebSocket integration for live updates
+- ✅ **Modular**: Pluggable action system
+- ✅ **Scalable**: Redis-based state management
 
-**Chức năng:**
-- `domain/`: Domain entities & business rules
-- `use-cases/`: Application use cases
-- `exceptions/`: Domain exceptions
+**Functions:**
+- `actions/`: Action implementations (login, add friend, join org, pair)
+- `dto/`: QR-related data transfer objects
+- `entities/`: QR database entities
+- `qr.controller.ts`: QR API endpoints
+- `qr.gateway.ts`: WebSocket gateway for real-time updates
+- `qr.service.ts`: QR business logic
 
-## 🔄 Quy Tắc Đặt Tên
+### **📁 `src/files/` - File Management**
+**Purpose:** Handles file upload, storage, and management
+
+**Reasons for organization:**
+- ✅ **File Operations**: Centralized file handling
+- ✅ **Storage Integration**: Multiple storage backends
+- ✅ **Security**: File validation and security
+- ✅ **Performance**: Efficient file operations
+
+**Functions:**
+- `entities/`: File database entities
+- `files.controller.ts`: File management endpoints
+- `files.service.ts`: File business logic
+- `files.module.ts`: File module configuration
+
+### **📁 `src/i18n/` - Internationalization**
+**Purpose:** Provides multi-language support
+
+**Reasons for organization:**
+- ✅ **Localization**: Multi-language support
+- ✅ **Maintainability**: Easy to add new languages
+- ✅ **Consistency**: Centralized translation management
+- ✅ **Performance**: Efficient translation loading
+
+**Functions:**
+- `en/`: English translations
+- `vi/`: Vietnamese translations
+- Language-specific JSON files for different modules
+
+### **📁 `src/workers/` - Background Job Processing**
+**Purpose:** Handles background tasks and job processing
+
+**Reasons for organization:**
+- ✅ **Async Processing**: Background task execution
+- ✅ **Job Management**: Queue-based job processing
+- ✅ **Scalability**: Distributed job processing
+- ✅ **Reliability**: Job retry and error handling
+
+**Functions:**
+- `worker.controller.ts`: Worker management endpoints
+- `worker.service.ts`: Job processing logic
+- `worker.module.ts`: Worker module configuration
+
+## 🔄 Naming Conventions
 
 ### **1. File Naming Convention**
 ```typescript
@@ -396,7 +462,7 @@ import { UserService } from '../../../../services/user.service';
 
 ### **1. Module Organization**
 ```typescript
-// Mỗi module nên có cấu trúc nhất quán
+// Each module should have consistent structure
 module/
 ├── dto/           # Data Transfer Objects
 ├── entities/      # Database entities
@@ -439,67 +505,60 @@ throw new Error('User not found');
 
 ## 🚀 Migration Guide
 
-### **Từ cấu trúc cũ sang mới:**
+### **Current Structure Organization:**
 
-1. **Tạo thư mục mới:**
+The current structure follows a flat module organization where each major feature is a top-level module in the `src/` directory:
+
+1. **Module Organization:**
 ```bash
-mkdir -p src/{common,modules,infrastructure,core}
+src/
+├── auth/          # Authentication & Authorization
+├── users/         # User Management
+├── qr/            # QR Actions Feature
+├── files/         # File Management
+├── workers/       # Background Jobs
+├── common/        # Shared utilities
+└── shared/        # Infrastructure & config
 ```
 
-2. **Di chuyển files:**
-```bash
-# Move subscribers
-mv src/shared/subscribers/* src/common/subscribers/
-
-# Move modules
-mv src/users src/modules/
-mv src/auth src/modules/
-
-# Move config
-# Keep src/shared/config/ as is
-```
-
-3. **Update imports:**
+2. **Import Paths:**
 ```typescript
-// Old
+// Current structure uses relative imports
 import { UserService } from '../users/users.service';
+import { AuthService } from '../auth/auth.service';
+import { QrService } from '../qr/qr.service';
 
-// New
-import { UserService } from '@modules/users/user.service';
+// Or absolute imports from src root
+import { UserService } from 'src/users/users.service';
+import { BaseEntity } from 'src/shared/entities/base.entity';
 ```
 
-4. **Update tsconfig.json:**
-```json
-{
-  "compilerOptions": {
-    "paths": {
-      "@/*": ["src/*"],
-      "@common/*": ["src/common/*"],
-      "@shared/*": ["src/shared/*"],
-      "@modules/*": ["src/modules/*"],
-      "@infrastructure/*": ["src/infrastructure/*"],
-      "@core/*": ["src/core/*"]
-    }
-  }
-}
+3. **Module Dependencies:**
+```typescript
+// Each module is self-contained with its own:
+// - DTOs
+// - Entities  
+// - Services
+// - Controllers
+// - Module definition
 ```
 
 ## 📊 Monitoring & Maintenance
 
 ### **1. Code Quality**
-- ESLint rules cho từng thư mục
+- ESLint rules for each directory
 - Prettier configuration
 - Husky pre-commit hooks
 
 ### **2. Documentation**
-- README cho mỗi module
+- README for each module
 - API documentation
 - Architecture decisions
 
 ### **3. Testing Strategy**
-- Unit tests cho services
-- Integration tests cho modules
-- E2E tests cho workflows
+- Unit tests for services
+- Integration tests for modules
+- E2E tests for workflows
 
 ### **4. Performance Monitoring**
 - Bundle size analysis
@@ -508,4 +567,4 @@ import { UserService } from '@modules/users/user.service';
 
 ---
 
-**Lưu ý:** Cấu trúc này có thể điều chỉnh theo quy mô dự án và team size. Với dự án nhỏ, có thể gộp một số thư mục lại. 
+**Note:** This structure can be adjusted based on project scale and team size. For small projects, some directories can be merged. 

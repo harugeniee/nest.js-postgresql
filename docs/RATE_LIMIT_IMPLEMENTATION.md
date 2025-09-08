@@ -2,15 +2,17 @@
 
 ## 🎯 Overview
 
-Đã triển khai thành công hệ thống **dynamic rate limiting** cho dự án NestJS với các tính năng:
+Successfully implemented a **hybrid rate limiting system** for the NestJS project with the following features:
 
-- ✅ Dynamic rate limits based on API keys and plans
-- ✅ IP whitelisting support
-- ✅ Redis-based distributed rate limiting
-- ✅ Cache management with invalidation
-- ✅ Admin REST API for management
-- ✅ Decorator support for route overrides
-- ✅ Multi-instance support
+- ✅ **Legacy System**: Plan-based rate limiting with API keys
+- ✅ **Advanced System**: Policy-based rate limiting with multiple strategies
+- ✅ **IP Whitelisting**: Bypass rate limits for trusted IPs
+- ✅ **Redis Integration**: Distributed rate limiting with cache invalidation
+- ✅ **Admin Management**: Full CRUD operations for plans, API keys, policies
+- ✅ **Multiple Strategies**: Fixed Window, Sliding Window, Token Bucket
+- ✅ **Hot Reload**: Real-time policy updates without restart
+- ✅ **Decorator Support**: Flexible route configuration
+- ✅ **Multi-instance Support**: Distributed rate limiting across instances
 
 ## 📁 Files Created/Modified
 
@@ -21,11 +23,17 @@ src/rate-limit/
 ├── entities/
 │   ├── plan.entity.ts              # Rate limit plans
 │   ├── api-key.entity.ts           # API key management
-│   └── ip-whitelist.entity.ts      # IP whitelist
-├── controllers/
-│   └── rate-limit-admin.controller.ts  # Admin API
-├── rate-limit-policy.service.ts    # Policy management
-├── custom-throttler.guard.ts       # Dynamic guard
+│   ├── ip-whitelist.entity.ts      # IP whitelist
+│   ├── rate-limit-policy.entity.ts # Advanced policy configuration
+│   └── rate-limit-log.entity.ts    # Rate limit logging
+├── dto/
+│   ├── plan.dto.ts                 # Plan DTOs
+│   ├── api-key.dto.ts              # API key DTOs
+│   ├── ip-whitelist.dto.ts         # IP whitelist DTOs
+│   └── rate-limit-policy.dto.ts    # Policy DTOs
+├── rate-limit-admin.controller.ts  # Admin API
+├── rate-limit.service.ts           # Core service (simplified)
+├── rate-limit.guard.ts             # Rate limiting guard
 ├── rate-limit.decorator.ts         # Route decorators
 ├── rate-limit.module.ts            # Main module
 └── README.md                       # Documentation
@@ -34,7 +42,8 @@ src/db/migrations/
 └── 1757217875336-add-rate-limit-tables.ts  # Database migration
 
 scripts/
-└── test-rate-limit.js              # Test script
+├── test-rate-limit.js              # Legacy system test
+└── test-advanced-rate-limit.js     # Advanced system test
 ```
 
 ### Modified Files
@@ -245,15 +254,15 @@ LOG_LEVEL=debug
 
 ## ✅ Implementation Complete
 
-Hệ thống rate limiting đã được triển khai hoàn chỉnh và sẵn sàng sử dụng trong production với:
+The rate limiting system has been fully implemented and is ready for production use with:
 
-- ✅ Database migration với seed data
-- ✅ Redis configuration và caching
-- ✅ Admin API đầy đủ
+- ✅ Database migration with seed data
+- ✅ Redis configuration and caching
+- ✅ Complete admin API
 - ✅ Decorator support
-- ✅ Error handling và logging
-- ✅ Documentation và test script
+- ✅ Error handling and logging
+- ✅ Documentation and test scripts
 - ✅ Environment configuration
 - ✅ Multi-instance support
 
-Hệ thống có thể được mở rộng dễ dàng và tích hợp với các module khác trong dự án.
+The system can be easily extended and integrated with other modules in the project.
