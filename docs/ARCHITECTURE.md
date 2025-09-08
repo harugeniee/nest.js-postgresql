@@ -28,56 +28,203 @@ This is an enterprise-grade NestJS application built with modern best practices,
 src/
 ├── auth/                 # Authentication & Authorization
 │   ├── guard/           # Authentication guards
+│   │   ├── auth.guard.ts
+│   │   ├── jwt-access-token.guard.ts
+│   │   ├── jwt-refresh-token.guard.ts
+│   │   ├── role.guard.ts
+│   │   ├── websocket-auth.guard.ts
+│   │   └── index.ts
 │   ├── auth.controller.ts
 │   ├── auth.service.ts
 │   └── auth.module.ts
 ├── common/              # Shared utilities & cross-cutting concerns
 │   ├── decorators/     # Custom decorators
+│   │   ├── auth.decorator.ts
+│   │   ├── client-info.decorator.ts
+│   │   ├── match.decorator.ts
+│   │   ├── roles.decorator.ts
+│   │   └── index.ts
 │   ├── dto/            # Data Transfer Objects
+│   │   ├── advanced-pagination.dto.ts
+│   │   ├── cursor-pagination.dto.ts
+│   │   ├── graphql-pagination.dto.ts
+│   │   ├── pagination.dto.ts
+│   │   └── index.ts
 │   ├── events/         # Domain events
+│   │   └── domain-events.ts
 │   ├── filters/        # Exception filters
+│   │   ├── http-exception.filter.ts
+│   │   └── ws-exception.filter.ts
 │   ├── gateways/       # WebSocket gateways
+│   │   ├── base.gateway.ts
+│   │   ├── socket.adapter.ts
+│   │   ├── index.ts
+│   │   └── README.md
 │   ├── interface/      # Shared interfaces
+│   │   ├── auth.interface.ts
+│   │   ├── pagination.interface.ts
+│   │   └── index.ts
 │   ├── pipes/          # Validation pipes
+│   │   ├── snowflake-id.pipe.ts
+│   │   └── index.ts
 │   ├── repositories/   # Base repository patterns
+│   │   ├── base.repository.ts
+│   │   └── typeorm.base-repo.ts
 │   ├── services/       # Base service patterns
+│   │   ├── base.service.ts
+│   │   ├── base.service.spec.ts
+│   │   ├── graphql-base.service.ts
+│   │   ├── graphql-base.service.spec.ts
+│   │   ├── index.ts
+│   │   └── README.md
 │   ├── subscribers/    # TypeORM subscribers
+│   │   ├── audit.subscriber.ts
+│   │   ├── cache.subscriber.ts
+│   │   ├── metadata.subscriber.ts
+│   │   ├── social-media.subscriber.ts
+│   │   ├── validation.subscriber.ts
+│   │   ├── index.ts
+│   │   └── README.md
 │   └── utils/          # Utility functions
+│       ├── cursor.util.ts
+│       ├── error.util.ts
+│       ├── hash.util.ts
+│       ├── query.util.ts
+│       └── index.ts
 ├── files/              # File management
 │   ├── entities/       # File entities
+│   │   └── file.entity.ts
 │   ├── files.controller.ts
 │   ├── files.service.ts
 │   └── files.module.ts
 ├── i18n/               # Internationalization
 │   ├── en/             # English translations
+│   │   ├── auth.json
+│   │   ├── common.json
+│   │   ├── qr.json
+│   │   ├── test.json
+│   │   └── user.json
 │   └── vi/             # Vietnamese translations
+│       ├── auth.json
+│       ├── common.json
+│       ├── qr.json
+│       ├── test.json
+│       └── user.json
 ├── qr/                 # QR Actions feature
 │   ├── actions/        # Action implementations
+│   │   ├── add-friend.action.ts
+│   │   ├── base-action.ts
+│   │   ├── join-org.action.ts
+│   │   ├── login.action.ts
+│   │   ├── pair.action.ts
+│   │   └── index.ts
 │   ├── dto/            # QR DTOs
+│   │   ├── approve-ticket.dto.ts
+│   │   ├── create-ticket.dto.ts
+│   │   └── index.ts
 │   ├── entities/       # QR entities
+│   │   └── qr.entity.ts
+│   ├── qr-action-executor.service.ts
 │   ├── qr.controller.ts
+│   ├── qr.gateway.spec.ts
 │   ├── qr.gateway.ts
+│   ├── qr.module.ts
+│   ├── qr.service.spec.ts
 │   ├── qr.service.ts
-│   └── qr.module.ts
+│   └── qr.utils.ts
+├── rate-limit/         # Rate limiting system
+│   ├── admin/          # Admin management
+│   ├── dto/            # Rate limit DTOs
+│   ├── entities/       # Rate limit entities
+│   │   ├── plan.entity.ts
+│   │   ├── api-key.entity.ts
+│   │   ├── ip-whitelist.entity.ts
+│   │   ├── rate-limit-policy.entity.ts
+│   │   ├── rate-limit-log.entity.ts
+│   │   └── README.md
+│   ├── rate-limit-admin.controller.ts
+│   ├── rate-limit.decorator.ts
+│   ├── rate-limit.guard.ts
+│   ├── rate-limit.module.ts
+│   ├── rate-limit.service.ts
+│   └── README.md
 ├── shared/             # Shared services & configurations
 │   ├── config/         # Environment configuration
+│   │   ├── app.config.ts
+│   │   ├── aws.config.ts
+│   │   ├── database.config.ts
+│   │   ├── mail.config.ts
+│   │   ├── oauth.config.ts
+│   │   ├── redis.config.ts
+│   │   ├── schema.ts
+│   │   └── index.ts
 │   ├── constants/      # Application constants
+│   │   ├── common.constants.ts
+│   │   ├── file.constants.ts
+│   │   ├── qr.constants.ts
+│   │   ├── user.constants.ts
+│   │   ├── worker.constants.ts
+│   │   └── index.ts
 │   ├── entities/       # Base entities
+│   │   └── base.entity.ts
 │   ├── helpers/        # Helper functions
+│   │   ├── build-response.ts
+│   │   ├── condition-builder.ts
+│   │   ├── format-i18n-response.ts
+│   │   ├── pagination-formatter.ts
+│   │   └── index.ts
 │   ├── interceptors/   # Response interceptors
+│   │   ├── response.interceptor.ts
+│   │   └── index.ts
 │   ├── libs/           # External library integrations
+│   │   └── snowflake/
+│   │       ├── snowflake.ts
+│   │       └── index.ts
 │   └── services/       # Core services (Cache, RabbitMQ, Firebase, etc.)
+│       ├── axios/      # HTTP client service
+│       │   ├── axios.module.ts
+│       │   └── axios.service.ts
+│       ├── cache/      # Cache service
+│       │   ├── cache.module.ts
+│       │   └── cache.service.ts
+│       ├── firebase/   # Firebase service
+│       │   ├── firebase.module.ts
+│       │   ├── firebase.service.ts
+│       │   └── firebase.types.ts
+│       ├── health/     # Health check service
+│       │   └── health.service.ts
+│       ├── rabbitmq/   # RabbitMQ service
+│       │   ├── rabbitmq.module.ts
+│       │   └── rabbitmq.service.ts
+│       └── index.ts
 ├── users/              # User management
 │   ├── dto/            # User DTOs
+│   │   ├── create-device-token.dto.ts
+│   │   ├── login.dto.ts
+│   │   ├── oauth-login.dto.ts
+│   │   ├── register.dto.ts
+│   │   ├── session.dto.ts
+│   │   ├── update-password.dto.ts
+│   │   ├── update-user.dto.ts
+│   │   └── index.ts
 │   ├── entities/       # User entities
+│   │   ├── user.entity.ts
+│   │   ├── user-device-tokens.entity.ts
+│   │   ├── user-sessions.entity.ts
+│   │   └── index.ts
 │   ├── services/       # User services
+│   │   ├── user-device-tokens.service.ts
+│   │   ├── user-sessions.service.ts
+│   │   └── index.ts
+│   ├── users.controller.spec.ts
 │   ├── users.controller.ts
-│   ├── users.service.ts
-│   └── users.module.ts
+│   ├── users.module.ts
+│   ├── users.service.spec.ts
+│   └── users.service.ts
 └── workers/            # Background job processing
     ├── worker.controller.ts
-    ├── worker.service.ts
-    └── worker.module.ts
+    ├── worker.module.ts
+    └── worker.service.ts
 ```
 
 ## Key Components
@@ -130,8 +277,17 @@ export abstract class BaseEntityCustom extends BaseEntity {
 - **Action Framework**: Pluggable action system for different operations
 - **Redis State Management**: Ephemeral ticket and grant storage
 - **Multi-language Support**: Internationalized error messages
+- **Supported Actions**: Login, Add Friend, Join Organization, Device Pairing
 
-### 6. **WebSocket Support**
+### 6. **Rate Limiting System**
+- **Dynamic Rate Limiting**: Based on API keys, plans, and IP whitelisting
+- **Multiple Strategies**: Fixed Window, Sliding Window, Token Bucket
+- **Policy-based Rules**: Flexible configuration with priority system
+- **Admin Management**: Full CRUD operations for plans, API keys, and policies
+- **Redis Integration**: Distributed rate limiting with cache invalidation
+- **Hot Reload**: Real-time policy updates without restart
+
+### 7. **WebSocket Support**
 - **Redis Adapter**: Scalable WebSocket communication
 - **Real-time Features**: Live updates for QR actions and notifications
 - **Authentication**: JWT-based WebSocket authentication
@@ -190,6 +346,10 @@ CORS_ORIGINS=http://localhost:3000
 # Rate Limiting
 RATE_LIMIT_TTL=60
 RATE_LIMIT_LIMIT=100
+RATE_LIMIT_REDIS_URL=redis://localhost:6379/1
+RATE_LIMIT_CACHE_TTL=300
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_DEFAULT_PLAN=anonymous
 
 # Logging
 LOG_LEVEL=info

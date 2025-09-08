@@ -11,6 +11,7 @@ import { QrTicket } from './entities/qr.entity';
 import { QrActionExecutorService } from './qr-action-executor.service';
 import { QrController } from './qr.controller';
 import { QrGateway } from './qr.gateway';
+import { QrPollingService } from './qr-polling.service';
 import { QrService } from './qr.service';
 
 /**
@@ -38,6 +39,7 @@ import { QrService } from './qr.service';
   providers: [
     // Core services
     QrService,
+    QrPollingService,
     QrGateway,
     QrActionExecutorService,
 
@@ -53,6 +55,7 @@ import { QrService } from './qr.service';
   exports: [
     // Export services for use in other modules
     QrService,
+    QrPollingService,
     QrGateway,
     QrActionExecutorService,
   ],

@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { CacheService } from '../shared/services/cache/cache.service';
+import { CacheModule } from '../shared/services/cache/cache.module';
 import {
   ApiKey,
   IpWhitelist,
@@ -27,6 +27,8 @@ import { RateLimitService } from './rate-limit.service';
 @Global()
 @Module({
   imports: [
+    // Import CacheModule to access CacheService
+    CacheModule,
     // Register entities with TypeORM
     TypeOrmModule.forFeature([
       Plan,
@@ -37,8 +39,6 @@ import { RateLimitService } from './rate-limit.service';
     ]),
   ],
   providers: [
-    // Cache service for Redis operations
-    CacheService,
     // Single rate limit service
     RateLimitService,
     // Single rate limit guard

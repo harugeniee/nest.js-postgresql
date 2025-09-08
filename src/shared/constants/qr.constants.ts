@@ -14,6 +14,10 @@ export const QR_REDIS_PREFIXES = {
   GRANT: 'QR:GRANT:',
   /** Prefix for rate limiting keys */
   RATE_LIMIT: 'QR:RATE_LIMIT:',
+  /** Prefix for QR ticket delivery codes */
+  DELIVERY: 'QR:DELIVERY:',
+  /** Prefix for QR status pub/sub channels */
+  STATUS_CHANNEL: 'qr:status:',
 } as const;
 
 /**
@@ -40,6 +44,8 @@ export const QR_RATE_LIMITS = {
   SCAN_ATTEMPTS: 3,
   /** Maximum number of approval attempts per ticket per user */
   APPROVAL_ATTEMPTS: 3,
+  /** Maximum number of polling requests per IP+ticket per window (2 seconds) */
+  POLLING: 1,
 } as const;
 
 /**
@@ -227,6 +233,22 @@ export const QR_METRICS = {
   ACTION_EXECUTION: 'qr.action.execution',
   /** Metric name for WebSocket connections */
   WS_CONNECTIONS: 'qr.websocket.connections',
+  /** Metric name for polling requests */
+  POLLING: 'qr.polling.requests',
+} as const;
+
+/**
+ * QR polling configuration
+ */
+export const QR_POLLING_CONFIG = {
+  /** Default short-poll interval in milliseconds */
+  SHORT_POLL_INTERVAL_MS: 2000,
+  /** Default long-poll timeout in milliseconds */
+  LONG_POLL_TIMEOUT_MS: 25000,
+  /** Rate limit window for polling in seconds */
+  RATE_LIMIT_WINDOW_SEC: 2,
+  /** Default delivery code TTL in seconds (same as grant TTL) */
+  DELIVERY_CODE_TTL_SEC: 30,
 } as const;
 
 /**
@@ -281,6 +303,8 @@ export interface QrTicket {
   approvedAt?: number;
   /** Timestamp when the ticket expires (Unix timestamp in milliseconds) */
   expiresAt: number;
+  /** Version number for ETag support (increments on status changes) */
+  version: number;
 }
 
 /**
@@ -298,6 +322,22 @@ export interface QrGrant {
   /** Timestamp when the grant was created (Unix timestamp in milliseconds) */
   createdAt: number;
   /** Timestamp when the grant expires (Unix timestamp in milliseconds) */
+  expiresAt: number;
+}
+
+/**
+ * QR Delivery Code Interface - Represents a one-time delivery code for polling-based grant exchange
+ */
+export interface QrDeliveryCode {
+  /** The delivery code (base64url encoded random string) */
+  deliveryCode: string;
+  /** The ticket ID this delivery code is associated with */
+  tid: string;
+  /** Web session ID that can use this delivery code */
+  webSessionId: string;
+  /** Timestamp when the delivery code was created (Unix timestamp in milliseconds) */
+  createdAt: number;
+  /** Timestamp when the delivery code expires (Unix timestamp in milliseconds) */
   expiresAt: number;
 }
 
