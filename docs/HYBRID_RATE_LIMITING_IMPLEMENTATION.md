@@ -214,29 +214,29 @@ GET /api/v1/token-bucket
 ## 🔄 Migration Strategy
 
 ### Phase 1: Parallel Operation ✅
-- Cả hai hệ thống chạy song song
-- Endpoints mới sử dụng `@RateLimit()`
-- Endpoints cũ tiếp tục dùng `@UsePlan()`
+- Both systems run in parallel
+- New endpoints use `@RateLimit()`
+- Old endpoints continue using `@UsePlan()`
 
 ### Phase 2: Gradual Migration
-- Migrate từng endpoint một
+- Migrate each endpoint one by one
 - Monitor performance
 - Fine-tune policies
 
 ### Phase 3: Full Migration
-- Tất cả endpoints dùng policy-based
-- Legacy system trở thành fallback
-- Remove legacy code khi ổn định
+- All endpoints use policy-based approach
+- Legacy system becomes fallback
+- Remove legacy code when stable
 
 ## 📊 Performance & Scalability
 
 ### 1. **Redis Optimization**
-- Lua scripts cho atomic operations
+- Lua scripts for atomic operations
 - Efficient key generation
-- Cache invalidation với Pub/Sub
+- Cache invalidation with Pub/Sub
 
 ### 2. **Memory Usage**
-- Policy caching với TTL
+- Policy caching with TTL
 - Efficient data structures
 - Garbage collection friendly
 
@@ -248,25 +248,25 @@ GET /api/v1/token-bucket
 ## 🎯 Best Practices
 
 ### 1. **Policy Design**
-- Bắt đầu với global policies
-- Thêm specific policies cho high-traffic routes
-- Sử dụng strategy phù hợp cho từng operation
+- Start with global policies
+- Add specific policies for high-traffic routes
+- Use appropriate strategy for each operation
 
 ### 2. **Key Generation**
 - Consistent key parts
-- Include user context khi có
+- Include user context when available
 - Group similar operations
 
 ### 3. **Monitoring**
 - Monitor rate limit hits
 - Track policy effectiveness
-- Set up alerts cho violations
+- Set up alerts for violations
 
 ## 🔍 Troubleshooting
 
 ### 1. **Common Issues**
-- Policy không match: Check regex pattern
-- Rate limiting quá strict: Tăng limits
+- Policy doesn't match: Check regex pattern
+- Rate limiting too strict: Increase limits
 - Cache issues: Check Redis connectivity
 
 ### 2. **Debug Tools**

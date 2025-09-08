@@ -158,21 +158,21 @@ RATE_LIMIT_DEFAULT_PLAN=anonymous
 ```
 
 ### **Database Migration**
-- ✅ `rate_limit_policies` table với seed data
-- ✅ Default policies cho các use cases phổ biến
-- ✅ Proper indexes và constraints
+- ✅ `rate_limit_policies` table with seed data
+- ✅ Default policies for common use cases
+- ✅ Proper indexes and constraints
 
-## 🎯 **Tính năng nổi bật**
+## 🎯 **Key Features**
 
 ### **1. Policy Priority System**
-- Chọn policy ưu tiên cao nhất
-- Flexible matching với regex patterns
+- Select highest priority policy
+- Flexible matching with regex patterns
 - Hot-reload support
 
 ### **2. Multiple Strategies**
-- **Fixed Window**: Simple counter với time window
-- **Sliding Window**: Smooth rate limiting với overlapping windows
-- **Token Bucket**: Burst-friendly với token refill
+- **Fixed Window**: Simple counter with time window
+- **Sliding Window**: Smooth rate limiting with overlapping windows
+- **Token Bucket**: Burst-friendly with token refill
 
 ### **3. Flexible Scoping**
 - **Global**: Applies to all requests
@@ -182,9 +182,9 @@ RATE_LIMIT_DEFAULT_PLAN=anonymous
 - **IP**: IP address targeting
 
 ### **4. Advanced Features**
-- Lua scripts cho atomic operations
-- Redis Pub/Sub cho cache invalidation
-- Version control cho policies
+- Lua scripts for atomic operations
+- Redis Pub/Sub for cache invalidation
+- Version control for policies
 - Admin testing tools
 - Comprehensive monitoring
 
@@ -209,19 +209,19 @@ RATE_LIMIT_DEFAULT_PLAN=anonymous
 ## 🔄 **Migration Strategy**
 
 ### **Phase 1: Parallel Operation** ✅
-- Cả hai hệ thống chạy song song
-- Endpoints mới sử dụng `@RateLimit()`
-- Endpoints cũ tiếp tục dùng `@UsePlan()`
+- Both systems run in parallel
+- New endpoints use `@RateLimit()`
+- Old endpoints continue using `@UsePlan()`
 
 ### **Phase 2: Gradual Migration**
-- Migrate từng endpoint một
+- Migrate each endpoint one by one
 - Monitor performance
 - Fine-tune policies
 
 ### **Phase 3: Full Migration**
-- Tất cả endpoints dùng policy-based
-- Legacy system trở thành fallback
-- Remove legacy code khi ổn định
+- All endpoints use policy-based approach
+- Legacy system becomes fallback
+- Remove legacy code when stable
 
 ## 🎉 **Conclusion**
 
