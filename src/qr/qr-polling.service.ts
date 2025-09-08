@@ -151,8 +151,18 @@ export class QrPollingService {
 
     return new Promise<'CHANGED' | 'TIMEOUT'>((resolve) => {
       const redis = this.cacheService.getRedisClient().duplicate();
-      let timeoutId: NodeJS.Timeout;
       let isResolved = false;
+
+      // Set timeout
+      const timeoutId = setTimeout(() => {
+        if (isResolved) return;
+        isResolved = true;
+        void redis
+          .unsubscribe(channel)
+          .then(() => redis.quit())
+          .catch(() => {});
+        resolve('TIMEOUT');
+      }, timeoutMs);
 
       const cleanup = async () => {
         if (isResolved) return;
@@ -166,32 +176,24 @@ export class QrPollingService {
         }
       };
 
-      // Set timeout
-      timeoutId = setTimeout(async () => {
-        await cleanup();
-        resolve('TIMEOUT');
-      }, timeoutMs);
-
       // Subscribe to status changes
-      redis.subscribe(channel, (error) => {
+      void redis.subscribe(channel, (error) => {
         if (error) {
           this.logger.error(`Error subscribing to channel ${channel}:`, error);
-          cleanup();
-          resolve('TIMEOUT');
+          void cleanup().then(() => resolve('TIMEOUT'));
         }
       });
 
       // Handle messages
-      redis.on('message', async (receivedChannel, message) => {
+      redis.on('message', (receivedChannel, message) => {
         if (receivedChannel === channel) {
           try {
-            const data = JSON.parse(message);
+            const data = JSON.parse(message) as { version?: number };
             if (
               typeof data.version === 'number' &&
               data.version > sinceVersion
             ) {
-              await cleanup();
-              resolve('CHANGED');
+              void cleanup().then(() => resolve('CHANGED'));
             }
           } catch (error) {
             this.logger.warn('Error parsing status message:', error);
@@ -200,10 +202,9 @@ export class QrPollingService {
       });
 
       // Handle Redis errors
-      redis.on('error', async (error) => {
+      redis.on('error', (error) => {
         this.logger.error('Redis pub/sub error:', error);
-        await cleanup();
-        resolve('TIMEOUT');
+        void cleanup().then(() => resolve('TIMEOUT'));
       });
     });
   }

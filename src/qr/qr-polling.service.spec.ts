@@ -6,7 +6,6 @@ import { QrPollingService } from './qr-polling.service';
 describe('QrPollingService', () => {
   let service: QrPollingService;
   let cacheService: jest.Mocked<CacheService>;
-  let configService: jest.Mocked<ConfigService>;
 
   beforeEach(async () => {
     const mockCacheService = {
