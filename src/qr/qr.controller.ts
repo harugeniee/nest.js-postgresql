@@ -549,13 +549,20 @@ export class QrController {
 
   /**
    * Parses If-None-Match header to extract ticket ID and version
+   * Uses safe regex to prevent ReDoS attacks
    */
   private parseIfNoneMatch(
     ifNoneMatch?: string,
   ): { tid: string; version: number } | undefined {
     if (!ifNoneMatch) return undefined;
 
-    const regex = /W\/"(.+):(\d+)"/;
+    // Use non-greedy quantifier and limit input length to prevent ReDoS
+    if (ifNoneMatch.length > 1000) {
+      return undefined; // Reject suspiciously long inputs
+    }
+
+    // Safe regex: non-greedy quantifier and specific character classes
+    const regex = /^W\/"([^:"]+):(\d+)"$/;
     const match = regex.exec(ifNoneMatch);
     return match ? { tid: match[1], version: Number(match[2]) } : undefined;
   }
