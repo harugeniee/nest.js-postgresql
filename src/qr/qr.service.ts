@@ -21,6 +21,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { CreateTicketDto } from './dto';
 import { QrActionExecutorService } from './qr-action-executor.service';
+import { QrPollingService } from './qr-polling.service';
 import {
   generateCodeChallenge,
   generateCodeVerifier,
@@ -53,6 +54,7 @@ export class QrService {
     private readonly cacheService: CacheService,
     private readonly actionExecutor: QrActionExecutorService,
     private readonly configService: ConfigService,
+    private readonly pollingService: QrPollingService,
   ) {
     // Get TTL values from configuration with fallbacks
     this.ticketTtl =
@@ -100,6 +102,7 @@ export class QrService {
       payload: createTicketDto.payload,
       createdAt: Date.now(),
       expiresAt: Date.now() + this.ticketTtl * 1000,
+      version: 1,
     };
 
     // Store ticket in Redis with TTL
@@ -210,10 +213,18 @@ export class QrService {
     ticket.status = 'SCANNED';
     ticket.scannedBy = userId;
     ticket.scannedAt = Date.now();
+    ticket.version = (ticket.version || 0) + 1;
 
     // Store updated ticket
     const ticketKey = `${QR_REDIS_PREFIXES.TICKET}${ticketId}`;
     await this.cacheService.set(ticketKey, ticket, this.ticketTtl);
+
+    // Publish status change
+    await this.pollingService.publishStatusChange(
+      ticketId,
+      'SCANNED',
+      ticket.version,
+    );
 
     this.logger.log(`Ticket ${ticketId} marked as scanned successfully`);
 
@@ -264,6 +275,7 @@ export class QrService {
     ticket.status = 'APPROVED';
     ticket.approvedBy = userId;
     ticket.approvedAt = Date.now();
+    ticket.version = (ticket.version || 0) + 1;
 
     // Store updated ticket
     const ticketKey = `${QR_REDIS_PREFIXES.TICKET}${ticketId}`;
@@ -304,6 +316,21 @@ export class QrService {
     const grantKey = `${QR_REDIS_PREFIXES.GRANT}${grantToken}`;
     await this.cacheService.set(grantKey, grant, this.grantTtl);
 
+    // Create delivery code for polling if webSessionId exists
+    if (ticket.webSessionId) {
+      await this.pollingService.createDeliveryCode(
+        ticketId,
+        ticket.webSessionId,
+      );
+    }
+
+    // Publish status change
+    await this.pollingService.publishStatusChange(
+      ticketId,
+      'APPROVED',
+      ticket.version,
+    );
+
     this.logger.log(
       `Ticket ${ticketId} approved successfully, grant token generated`,
     );
@@ -335,10 +362,18 @@ export class QrService {
 
     // Update ticket status
     ticket.status = 'REJECTED';
+    ticket.version = (ticket.version || 0) + 1;
 
     // Store updated ticket
     const ticketKey = `${QR_REDIS_PREFIXES.TICKET}${ticketId}`;
     await this.cacheService.set(ticketKey, ticket, this.ticketTtl);
+
+    // Publish status change
+    await this.pollingService.publishStatusChange(
+      ticketId,
+      'REJECTED',
+      ticket.version,
+    );
 
     this.logger.log(`Ticket ${ticketId} rejected successfully`);
 
@@ -374,13 +409,80 @@ export class QrService {
 
     // Mark ticket as used
     ticket.status = 'USED';
+    ticket.version = (ticket.version || 0) + 1;
     const ticketKey = `${QR_REDIS_PREFIXES.TICKET}${grant.tid}`;
     await this.cacheService.set(ticketKey, ticket, this.ticketTtl);
 
     // Delete the grant token (one-time use)
     await this.cacheService.delete(grantKey);
 
+    // Publish status change
+    await this.pollingService.publishStatusChange(
+      grant.tid,
+      'USED',
+      ticket.version,
+    );
+
     this.logger.log(`Grant token ${grantToken} exchanged successfully`);
+
+    return grant;
+  }
+
+  /**
+   * Exchanges a delivery code for ticket information (polling-based)
+   *
+   * @param tid - The ticket ID
+   * @param deliveryCode - The delivery code to exchange
+   * @returns The grant information
+   */
+  async exchangeDeliveryCode(
+    tid: string,
+    deliveryCode: string,
+  ): Promise<QrGrant> {
+    this.logger.log(`Exchanging delivery code for ticket: ${tid}`);
+
+    // Validate and consume the delivery code
+    const isValid = await this.pollingService.validateAndConsumeDeliveryCode(
+      tid,
+      deliveryCode,
+    );
+    if (!isValid) {
+      throw new NotFoundException('Invalid or expired delivery code');
+    }
+
+    // Get the ticket
+    const ticket = await this.getTicket(tid);
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    // Check if ticket is approved
+    if (ticket.status !== 'APPROVED') {
+      throw new BadRequestException(
+        `Ticket status is ${ticket.status}, expected APPROVED`,
+      );
+    }
+
+    // Create grant information (similar to exchangeGrant but without grant token)
+    const grant: QrGrant = {
+      tid: ticket.tid,
+      type: ticket.type,
+      webSessionId: ticket.webSessionId,
+      userId: ticket.approvedBy || '',
+      createdAt: Date.now(),
+      expiresAt: Date.now() + this.grantTtl * 1000,
+    };
+
+    // Mark ticket as used
+    ticket.status = 'USED';
+    ticket.version = (ticket.version || 0) + 1;
+    const ticketKey = `${QR_REDIS_PREFIXES.TICKET}${tid}`;
+    await this.cacheService.set(ticketKey, ticket, this.ticketTtl);
+
+    // Publish status change
+    await this.pollingService.publishStatusChange(tid, 'USED', ticket.version);
+
+    this.logger.log(`Delivery code for ticket ${tid} exchanged successfully`);
 
     return grant;
   }

@@ -12,6 +12,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CreateTicketDto } from './dto';
 import { QrActionExecutorService } from './qr-action-executor.service';
 import { QrService } from './qr.service';
+import { QrPollingService } from './qr-polling.service';
 import { generateCodeChallenge } from './qr.utils';
 
 // Helper function to generate valid test ticket IDs
@@ -50,11 +51,17 @@ const mockConfigService = {
   get: jest.fn(),
 };
 
+const mockPollingService = {
+  publishStatusChange: jest.fn(),
+  createDeliveryCode: jest.fn(),
+};
+
 describe('QrService', () => {
   let service: QrService;
   let cacheService: CacheService;
   let actionExecutor: QrActionExecutorService;
   let configService: ConfigService;
+  let pollingService: QrPollingService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -72,6 +79,10 @@ describe('QrService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: QrPollingService,
+          useValue: mockPollingService,
+        },
       ],
     }).compile();
 
@@ -81,6 +92,7 @@ describe('QrService', () => {
       QrActionExecutorService,
     );
     configService = module.get<ConfigService>(ConfigService);
+    pollingService = module.get<QrPollingService>(QrPollingService);
 
     // Reset mocks
     jest.clearAllMocks();
@@ -171,6 +183,7 @@ describe('QrService', () => {
         codeChallenge: validChallenge,
         createdAt: Date.now(),
         expiresAt: Date.now() + 180000,
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -203,6 +216,7 @@ describe('QrService', () => {
         codeChallenge: validChallenge,
         createdAt: Date.now() - 200000, // 200 seconds ago
         expiresAt: Date.now() - 20000, // 20 seconds ago (expired)
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -231,6 +245,7 @@ describe('QrService', () => {
         payload: { friendUserId: '123', friendName: 'John Doe' },
         createdAt: Date.now(),
         expiresAt: Date.now() + 180000,
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -266,6 +281,7 @@ describe('QrService', () => {
         codeChallenge: validChallenge,
         createdAt: Date.now(),
         expiresAt: Date.now() + 180000,
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -302,6 +318,7 @@ describe('QrService', () => {
         codeChallenge: validChallenge,
         createdAt: Date.now(),
         expiresAt: Date.now() + 180000,
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -320,6 +337,7 @@ describe('QrService', () => {
         codeChallenge: validChallenge,
         createdAt: Date.now() - 200000,
         expiresAt: Date.now() - 20000, // expired
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -344,6 +362,7 @@ describe('QrService', () => {
         scannedAt: Date.now(),
         createdAt: Date.now() - 100000,
         expiresAt: Date.now() + 80000,
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -390,6 +409,7 @@ describe('QrService', () => {
         scannedAt: Date.now(),
         createdAt: Date.now() - 100000,
         expiresAt: Date.now() + 80000,
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -414,6 +434,7 @@ describe('QrService', () => {
         scannedAt: Date.now(),
         createdAt: Date.now() - 100000,
         expiresAt: Date.now() + 80000,
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -446,6 +467,7 @@ describe('QrService', () => {
         scannedAt: Date.now(),
         createdAt: Date.now() - 100000,
         expiresAt: Date.now() + 80000,
+        version: 1,
       };
 
       mockCacheService.get.mockResolvedValue(mockTicket);
@@ -485,6 +507,7 @@ describe('QrService', () => {
         approvedAt: Date.now(),
         createdAt: Date.now() - 100000,
         expiresAt: Date.now() + 80000,
+        version: 1,
       };
 
       mockCacheService.get
@@ -572,11 +595,13 @@ describe('QrService', () => {
         .mockResolvedValueOnce({
           type: QR_ACTION_TYPES.LOGIN,
           expiresAt: Date.now() + 100000,
+          version: 1,
           status: 'PENDING',
         } as QrTicket)
         .mockResolvedValueOnce({
           type: QR_ACTION_TYPES.ADD_FRIEND,
           expiresAt: Date.now() + 100000,
+          version: 1,
           status: 'APPROVED',
         } as QrTicket);
 

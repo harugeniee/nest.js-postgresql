@@ -5,3 +5,5 @@
 
 export * from './create-ticket.dto';
 export * from './approve-ticket.dto';
+export * from './qr-poll-response.dto';
+export * from './qr-grant-exchange.dto';

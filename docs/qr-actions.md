@@ -52,6 +52,51 @@ Content-Type: application/json
 GET /qr/tickets/{ticketId}
 ```
 
+#### Poll Ticket Status (Short Poll)
+```http
+GET /qr/tickets/{ticketId}/poll?webSessionId={webSessionId}
+```
+
+**Response:**
+```json
+{
+  "tid": "ticket_id",
+  "status": "PENDING",
+  "expiresAt": "2024-01-01T12:00:00.000Z",
+  "scannedAt": null,
+  "approvedAt": null,
+  "rejectedAt": null,
+  "usedAt": null,
+  "grantReady": false,
+  "deliveryCode": null,
+  "nextPollAfterMs": 2000,
+  "version": 1
+}
+```
+
+#### Poll Ticket Status (Long Poll)
+```http
+GET /qr/tickets/{ticketId}/long-poll?webSessionId={webSessionId}
+If-None-Match: W/"ticket_id:1"
+```
+
+**Response (when status changes):**
+```json
+{
+  "tid": "ticket_id",
+  "status": "APPROVED",
+  "expiresAt": "2024-01-01T12:00:00.000Z",
+  "scannedAt": "2024-01-01T11:58:00.000Z",
+  "approvedAt": "2024-01-01T11:59:00.000Z",
+  "rejectedAt": null,
+  "usedAt": null,
+  "grantReady": true,
+  "deliveryCode": "base64url_delivery_code",
+  "nextPollAfterMs": 2000,
+  "version": 3
+}
+```
+
 ### Protected Endpoints (JWT Required)
 
 #### Mark Ticket as Scanned
@@ -77,7 +122,7 @@ POST /qr/tickets/{ticketId}/reject
 Authorization: Bearer {jwt_token}
 ```
 
-#### Exchange Grant for Tokens
+#### Exchange Grant for Tokens (Legacy)
 ```http
 POST /qr/auth/qr/grant
 Content-Type: application/json
@@ -85,6 +130,17 @@ Content-Type: application/json
 {
   "tid": "ticket_id",
   "grantToken": "grant_token"
+}
+```
+
+#### Exchange Grant for Tokens (Polling)
+```http
+POST /qr/auth/qr/grant
+Content-Type: application/json
+
+{
+  "tid": "ticket_id",
+  "deliveryCode": "base64url_delivery_code"
 }
 ```
 
@@ -103,6 +159,149 @@ GET /qr/actions
 #### Health Check
 ```http
 GET /qr/health
+```
+
+## REST Polling
+
+The QR Actions feature now supports REST polling as an alternative to WebSocket connections. This is useful for clients that cannot maintain persistent WebSocket connections or prefer a simpler HTTP-based approach.
+
+### Polling Methods
+
+#### Short Poll
+- **Endpoint**: `GET /qr/tickets/{ticketId}/poll`
+- **Purpose**: Immediate status check with suggested next poll interval
+- **Rate Limit**: 1 request per 2 seconds per IP+ticket combination
+- **ETag Support**: Returns 304 Not Modified if status hasn't changed
+
+#### Long Poll
+- **Endpoint**: `GET /qr/tickets/{ticketId}/long-poll`
+- **Purpose**: Hangs connection for up to 25 seconds waiting for status changes
+- **Rate Limit**: 1 request per 2 seconds per IP+ticket combination
+- **ETag Support**: Uses If-None-Match header to detect changes
+
+### Polling Features
+
+- **ETag Caching**: Reduces unnecessary data transfer with 304 responses
+- **Delivery Codes**: Secure one-time codes for grant exchange (30s TTL)
+- **Version Tracking**: Incremental version numbers for change detection
+- **Rate Limiting**: Prevents abuse with IP+ticket based limits
+- **WebSocket Sync**: Status changes are published to both polling and WebSocket clients
+
+### Polling Flow Example
+
+```bash
+# 1. Create ticket
+curl -X POST http://localhost:3000/qr/tickets \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "LOGIN",
+    "webSessionId": "session_123"
+  }'
+
+# 2. Start polling (short poll)
+curl -X GET "http://localhost:3000/qr/tickets/abc123/poll?webSessionId=session_123"
+
+# 3. Long poll with ETag (waits for changes)
+curl -X GET "http://localhost:3000/qr/tickets/abc123/long-poll?webSessionId=session_123" \
+  -H 'If-None-Match: W/"abc123:1"'
+
+# 4. Exchange delivery code when approved
+curl -X POST http://localhost:3000/qr/auth/qr/grant \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tid": "abc123",
+    "deliveryCode": "delivery_code_from_poll_response"
+  }'
+```
+
+### JavaScript Polling Example
+
+```javascript
+class QrPoller {
+  constructor(ticketId, webSessionId) {
+    this.ticketId = ticketId;
+    this.webSessionId = webSessionId;
+    this.etag = null;
+    this.isPolling = false;
+  }
+
+  async startPolling() {
+    this.isPolling = true;
+    while (this.isPolling) {
+      try {
+        const response = await this.poll();
+        this.handleResponse(response);
+        
+        if (response.grantReady) {
+          await this.exchangeGrant(response.deliveryCode);
+          break;
+        }
+        
+        // Wait for next poll
+        await new Promise(resolve => 
+          setTimeout(resolve, response.nextPollAfterMs)
+        );
+      } catch (error) {
+        console.error('Polling error:', error);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+  }
+
+  async poll() {
+    const headers = {};
+    if (this.etag) {
+      headers['If-None-Match'] = this.etag;
+    }
+
+    const response = await fetch(
+      `/qr/tickets/${this.ticketId}/poll?webSessionId=${this.webSessionId}`,
+      { headers }
+    );
+
+    if (response.status === 304) {
+      // No changes, continue polling
+      return null;
+    }
+
+    this.etag = response.headers.get('ETag');
+    return response.json();
+  }
+
+  handleResponse(data) {
+    if (!data) return;
+    
+    console.log('Status:', data.status);
+    console.log('Version:', data.version);
+    
+    if (data.grantReady) {
+      console.log('Grant ready! Delivery code:', data.deliveryCode);
+    }
+  }
+
+  async exchangeGrant(deliveryCode) {
+    const response = await fetch('/qr/auth/qr/grant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tid: this.ticketId,
+        deliveryCode: deliveryCode
+      })
+    });
+    
+    const result = await response.json();
+    console.log('Grant exchanged:', result);
+    return result;
+  }
+
+  stop() {
+    this.isPolling = false;
+  }
+}
+
+// Usage
+const poller = new QrPoller('ticket_id', 'session_123');
+poller.startPolling();
 ```
 
 ## WebSocket Events
