@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailService } from 'src/shared/services/mail/mail.service';
+import { maskEmail } from 'src/common/utils';
 import {
   SingleEmailQueueJob,
   BatchEmailQueueJob,
@@ -144,29 +145,34 @@ export class WorkerService {
   /**
    * Process OTP email job
    */
-  async processOtpEmail(job: OtpEmailQueueJob): Promise<MailQueueJobResult> {
+  async processOtpEmail(
+    job: OtpEmailQueueJob | string,
+  ): Promise<MailQueueJobResult> {
     const startTime = Date.now();
+    const jobData =
+      typeof job === 'string' ? (JSON.parse(job) as OtpEmailQueueJob) : job;
+    console.log('jobData', jobData);
     this.logger.log(
-      `Processing OTP email job: ${job.jobId}, email: ${this.maskEmail(job.email)}`,
+      `Processing OTP email job: ${jobData.jobId}, email: ${maskEmail(jobData.email)}`,
     );
 
     try {
       const result = await this.mailService.sendTemplateMail(
         'otp-login',
-        { email: job.email },
+        { email: jobData.email },
         {
-          otpCode: job.otpCode,
-          requestId: job.requestId,
+          otpCode: jobData.otpCode,
+          requestId: jobData.requestId,
           appName: process.env.APP_NAME || 'NestJS App',
           appUrl: process.env.APP_URL || 'http://localhost:3000',
           supportEmail: process.env.MAIL_SUPPORT || process.env.MAIL_FROM,
           companyName: process.env.COMPANY_NAME || 'Your Company',
-          ...job.templateData,
+          ...jobData.templateData,
         },
         {
           priority: 'high',
           headers: {
-            'X-OTP-Request-ID': job.requestId,
+            'X-OTP-Request-ID': jobData.requestId,
             'X-OTP-Type': 'login',
           },
         },
@@ -174,11 +180,11 @@ export class WorkerService {
 
       const processingTime = Date.now() - startTime;
       this.logger.log(
-        `OTP email job completed: ${job.jobId}, success: ${result.success}`,
+        `OTP email job completed: ${jobData.jobId}, success: ${result.success}`,
       );
 
       return {
-        jobId: job.jobId,
+        jobId: jobData.jobId,
         success: result.success,
         error: result.error,
         processingTime,
@@ -186,31 +192,14 @@ export class WorkerService {
       };
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      this.logger.error(`OTP email job failed: ${job.jobId}`, error);
+      this.logger.error(`OTP email job failed: ${jobData.jobId}`, error);
 
       return {
-        jobId: job.jobId,
+        jobId: jobData.jobId,
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         processingTime,
       };
     }
-  }
-
-  /**
-   * Mask email address for logging (security)
-   */
-  private maskEmail(email: string): string {
-    if (!email?.includes('@')) {
-      return '***@***';
-    }
-
-    const [localPart, domain] = email.split('@');
-    const maskedLocal =
-      localPart.length > 2
-        ? `${localPart[0]}${'*'.repeat(localPart.length - 2)}${localPart[localPart.length - 1]}`
-        : '**';
-
-    return `${maskedLocal}@${domain}`;
   }
 }

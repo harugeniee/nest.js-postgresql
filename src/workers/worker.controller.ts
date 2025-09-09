@@ -99,7 +99,7 @@ export class WorkerController {
 
   @MessagePattern(JOB_NAME.MAIL_OTP)
   async processOtpEmail(
-    @Payload() job: OtpEmailQueueJob,
+    @Payload() job: OtpEmailQueueJob | string,
     @Ctx() context: RmqContext,
   ) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

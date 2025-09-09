@@ -10,10 +10,15 @@ import {
   RegisterDto,
   UpdatePasswordDto,
 } from 'src/users/dto';
-import { User } from 'src/users/entities/user.entity';
+import { User } from 'src/users/entities';
 import { UsersService } from 'src/users/users.service';
 import { OtpRequestDto, OtpVerifyDto } from './dto';
 import { OtpData } from './interfaces';
+import {
+  generateOtpCode,
+  generateOtpRequestId,
+  maskEmail,
+} from 'src/common/utils';
 
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -248,17 +253,17 @@ export class AuthService {
    * @returns OTP request result
    */
   async requestOtp(otpRequestDto: OtpRequestDto) {
+    const maskedEmail = maskEmail(otpRequestDto.email);
+
     try {
-      this.logger.log(
-        `OTP request initiated for email: ${this.maskEmail(otpRequestDto.email)}`,
-      );
+      this.logger.log(`OTP request initiated for email: ${maskedEmail}`);
 
       // Check if user exists (for security, we don't reveal if user exists or not)
       const user = await this.usersService.findByEmail(otpRequestDto.email);
 
       // Always return success message regardless of user existence for security
-      const requestId = this.generateRequestId();
-      const otpCode = this.generateOtpCode();
+      const requestId = generateOtpRequestId();
+      const otpCode = generateOtpCode(this.OTP_LENGTH);
       const now = Date.now();
       const expiresAt = now + this.OTP_TTL_SECONDS * 1000;
 
@@ -287,11 +292,11 @@ export class AuthService {
         );
 
         this.logger.log(
-          `OTP sent successfully to: ${this.maskEmail(otpRequestDto.email)}, requestId: ${requestId}`,
+          `OTP sent successfully to: ${maskedEmail}, requestId: ${requestId}`,
         );
       } else {
         this.logger.log(
-          `OTP request for non-existent user: ${this.maskEmail(otpRequestDto.email)}, requestId: ${requestId}`,
+          `OTP request for non-existent user: ${maskedEmail}, requestId: ${requestId}`,
         );
       }
 
@@ -304,7 +309,7 @@ export class AuthService {
       });
     } catch (error) {
       this.logger.error(
-        `Failed to request OTP for email ${this.maskEmail(otpRequestDto.email)}:`,
+        `Failed to request OTP for email ${maskedEmail}:`,
         error,
       );
       throw new HttpException(
@@ -324,22 +329,22 @@ export class AuthService {
    * @returns Login result with JWT tokens
    */
   async verifyOtp(otpVerifyDto: OtpVerifyDto, clientInfo: ClientInfo) {
+    const maskedEmail = maskEmail(otpVerifyDto.email);
+
     try {
       this.logger.log(
-        `OTP verification initiated for email: ${this.maskEmail(otpVerifyDto.email)}, requestId: ${otpVerifyDto.requestId || 'N/A'}`,
+        `OTP verification initiated for email: ${maskedEmail}, requestId: ${otpVerifyDto.requestId || 'N/A'}`,
       );
 
       const storeKey = this.getOtpStoreKey(otpVerifyDto.email);
       const otpData = await this.otpStore.get(storeKey);
 
       if (!otpData) {
-        this.logger.warn(
-          `OTP not found for email: ${this.maskEmail(otpVerifyDto.email)}`,
-        );
+        this.logger.warn(`OTP not found for email: ${maskedEmail}`);
         throw new HttpException(
           {
-            messageKey: 'auth.OTP_VERIFICATION_FAILED',
-            details: 'Invalid or expired OTP code. Please request a new one.',
+            messageKey: 'auth.OTP_NOT_FOUND',
+            details: 'OTP code not found. Please request a new one.',
           },
           HttpStatus.UNAUTHORIZED,
         );
@@ -347,12 +352,10 @@ export class AuthService {
 
       // Check if OTP is already used
       if (otpData.isUsed) {
-        this.logger.warn(
-          `OTP already used for email: ${this.maskEmail(otpVerifyDto.email)}`,
-        );
+        this.logger.warn(`OTP already used for email: ${maskedEmail}`);
         throw new HttpException(
           {
-            messageKey: 'auth.OTP_VERIFICATION_FAILED',
+            messageKey: 'auth.OTP_ALREADY_USED',
             details:
               'OTP code has already been used. Please request a new one.',
           },
@@ -362,13 +365,11 @@ export class AuthService {
 
       // Check if OTP is expired
       if (Date.now() > otpData.expiresAt) {
-        this.logger.warn(
-          `OTP expired for email: ${this.maskEmail(otpVerifyDto.email)}`,
-        );
+        this.logger.warn(`OTP expired for email: ${maskedEmail}`);
         await this.otpStore.delete(storeKey);
         throw new HttpException(
           {
-            messageKey: 'auth.OTP_VERIFICATION_FAILED',
+            messageKey: 'auth.OTP_EXPIRED',
             details: 'OTP code has expired. Please request a new one.',
           },
           HttpStatus.UNAUTHORIZED,
@@ -377,13 +378,11 @@ export class AuthService {
 
       // Check if max attempts exceeded
       if (otpData.attempts >= otpData.maxAttempts) {
-        this.logger.warn(
-          `Max attempts exceeded for email: ${this.maskEmail(otpVerifyDto.email)}`,
-        );
+        this.logger.warn(`Max attempts exceeded for email: ${maskedEmail}`);
         await this.otpStore.delete(storeKey);
         throw new HttpException(
           {
-            messageKey: 'auth.OTP_VERIFICATION_FAILED',
+            messageKey: 'auth.OTP_MAX_ATTEMPTS_EXCEEDED',
             details:
               'Maximum verification attempts exceeded. Please request a new OTP.',
           },
@@ -394,7 +393,7 @@ export class AuthService {
       // Verify OTP code
       if (otpData.code !== otpVerifyDto.code) {
         this.logger.warn(
-          `Invalid OTP code for email: ${this.maskEmail(otpVerifyDto.email)}, attempts: ${otpData.attempts + 1}`,
+          `Invalid OTP code for email: ${maskedEmail}, attempts: ${otpData.attempts + 1}`,
         );
 
         // Increment attempts
@@ -403,8 +402,8 @@ export class AuthService {
         if (!updatedOtpData) {
           throw new HttpException(
             {
-              messageKey: 'auth.OTP_VERIFICATION_FAILED',
-              details: 'OTP verification failed. Please request a new one.',
+              messageKey: 'auth.OTP_UPDATE_FAILED',
+              details: 'Failed to update OTP attempts. Please request a new one.',
             },
             HttpStatus.UNAUTHORIZED,
           );
@@ -421,7 +420,7 @@ export class AuthService {
           await this.otpStore.delete(storeKey);
           throw new HttpException(
             {
-              messageKey: 'auth.OTP_VERIFICATION_FAILED',
+              messageKey: 'auth.OTP_MAX_ATTEMPTS_EXCEEDED',
               details:
                 'Maximum verification attempts exceeded. Please request a new OTP.',
             },
@@ -431,7 +430,7 @@ export class AuthService {
 
         throw new HttpException(
           {
-            messageKey: 'auth.OTP_VERIFICATION_FAILED',
+            messageKey: 'auth.OTP_INVALID_CODE',
             details: 'Invalid OTP code. Please check and try again.',
             remainingAttempts,
             expiresInSec,
@@ -443,9 +442,7 @@ export class AuthService {
       // OTP is valid - mark as used and delete
       await this.otpStore.markAsUsed(storeKey);
 
-      this.logger.log(
-        `OTP verified successfully for email: ${this.maskEmail(otpVerifyDto.email)}`,
-      );
+      this.logger.log(`OTP verified successfully for email: ${maskedEmail}`);
 
       // Get user for login
       const user = await this.usersService.findByEmail(otpVerifyDto.email);
@@ -471,38 +468,17 @@ export class AuthService {
         throw error;
       }
       this.logger.error(
-        `Failed to verify OTP for email ${this.maskEmail(otpVerifyDto.email)}:`,
+        `Failed to verify OTP for email ${maskedEmail}:`,
         error,
       );
       throw new HttpException(
         {
-          messageKey: 'auth.OTP_VERIFICATION_FAILED',
+          messageKey: 'auth.OTP_VERIFICATION_ERROR',
           details: 'OTP verification failed. Please try again later.',
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-  }
-
-  /**
-   * Generate 6-digit OTP code
-   * @returns 6-digit OTP code as string
-   */
-  private generateOtpCode(): string {
-    const min = Math.pow(10, this.OTP_LENGTH - 1);
-    const max = Math.pow(10, this.OTP_LENGTH) - 1;
-    const code = Math.floor(Math.random() * (max - min + 1)) + min;
-    return code.toString().padStart(this.OTP_LENGTH, '0');
-  }
-
-  /**
-   * Generate unique request ID
-   * @returns Unique request ID
-   */
-  private generateRequestId(): string {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 8);
-    return `otp_${timestamp}_${random}`;
   }
 
   /**
@@ -512,24 +488,5 @@ export class AuthService {
    */
   private getOtpStoreKey(email: string): string {
     return `${this.OTP_PREFIX}${email.toLowerCase()}`;
-  }
-
-  /**
-   * Mask email address for logging (security)
-   * @param email - Email address to mask
-   * @returns Masked email address
-   */
-  private maskEmail(email: string): string {
-    if (!email?.includes('@')) {
-      return '***@***';
-    }
-
-    const [localPart, domain] = email.split('@');
-    const maskedLocal =
-      localPart.length > 2
-        ? `${localPart[0]}${'*'.repeat(localPart.length - 2)}${localPart[localPart.length - 1]}`
-        : '**';
-
-    return `${maskedLocal}@${domain}`;
   }
 }

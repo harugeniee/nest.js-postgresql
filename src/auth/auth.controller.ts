@@ -22,6 +22,10 @@ import { AuthService } from './auth.service';
 import { JwtAccessTokenGuard } from './guard/jwt-access-token.guard';
 import { JwtRefreshTokenGuard } from './guard/jwt-refresh-token.guard';
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
+import {
+  CustomRateLimit,
+  RateLimit,
+} from 'src/rate-limit/rate-limit.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -124,6 +128,7 @@ export class AuthController {
 
   @Post('otp/request')
   @HttpCode(HttpStatus.OK)
+  @CustomRateLimit(3, 15 * 60)
   async requestOtp(@Body() otpRequestDto: OtpRequestDto) {
     return this.authService.requestOtp(otpRequestDto);
   }

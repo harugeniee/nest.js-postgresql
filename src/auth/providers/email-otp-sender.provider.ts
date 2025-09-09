@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailQueueIntegrationService } from 'src/shared/services/mail/mail-queue-integration.service';
 import { EmailOtpSender } from '../interfaces';
+import { maskEmail } from 'src/common/utils';
 
 /**
  * Email OTP sender implementation using queue-based email sending
@@ -24,7 +25,7 @@ export class MailerEmailOtpSender implements EmailOtpSender {
   async sendOtp(email: string, code: string, requestId: string): Promise<void> {
     try {
       this.logger.log(
-        `Queuing OTP email to: ${this.maskEmail(email)}, requestId: ${requestId}`,
+        `Queuing OTP email to: ${maskEmail(email)}, requestId: ${requestId}`,
       );
 
       const result = await this.mailQueueIntegration.sendOtpEmailQueue(
@@ -42,33 +43,14 @@ export class MailerEmailOtpSender implements EmailOtpSender {
       );
 
       this.logger.log(
-        `OTP email queued successfully to: ${this.maskEmail(email)}, jobId: ${result.jobId}`,
+        `OTP email queued successfully to: ${maskEmail(email)}, jobId: ${result.jobId}`,
       );
     } catch (error) {
       this.logger.error(
-        `Error queuing OTP email to ${this.maskEmail(email)}:`,
+        `Error queuing OTP email to ${maskEmail(email)}:`,
         error,
       );
       throw error;
     }
-  }
-
-  /**
-   * Mask email address for logging (security)
-   * @param email - Email address to mask
-   * @returns Masked email address
-   */
-  private maskEmail(email: string): string {
-    if (!email?.includes('@')) {
-      return '***@***';
-    }
-
-    const [localPart, domain] = email.split('@');
-    const maskedLocal =
-      localPart.length > 2
-        ? `${localPart[0]}${'*'.repeat(localPart.length - 2)}${localPart[localPart.length - 1]}`
-        : '**';
-
-    return `${maskedLocal}@${domain}`;
   }
 }

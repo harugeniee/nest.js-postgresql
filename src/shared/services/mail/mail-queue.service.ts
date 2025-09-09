@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RabbitMQService } from '../rabbitmq/rabbitmq.service';
 import { JOB_NAME } from 'src/shared/constants';
+import { maskEmail } from 'src/common/utils';
 import {
   MailQueueJob,
   MailQueueJobType,
@@ -176,7 +177,7 @@ export class MailQueueService {
     };
 
     this.logger.debug(
-      `Sending OTP email job: ${jobId}, email: ${this.maskEmail(email)}`,
+      `Sending OTP email job: ${jobId}, email: ${maskEmail(email)}`,
     );
     const success = this.rabbitMQService.sendDataToRabbitMQ(
       JOB_NAME.MAIL_OTP,
@@ -297,22 +298,5 @@ export class MailQueueService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Mask email address for logging (security)
-   */
-  private maskEmail(email: string): string {
-    if (!email?.includes('@')) {
-      return '***@***';
-    }
-
-    const [localPart, domain] = email.split('@');
-    const maskedLocal =
-      localPart.length > 2
-        ? `${localPart[0]}${'*'.repeat(localPart.length - 2)}${localPart[localPart.length - 1]}`
-        : '**';
-
-    return `${maskedLocal}@${domain}`;
   }
 }

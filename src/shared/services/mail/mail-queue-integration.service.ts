@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MailService } from './mail.service';
 import { MailQueueService } from './mail-queue.service';
 import { MailOptions, MailAddress } from './mail.interface';
+import { maskEmail } from 'src/common/utils';
 
 /**
  * Mail Queue Integration Service
@@ -128,7 +129,7 @@ export class MailQueueIntegrationService {
       );
 
       this.logger.log(
-        `OTP email queued successfully: ${jobId}, email: ${this.maskEmail(email)}`,
+        `OTP email queued successfully: ${jobId}, email: ${maskEmail(email)}`,
       );
       return {
         jobId,
@@ -217,22 +218,5 @@ export class MailQueueIntegrationService {
    */
   async testConnection() {
     return this.mailService.testConnection();
-  }
-
-  /**
-   * Mask email address for logging (security)
-   */
-  private maskEmail(email: string): string {
-    if (!email?.includes('@')) {
-      return '***@***';
-    }
-
-    const [localPart, domain] = email.split('@');
-    const maskedLocal =
-      localPart.length > 2
-        ? `${localPart[0]}${'*'.repeat(localPart.length - 2)}${localPart[localPart.length - 1]}`
-        : '**';
-
-    return `${maskedLocal}@${domain}`;
   }
 }
