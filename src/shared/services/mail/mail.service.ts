@@ -20,7 +20,7 @@ import * as templates from './templates';
 @Injectable()
 export class MailService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MailService.name);
-  private transporter: any;
+  private transporter: any = null;
   private readonly config: ReturnType<typeof mailConfig>;
   private readonly validationConfig = mailValidationConfig;
   private readonly templateRegistry: Map<string, (...args: any[]) => string> =
@@ -43,7 +43,9 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.transporter) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (this.transporter && typeof this.transporter.close === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       this.transporter.close();
       this.logger.log('🔴 Mail transporter closed');
     }
@@ -54,6 +56,7 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
    */
   private async initializeTransporter(): Promise<void> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       this.transporter = nodemailer.createTransport({
         host: this.config.host,
         port: this.config.port,
@@ -71,8 +74,12 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
       });
 
       // Verify connection
-      await this.transporter.verify();
-      this.logger.log('✅ Mail transporter verified successfully');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (this.transporter && typeof this.transporter.verify === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        await this.transporter.verify();
+        this.logger.log('✅ Mail transporter verified successfully');
+      }
     } catch (error) {
       this.logger.error('❌ Failed to initialize mail transporter:', error);
       throw error;
@@ -160,6 +167,15 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
       }
 
       // Send email
+      if (
+        !this.transporter ||
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        typeof this.transporter.sendMail !== 'function'
+      ) {
+        throw new Error('Mail transporter not initialized');
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       const info = await this.transporter.sendMail({
         from: options.from || this.config.from,
         to: this.formatRecipients(options.to),
@@ -182,12 +198,15 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
       this.updateMetrics(true, Date.now() - startTime);
 
       // Log success
-      this.logger.log(`📧 Email sent successfully: ${info.messageId}`);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const messageId = info?.messageId || 'unknown';
+      this.logger.log(`📧 Email sent successfully: ${messageId}`);
 
       return {
         success: true,
-        messageId: info.messageId,
-        response: info.response,
+        messageId: messageId as string,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        response: (info?.response as string) || 'unknown',
       };
     } catch (error) {
       // Update metrics
@@ -294,10 +313,14 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
         }
       } else {
         totalFailed++;
-        errors.push(result.reason?.message || 'Unknown error');
+        const errorMessage =
+          result.reason instanceof Error
+            ? result.reason.message
+            : 'Unknown error';
+        errors.push(errorMessage);
         results.push({
           success: false,
-          error: result.reason?.message || 'Unknown error',
+          error: errorMessage,
         });
       }
     });
@@ -443,7 +466,10 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
 
     const recipientList = Array.isArray(recipients) ? recipients : [recipients];
     for (const recipient of recipientList) {
-      const email = typeof recipient === 'string' ? recipient : recipient.email;
+      const email =
+        typeof recipient === 'string'
+          ? recipient
+          : (recipient as MailAddress).email;
       if (!this.validationConfig.emailRegex.test(email)) {
         errors.push(`Invalid email address: ${email}`);
       }
@@ -481,14 +507,15 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
     }
 
     for (const attachment of attachments) {
+      const attachmentObj = attachment as { contentType?: string };
       if (
-        attachment.contentType &&
+        attachmentObj.contentType &&
         !this.validationConfig.allowedAttachmentTypes.includes(
-          attachment.contentType,
+          attachmentObj.contentType,
         )
       ) {
         warnings.push(
-          `Attachment type '${attachment.contentType}' may not be supported`,
+          `Attachment type '${attachmentObj.contentType}' may not be supported`,
         );
       }
     }
@@ -615,6 +642,11 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
    */
   async testConnection(): Promise<boolean> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (!this.transporter || typeof this.transporter.verify !== 'function') {
+        return false;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await this.transporter.verify();
       return true;
     } catch (error) {
@@ -639,14 +671,14 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
   /**
    * Send single email via queue (asynchronous)
    * @param mailOptions - Mail options
-   * @param priority - Job priority (1-10)
-   * @param delay - Delay in milliseconds before processing
+   * @param _priority - Job priority (1-10)
+   * @param _delay - Delay in milliseconds before processing
    * @returns Job ID for tracking
    */
   async sendMailQueue(
     mailOptions: MailOptions,
-    priority: number = 5,
-    delay?: number,
+    _priority: number = 5,
+    _delay?: number,
   ): Promise<{ jobId: string; message: string }> {
     // This method would be implemented by injecting MailQueueService
     // For now, we'll throw an error to indicate it needs to be implemented
@@ -659,15 +691,15 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
    * Send batch email via queue (asynchronous)
    * @param mailOptions - Mail options (without recipients)
    * @param recipients - List of recipients
-   * @param priority - Job priority (1-10)
-   * @param delay - Delay in milliseconds before processing
+   * @param _priority - Job priority (1-10)
+   * @param _delay - Delay in milliseconds before processing
    * @returns Job ID for tracking
    */
   async sendMailBatchQueue(
     mailOptions: Omit<MailOptions, 'to'>,
     recipients: MailAddress[],
-    priority: number = 5,
-    delay?: number,
+    _priority: number = 5,
+    _delay?: number,
   ): Promise<{ jobId: string; message: string }> {
     // This method would be implemented by injecting MailQueueService
     throw new Error(
@@ -679,19 +711,19 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
    * Send template email via queue (asynchronous)
    * @param templateName - Template name
    * @param recipients - Recipients
-   * @param templateData - Template data
-   * @param options - Additional mail options
-   * @param priority - Job priority (1-10)
-   * @param delay - Delay in milliseconds before processing
+   * @param _templateData - Template data
+   * @param _options - Additional mail options
+   * @param _priority - Job priority (1-10)
+   * @param _delay - Delay in milliseconds before processing
    * @returns Job ID for tracking
    */
   async sendTemplateMailQueue(
     templateName: string,
     recipients: MailAddress | MailAddress[],
-    templateData: Record<string, unknown> = {},
-    options: Partial<MailOptions> = {},
-    priority: number = 5,
-    delay?: number,
+    _templateData: Record<string, unknown> = {},
+    _options: Partial<MailOptions> = {},
+    _priority: number = 5,
+    _delay?: number,
   ): Promise<{ jobId: string; message: string }> {
     // This method would be implemented by injecting MailQueueService
     throw new Error(
@@ -704,18 +736,18 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
    * @param email - Recipient email
    * @param otpCode - OTP code
    * @param requestId - Request ID
-   * @param templateData - Additional template data
-   * @param priority - Job priority (1-10)
-   * @param delay - Delay in milliseconds before processing
+   * @param _templateData - Additional template data
+   * @param _priority - Job priority (1-10)
+   * @param _delay - Delay in milliseconds before processing
    * @returns Job ID for tracking
    */
   async sendOtpEmailQueue(
     email: string,
     otpCode: string,
     requestId: string,
-    templateData: Record<string, unknown> = {},
-    priority: number = 8, // Higher priority for OTP emails
-    delay?: number,
+    _templateData: Record<string, unknown> = {},
+    _priority: number = 8, // Higher priority for OTP emails
+    _delay?: number,
   ): Promise<{ jobId: string; message: string }> {
     // This method would be implemented by injecting MailQueueService
     throw new Error(
