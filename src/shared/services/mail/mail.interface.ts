@@ -178,3 +178,6 @@ export interface MailProviderResult {
   error?: string;
   responseTime: number;
 }
+
+// Re-export mail queue interfaces
+export * from './mail-queue.interface';

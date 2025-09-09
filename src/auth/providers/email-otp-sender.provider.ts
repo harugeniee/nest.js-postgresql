@@ -1,65 +1,52 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MailService } from 'src/shared/services/mail/mail.service';
+import { MailQueueIntegrationService } from 'src/shared/services/mail/mail-queue-integration.service';
 import { EmailOtpSender } from '../interfaces';
 
 /**
- * Email OTP sender implementation using the existing MailService
- * Sends OTP codes via email using configured mail templates
+ * Email OTP sender implementation using queue-based email sending
+ * Sends OTP codes via email using RabbitMQ queue for asynchronous processing
  */
 @Injectable()
 export class MailerEmailOtpSender implements EmailOtpSender {
   private readonly logger = new Logger(MailerEmailOtpSender.name);
 
-  constructor(private readonly mailService: MailService) {}
+  constructor(
+    private readonly mailQueueIntegration: MailQueueIntegrationService,
+  ) {}
 
   /**
-   * Send OTP code via email
+   * Send OTP code via email using queue
    * @param email - Recipient email address
    * @param code - OTP code to send
    * @param requestId - Request ID for tracking
-   * @returns Promise that resolves when email is sent
+   * @returns Promise that resolves when email is queued
    */
   async sendOtp(email: string, code: string, requestId: string): Promise<void> {
     try {
       this.logger.log(
-        `Sending OTP email to: ${this.maskEmail(email)}, requestId: ${requestId}`,
+        `Queuing OTP email to: ${this.maskEmail(email)}, requestId: ${requestId}`,
       );
 
-      const result = await this.mailService.sendTemplateMail(
-        'otp-login', // Template name
-        { email },
+      const result = await this.mailQueueIntegration.sendOtpEmailQueue(
+        email,
+        code,
+        requestId,
         {
-          otpCode: code,
-          requestId,
           // Additional template data
           appName: process.env.APP_NAME || 'NestJS App',
           appUrl: process.env.APP_URL || 'http://localhost:3000',
           supportEmail: process.env.MAIL_SUPPORT || process.env.MAIL_FROM,
           companyName: process.env.COMPANY_NAME || 'Your Company',
         },
-        {
-          // Email options
-          priority: 'high',
-          headers: {
-            'X-OTP-Request-ID': requestId,
-            'X-OTP-Type': 'login',
-          },
-        },
+        8, // High priority for OTP emails
       );
 
-      if (!result.success) {
-        this.logger.error(
-          `Failed to send OTP email to ${this.maskEmail(email)}: ${result.error}`,
-        );
-        throw new Error(`Failed to send OTP email: ${result.error}`);
-      }
-
       this.logger.log(
-        `OTP email sent successfully to: ${this.maskEmail(email)}, messageId: ${result.messageId}`,
+        `OTP email queued successfully to: ${this.maskEmail(email)}, jobId: ${result.jobId}`,
       );
     } catch (error) {
       this.logger.error(
-        `Error sending OTP email to ${this.maskEmail(email)}:`,
+        `Error queuing OTP email to ${this.maskEmail(email)}:`,
         error,
       );
       throw error;

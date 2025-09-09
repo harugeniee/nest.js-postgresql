@@ -626,4 +626,93 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
     }
     return chunks;
   }
+
+  // ==================== QUEUE-BASED EMAIL METHODS ====================
+
+  /**
+   * Send single email via queue (asynchronous)
+   * @param mailOptions - Mail options
+   * @param priority - Job priority (1-10)
+   * @param delay - Delay in milliseconds before processing
+   * @returns Job ID for tracking
+   */
+  async sendMailQueue(
+    mailOptions: MailOptions,
+    priority: number = 5,
+    delay?: number,
+  ): Promise<{ jobId: string; message: string }> {
+    // This method would be implemented by injecting MailQueueService
+    // For now, we'll throw an error to indicate it needs to be implemented
+    throw new Error(
+      'Queue-based email sending requires MailQueueService injection',
+    );
+  }
+
+  /**
+   * Send batch email via queue (asynchronous)
+   * @param mailOptions - Mail options (without recipients)
+   * @param recipients - List of recipients
+   * @param priority - Job priority (1-10)
+   * @param delay - Delay in milliseconds before processing
+   * @returns Job ID for tracking
+   */
+  async sendMailBatchQueue(
+    mailOptions: Omit<MailOptions, 'to'>,
+    recipients: MailAddress[],
+    priority: number = 5,
+    delay?: number,
+  ): Promise<{ jobId: string; message: string }> {
+    // This method would be implemented by injecting MailQueueService
+    throw new Error(
+      'Queue-based batch email sending requires MailQueueService injection',
+    );
+  }
+
+  /**
+   * Send template email via queue (asynchronous)
+   * @param templateName - Template name
+   * @param recipients - Recipients
+   * @param templateData - Template data
+   * @param options - Additional mail options
+   * @param priority - Job priority (1-10)
+   * @param delay - Delay in milliseconds before processing
+   * @returns Job ID for tracking
+   */
+  async sendTemplateMailQueue(
+    templateName: string,
+    recipients: MailAddress | MailAddress[],
+    templateData: Record<string, unknown> = {},
+    options: Partial<MailOptions> = {},
+    priority: number = 5,
+    delay?: number,
+  ): Promise<{ jobId: string; message: string }> {
+    // This method would be implemented by injecting MailQueueService
+    throw new Error(
+      'Queue-based template email sending requires MailQueueService injection',
+    );
+  }
+
+  /**
+   * Send OTP email via queue (asynchronous)
+   * @param email - Recipient email
+   * @param otpCode - OTP code
+   * @param requestId - Request ID
+   * @param templateData - Additional template data
+   * @param priority - Job priority (1-10)
+   * @param delay - Delay in milliseconds before processing
+   * @returns Job ID for tracking
+   */
+  async sendOtpEmailQueue(
+    email: string,
+    otpCode: string,
+    requestId: string,
+    templateData: Record<string, unknown> = {},
+    priority: number = 8, // Higher priority for OTP emails
+    delay?: number,
+  ): Promise<{ jobId: string; message: string }> {
+    // This method would be implemented by injecting MailQueueService
+    throw new Error(
+      'Queue-based OTP email sending requires MailQueueService injection',
+    );
+  }
 }
