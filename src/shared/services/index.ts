@@ -5,3 +5,6 @@ export * from './cache/cache.service';
 export * from './cache/cache.module';
 export * from './rabbitmq/rabbitmq.service';
 export * from './rabbitmq/rabbitmq.module';
+export * from './mail/mail.service';
+export * from './mail/mail.module';
+export * from './mail/mail.interface';

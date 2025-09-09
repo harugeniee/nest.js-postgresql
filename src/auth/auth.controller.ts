@@ -2,6 +2,7 @@ import { Auth, ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { CreateDeviceTokenDto, LoginDto, RegisterDto } from 'src/users/dto';
 import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
+import { OtpRequestDto, OtpVerifyDto } from './dto';
 
 import {
   Body,
@@ -21,6 +22,10 @@ import { AuthService } from './auth.service';
 import { JwtAccessTokenGuard } from './guard/jwt-access-token.guard';
 import { JwtRefreshTokenGuard } from './guard/jwt-refresh-token.guard';
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
+import {
+  CustomRateLimit,
+  RateLimit,
+} from 'src/rate-limit/rate-limit.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -119,5 +124,21 @@ export class AuthController {
   @Auth()
   async getSessionById(@Param('id') id: string) {
     return this.authService.getSessionById(id);
+  }
+
+  @Post('otp/request')
+  @HttpCode(HttpStatus.OK)
+  @CustomRateLimit(3, 15 * 60)
+  async requestOtp(@Body() otpRequestDto: OtpRequestDto) {
+    return this.authService.requestOtp(otpRequestDto);
+  }
+
+  @Post('otp/verify')
+  @HttpCode(HttpStatus.OK)
+  async verifyOtp(
+    @Body() otpVerifyDto: OtpVerifyDto,
+    @ClientInfo() clientInfo: ClientInfo,
+  ) {
+    return this.authService.verifyOtp(otpVerifyDto, clientInfo);
   }
 }

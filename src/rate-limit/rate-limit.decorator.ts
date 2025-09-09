@@ -91,7 +91,7 @@ export const UsePlan = (planName: string) =>
 /**
  * Decorator to set custom rate limits for a route
  *
- * @param limit Requests per minute
+ * @param limit Requests per ttl
  * @param ttl Time to live in seconds
  * @returns Method decorator
  *
