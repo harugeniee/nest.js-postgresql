@@ -89,6 +89,7 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
         welcome: templates.welcomeTemplate,
         'password-reset': templates.passwordResetTemplate,
         notification: templates.notificationTemplate,
+        'otp-login': templates.otpLoginTemplate,
       };
 
       for (const [templateName, templateFunction] of Object.entries(
