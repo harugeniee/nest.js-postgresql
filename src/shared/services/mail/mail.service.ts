@@ -596,10 +596,31 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
   /**
    * Convert HTML to text
    * Fixes double-unescaping vulnerability by using a single-pass approach
+   * Fixes incomplete multi-character sanitization by using multi-pass tag removal
    */
   private htmlToText(html: string): string {
-    // First remove HTML tags
-    let text = html.replace(/<[^>]*>/g, '');
+    // Remove HTML tags using multi-pass approach to handle nested/malformed tags
+    // First, remove script and style tags completely (including their content)
+    let text = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+
+    // Add spaces around block-level elements to preserve natural spacing
+    text = text.replace(
+      /<(div|p|h[1-6]|li|br|hr|blockquote|pre|table|tr|td|th)\b[^>]*>/gi,
+      ' ',
+    );
+    text = text.replace(
+      /<\/(div|p|h[1-6]|li|br|hr|blockquote|pre|table|tr|td|th)>/gi,
+      ' ',
+    );
+
+    // Then remove all remaining HTML tags
+    let previousText;
+    do {
+      previousText = text;
+      text = text.replace(/<[^>]*>/g, '');
+    } while (text !== previousText);
 
     // Handle HTML entities in a single pass to avoid double-unescaping
     // Use a more comprehensive approach that handles all common entities
@@ -627,7 +648,7 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
       return String.fromCharCode(parseInt(hex, 16));
     });
 
-    // Clean up whitespace
+    // Clean up whitespace - preserve single spaces but normalize multiple spaces
     return text.replace(/\s+/g, ' ').trim();
   }
 
