@@ -90,3 +90,10 @@ export function getOtpRemainingTime(
   const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
   return remaining;
 }
+
+/**
+ * Generate unique job ID
+ */
+export function generateJobId(): string {
+  return globalSnowflake.nextId().toString();
+}

@@ -177,7 +177,7 @@ export class WorkerService {
           },
         },
       );
-
+      console.log(result);
       const processingTime = Date.now() - startTime;
       this.logger.log(
         `OTP email job completed: ${jobData.jobId}, success: ${result.success}`,

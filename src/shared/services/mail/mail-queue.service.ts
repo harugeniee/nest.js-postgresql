@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RabbitMQService } from '../rabbitmq/rabbitmq.service';
+import { RabbitMQService } from 'src/shared/services';
 import { JOB_NAME } from 'src/shared/constants';
-import { maskEmail } from 'src/common/utils';
+import { maskEmail, generateJobId } from 'src/common/utils';
 import {
   MailQueueJob,
   MailQueueJobType,
@@ -31,15 +31,6 @@ export class MailQueueService {
   constructor(private readonly rabbitMQService: RabbitMQService) {}
 
   /**
-   * Generate unique job ID
-   */
-  private generateJobId(): string {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 8);
-    return `mail_${timestamp}_${random}`;
-  }
-
-  /**
    * Send single email job to queue
    */
   async sendSingleEmail(
@@ -47,7 +38,7 @@ export class MailQueueService {
     priority: number = this.config.defaultPriority,
     delay?: number,
   ): Promise<string> {
-    const jobId = this.generateJobId();
+    const jobId = generateJobId();
     const job: SingleEmailQueueJob = {
       jobId,
       type: MailQueueJobType.SINGLE_EMAIL,
@@ -81,7 +72,7 @@ export class MailQueueService {
     priority: number = this.config.defaultPriority,
     delay?: number,
   ): Promise<string> {
-    const jobId = this.generateJobId();
+    const jobId = generateJobId();
     const job: BatchEmailQueueJob = {
       jobId,
       type: MailQueueJobType.BATCH_EMAIL,
@@ -120,7 +111,7 @@ export class MailQueueService {
     priority: number = this.config.defaultPriority,
     delay?: number,
   ): Promise<string> {
-    const jobId = this.generateJobId();
+    const jobId = generateJobId();
     const job: TemplateEmailQueueJob = {
       jobId,
       type: MailQueueJobType.TEMPLATE_EMAIL,
@@ -161,7 +152,7 @@ export class MailQueueService {
     priority: number = this.config.defaultPriority,
     delay?: number,
   ): Promise<string> {
-    const jobId = this.generateJobId();
+    const jobId = generateJobId();
     const job: OtpEmailQueueJob = {
       jobId,
       type: MailQueueJobType.OTP_EMAIL,
@@ -242,7 +233,7 @@ export class MailQueueService {
               );
               break;
             default:
-              throw new Error(`Unknown job type: ${(job as any).type}`);
+              throw new Error(`Unknown job type: ${(job as any)?.type}`);
           }
           return jobId;
         } catch (error) {

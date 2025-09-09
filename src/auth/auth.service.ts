@@ -403,7 +403,8 @@ export class AuthService {
           throw new HttpException(
             {
               messageKey: 'auth.OTP_UPDATE_FAILED',
-              details: 'Failed to update OTP attempts. Please request a new one.',
+              details:
+                'Failed to update OTP attempts. Please request a new one.',
             },
             HttpStatus.UNAUTHORIZED,
           );

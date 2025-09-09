@@ -59,6 +59,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   onModuleDestroy(): void {
     void this.redis.quit();
+    void this.clearCache();
   }
 
   /**

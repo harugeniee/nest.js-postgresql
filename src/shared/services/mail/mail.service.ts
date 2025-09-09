@@ -135,9 +135,16 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
       // Check rate limiting
       const rateLimitCheck = await this.checkRateLimit(options.to);
       if (!rateLimitCheck.allowed) {
+        // Calculate remaining seconds until reset
+        const currentTime = Math.floor(Date.now() / 1000);
+        const remainingSeconds = Math.max(
+          0,
+          rateLimitCheck.resetTime - currentTime,
+        );
+
         return {
           success: false,
-          error: `Rate limit exceeded. Try again in ${rateLimitCheck.resetTime} seconds`,
+          error: `Rate limit exceeded. Try again in ${remainingSeconds} seconds`,
         };
       }
 
@@ -502,7 +509,7 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
         : [typeof recipients === 'string' ? recipients : recipients.email];
 
       const rateLimitKey = `mail:rate_limit:${recipientEmails[0]}`;
-      const limit = 10; // 10 emails per hour
+      const limit = 1; // 10 emails per hour
       const window = 3600; // 1 hour in seconds
 
       const result = await this.cacheService.atomicIncrementWithLimit(
