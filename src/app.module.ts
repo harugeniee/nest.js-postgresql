@@ -27,7 +27,7 @@ import {
   redisConfig,
 } from './shared/config';
 import { configValidationSchema } from './shared/config/schema';
-import { CacheModule, RabbitmqModule } from './shared/services';
+import { CacheModule, RabbitmqModule, MailModule } from './shared/services';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
@@ -81,6 +81,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
     CacheModule,
     WorkerModule,
     RabbitmqModule,
+    MailModule,
     FilesModule,
     AuthModule,
     QrModule,

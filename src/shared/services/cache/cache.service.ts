@@ -51,6 +51,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   onModuleInit(): void {
     this.setupRedisEventListeners();
+    void this.reset();
   }
 
   /**
@@ -59,6 +60,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   onModuleDestroy(): void {
     void this.redis.quit();
+    void this.clearCache();
   }
 
   /**
@@ -127,8 +129,15 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Get Redis server information and statistics
-   * @returns {Promise<string>} Redis server information string
-   * @throws {Error} When Redis info command fails
+   *
+   * @returns {Promise<string>} Redis server information string returned by the `INFO` command.
+   * The string contains multiple sections and key/value pairs describing the server status.
+   *
+   * @throws {Error} When Redis `INFO` command fails or the client connection is not available.
+   *
+   * @example
+   * const info = await cacheService.getRedisInfo();
+   * // Use the info string for diagnostics or logging
    */
   async getRedisInfo(): Promise<string> {
     try {
@@ -142,10 +151,17 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Clear all cache entries from Redis (use with caution in production)
-   * Removes all keys from all databases
-   * @returns {Promise<void>}
-   * @throws {Error} When Redis flushall command fails
+   * Clear all cache entries from all Redis databases.
+   *
+   * @remarks
+   * This uses `FLUSHALL` which removes keys across all databases in the current Redis instance.
+   * It is destructive and should be used with extreme caution in production environments.
+   *
+   * @returns {Promise<void>} Resolves when the operation completes.
+   * @throws {Error} When Redis `FLUSHALL` command fails.
+   *
+   * @example
+   * await cacheService.clearCache();
    */
   async clearCache(): Promise<void> {
     try {
@@ -158,10 +174,17 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Get Time-To-Live (TTL) for a specific cache key
-   * @param {string} key - The cache key to check TTL for
-   * @returns {Promise<number>} TTL in seconds, -1 if key has no TTL, -2 if key doesn't exist
-   * @throws {Error} When Redis TTL command fails
+   * Get Time-To-Live (TTL) for a specific cache key.
+   *
+   * @param {string} key - The cache key to check TTL for.
+   * @returns {Promise<number>} Number of seconds until expiration.
+   * Returns `-1` if the key exists but has no associated expiration.
+   * Returns `-2` if the key does not exist.
+   *
+   * @throws {Error} When Redis `TTL` command fails.
+   *
+   * @example
+   * const ttl = await cacheService.getTtl('user:123');
    */
   async getTtl(key: string): Promise<number> {
     try {
@@ -173,12 +196,18 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Set cache with key and value, optionally with TTL
-   * @param {string} key - The cache key to store the value under
-   * @param {unknown} value - The value to cache (will be JSON serialized)
-   * @param {number} [ttlInSec] - Optional TTL in seconds. If not provided, uses default TTL. If negative, no TTL is set
-   * @returns {Promise<void>}
-   * @throws {Error} When Redis set/setex command fails
+   * Set a cache entry with optional TTL.
+   *
+   * @param {string} key - Cache key to store the value under.
+   * @param {unknown} value - Value to cache. It will be JSON serialized.
+   * @param {number} [ttlInSec] - Optional TTL in seconds. If omitted, defaults to the service default TTL.
+   * If a negative value is provided, the key will be set without expiration.
+   *
+   * @returns {Promise<void>} Resolves when the value is stored.
+   * @throws {Error} When Redis `SET`/`SETEX` operation fails.
+   *
+   * @example
+   * await cacheService.set('user:123', { id: 123, name: 'Alice' }, 600);
    */
   async set(key: string, value: unknown, ttlInSec?: number): Promise<void> {
     try {
@@ -199,11 +228,17 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Get cache value by key
-   * @template T - The expected type of the cached value
-   * @param {string} key - The cache key to retrieve
-   * @returns {Promise<T | null>} The cached value if found, null if not found
-   * @throws {Error} When Redis get command fails
+   * Get a cache entry by key.
+   *
+   * @template T - Expected type of the cached value after deserialization.
+   * @param {string} key - Cache key to retrieve.
+   * @returns {Promise<T | null>} The parsed value if key exists, otherwise `null`.
+   * If the stored value is not valid JSON, the raw string is returned as type `T`.
+   *
+   * @throws {Error} When Redis `GET` command fails.
+   *
+   * @example
+   * const user = await cacheService.get<User>('user:123');
    */
   async get<T>(key: string): Promise<T | null> {
     try {
@@ -228,10 +263,14 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Delete cache entry by key
-   * @param {string} key - The cache key to delete
-   * @returns {Promise<void>}
-   * @throws {Error} When Redis del command fails
+   * Delete a cache entry by key.
+   *
+   * @param {string} key - Cache key to delete.
+   * @returns {Promise<void>} Resolves even if the key did not exist.
+   * @throws {Error} When Redis `DEL` command fails.
+   *
+   * @example
+   * await cacheService.delete('user:123');
    */
   async delete(key: string): Promise<void> {
     try {
@@ -244,10 +283,14 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Check if a cache key exists
-   * @param {string} key - The cache key to check
-   * @returns {Promise<boolean>} True if key exists, false otherwise
-   * @throws {Error} When Redis exists command fails
+   * Check existence of a cache key.
+   *
+   * @param {string} key - Cache key to check.
+   * @returns {Promise<boolean>} `true` if the key exists, otherwise `false`.
+   * @throws {Error} When Redis `EXISTS` command fails.
+   *
+   * @example
+   * const present = await cacheService.exists('user:123');
    */
   async exists(key: string): Promise<boolean> {
     try {
@@ -260,12 +303,16 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Set cache with prefix for better key organization
-   * @param {string} prefix - The prefix to prepend to the key
-   * @param {string} key - The cache key (will be combined with prefix)
-   * @param {unknown} value - The value to cache
-   * @param {number} [ttl] - Optional TTL in seconds
-   * @returns {Promise<void>}
+   * Set a cache entry using a namespaced prefix.
+   *
+   * @param {string} prefix - Prefix to prepend to the key (e.g., `user`).
+   * @param {string} key - Key segment (e.g., `123`). The full key becomes `prefix:key`.
+   * @param {unknown} value - Value to cache. It will be JSON serialized.
+   * @param {number} [ttl] - Optional TTL in seconds.
+   * @returns {Promise<void>} Resolves when the value is stored.
+   *
+   * @example
+   * await cacheService.setWithPrefix('user', '123', { id: 123 });
    */
   async setWithPrefix(
     prefix: string,
@@ -278,11 +325,15 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Get cache with prefix
-   * @template T - The expected type of the cached value
-   * @param {string} prefix - The prefix used when setting the cache
-   * @param {string} key - The cache key (will be combined with prefix)
-   * @returns {Promise<T | null>} The cached value if found, null if not found
+   * Get a cache entry using a namespaced prefix.
+   *
+   * @template T - Expected type of the cached value after deserialization.
+   * @param {string} prefix - Prefix used when setting the cache.
+   * @param {string} key - Key segment to combine with the prefix.
+   * @returns {Promise<T | null>} The parsed value if present, otherwise `null`.
+   *
+   * @example
+   * const user = await cacheService.getWithPrefix<User>('user', '123');
    */
   async getWithPrefix<T>(prefix: string, key: string): Promise<T | null> {
     const fullKey = `${prefix}:${key}`;
@@ -290,10 +341,14 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Delete cache with prefix
-   * @param {string} prefix - The prefix used when setting the cache
-   * @param {string} key - The cache key (will be combined with prefix)
-   * @returns {Promise<void>}
+   * Delete a cache entry using a namespaced prefix.
+   *
+   * @param {string} prefix - Prefix used when setting the cache.
+   * @param {string} key - Key segment to combine with the prefix.
+   * @returns {Promise<void>} Resolves even if the key did not exist.
+   *
+   * @example
+   * await cacheService.deleteWithPrefix('user', '123');
    */
   async deleteWithPrefix(prefix: string, key: string): Promise<void> {
     const fullKey = `${prefix}:${key}`;
@@ -301,12 +356,18 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Clear cache by pattern using SCAN (safe for production)
-   * Uses Redis SCAN command to safely iterate through keys matching a pattern
-   * @param {string} pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*', '*:profile')
-   * @param {number} [count=100] - Number of keys to scan per iteration (higher values = faster but more memory usage)
-   * @returns {Promise<number>} Total number of keys deleted
-   * @throws {Error} When Redis scan or del commands fail
+   * Delete keys by pattern using `SCAN` + `DEL` (safe for production).
+   *
+   * @remarks
+   * Uses incremental iteration with `SCAN` to avoid blocking Redis. Deletion is blocking per batch.
+   *
+   * @param {string} pattern - Redis glob-style pattern (e.g., `user:*`, `*:profile`).
+   * @param {number} [count=100] - Approximate number of keys to scan per iteration.
+   * @returns {Promise<number>} Total number of keys deleted.
+   * @throws {Error} When `SCAN` or `DEL` commands fail.
+   *
+   * @example
+   * const deleted = await cacheService.deleteKeysByPattern('user:*', 500);
    */
   async deleteKeysByPattern(pattern: string, count = 100): Promise<number> {
     try {
@@ -344,12 +405,15 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Delete keys by pattern using SCAN with UNLINK (non-blocking, Redis 4.0+)
-   * Uses Redis UNLINK command for non-blocking deletion, better for production environments
-   * @param {string} pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*', '*:profile')
-   * @param {number} [count=100] - Number of keys to scan per iteration
-   * @returns {Promise<number>} Total number of keys unlinked
-   * @throws {Error} When Redis scan or unlink commands fail
+   * Delete keys by pattern using `SCAN` + `UNLINK` (non-blocking delete).
+   *
+   * @remarks
+   * `UNLINK` asynchronously frees memory and is preferred in production for large deletions.
+   *
+   * @param {string} pattern - Redis glob-style pattern (e.g., `user:*`).
+   * @param {number} [count=100] - Approximate number of keys to scan per iteration.
+   * @returns {Promise<number>} Total number of keys scheduled for unlink (unlinked count).
+   * @throws {Error} When `SCAN` or `UNLINK` commands fail.
    */
   async deleteKeysByPatternAsync(
     pattern: string,
@@ -390,12 +454,15 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Find keys by pattern using SCAN (safe for production)
-   * Returns all keys matching the pattern without deleting them
-   * @param {string} pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*', '*:profile')
-   * @param {number} [count=100] - Number of keys to scan per iteration
-   * @returns {Promise<string[]>} Array of keys matching the pattern
-   * @throws {Error} When Redis scan command fails
+   * Find keys by pattern using `SCAN` (safe for production).
+   *
+   * @param {string} pattern - Redis glob-style pattern.
+   * @param {number} [count=100] - Approximate number of keys to scan per iteration.
+   * @returns {Promise<string[]>} All keys that match the pattern.
+   * @throws {Error} When Redis `SCAN` command fails.
+   *
+   * @example
+   * const keys = await cacheService.findKeysByPattern('user:*');
    */
   async findKeysByPattern(pattern: string, count = 100): Promise<string[]> {
     try {
@@ -427,12 +494,12 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Count keys by pattern using SCAN (safe for production)
-   * Returns the total count of keys matching the pattern without retrieving them
-   * @param {string} pattern - Redis pattern (e.g., 'ABC:NBN:12*', 'user:*', '*:profile')
-   * @param {number} [count=100] - Number of keys to scan per iteration
-   * @returns {Promise<number>} Total count of keys matching the pattern
-   * @throws {Error} When Redis scan command fails
+   * Count keys by pattern using `SCAN` (safe for production).
+   *
+   * @param {string} pattern - Redis glob-style pattern.
+   * @param {number} [count=100] - Approximate number of keys to scan per iteration.
+   * @returns {Promise<number>} Total count of keys matching the pattern.
+   * @throws {Error} When Redis `SCAN` command fails.
    */
   async countKeysByPattern(pattern: string, count = 100): Promise<number> {
     try {
@@ -464,12 +531,16 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Delete multiple keys by multiple patterns
-   * Processes each pattern sequentially and returns results for each
-   * @param {string[]} patterns - Array of Redis patterns to match
-   * @param {number} [count=100] - Number of keys to scan per iteration for each pattern
-   * @returns {Promise<Record<string, number>>} Object mapping each pattern to the number of keys deleted
-   * @throws {Error} When any Redis operation fails
+   * Delete multiple sets of keys given multiple patterns.
+   *
+   * @param {string[]} patterns - Array of Redis patterns to match.
+   * @param {number} [count=100] - Approximate number of keys to scan per iteration for each pattern.
+   * @returns {Promise<Record<string, number>>} Map from pattern to number of deleted keys.
+   * @throws {Error} When any underlying Redis operation fails.
+   *
+   * @example
+   * const result = await cacheService.deleteKeysByPatterns(['user:*', 'post:*']);
+   * // result = { 'user:*': 120, 'post:*': 42 }
    */
   async deleteKeysByPatterns(
     patterns: string[],
@@ -492,32 +563,32 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Delete keys by prefix (convenience method)
-   * Shorthand for deleting keys that start with a specific prefix
-   * @param {string} prefix - Key prefix (e.g., 'ABC:NBN:12')
-   * @param {number} [count=100] - Number of keys to scan per iteration
-   * @returns {Promise<number>} Total number of keys deleted
+   * Delete keys by prefix (convenience).
+   *
+   * @param {string} prefix - Key prefix (e.g., `user:` or `ABC:NBN:12`).
+   * @param {number} [count=100] - Approximate number of keys to scan per iteration.
+   * @returns {Promise<number>} Total number of keys deleted.
    */
   async deleteKeysByPrefix(prefix: string, count = 100): Promise<number> {
     return this.deleteKeysByPattern(`${prefix}*`, count);
   }
 
   /**
-   * Delete keys by suffix (convenience method)
-   * Shorthand for deleting keys that end with a specific suffix
-   * @param {string} suffix - Key suffix (e.g., ':123')
-   * @param {number} [count=100] - Number of keys to scan per iteration
-   * @returns {Promise<number>} Total number of keys deleted
+   * Delete keys by suffix (convenience).
+   *
+   * @param {string} suffix - Key suffix (e.g., `:123`).
+   * @param {number} [count=100] - Approximate number of keys to scan per iteration.
+   * @returns {Promise<number>} Total number of keys deleted.
    */
   async deleteKeysBySuffix(suffix: string, count = 100): Promise<number> {
     return this.deleteKeysByPattern(`*${suffix}`, count);
   }
 
   /**
-   * Reset all cache entries
-   * Removes all keys from all databases (use with extreme caution in production)
-   * @returns {Promise<void>}
-   * @throws {Error} When Redis flushall command fails
+   * Reset the Redis instance by removing all keys from all databases.
+   *
+   * @returns {Promise<void>} Resolves when the operation completes.
+   * @throws {Error} When Redis `FLUSHALL` command fails.
    */
   async reset(): Promise<void> {
     try {
@@ -530,12 +601,19 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Set distributed lock with TTL
-   * Implements a simple distributed locking mechanism using Redis
-   * @param {string} identifier - Unique identifier for the lock
-   * @param {number} ttl - Lock TTL in seconds (lock will auto-expire after this time)
-   * @returns {Promise<boolean>} True if lock was acquired, false if already locked
-   * @throws {Error} When Redis operations fail
+   * Acquire a simple distributed lock with TTL.
+   *
+   * @remarks
+   * This implementation is a basic best-effort lock using a single key with `SETEX`.
+   * It does not implement fencing tokens or unique ownership checks. Use Redlock for stronger guarantees.
+   *
+   * @param {string} identifier - Unique lock identifier.
+   * @param {number} ttl - Lock TTL in seconds.
+   * @returns {Promise<boolean>} `true` if the lock was acquired, `false` if the lock already exists.
+   * @throws {Error} When Redis operations fail.
+   *
+   * @example
+   * const acquired = await cacheService.setLock('job:sync', 30);
    */
   async setLock(identifier: string, ttl: number): Promise<boolean> {
     try {
@@ -554,11 +632,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Release distributed lock
-   * Removes the lock, allowing other processes to acquire it
-   * @param {string} identifier - Unique identifier for the lock to release
-   * @returns {Promise<void>}
-   * @throws {Error} When Redis del command fails
+   * Release a previously acquired distributed lock.
+   *
+   * @param {string} identifier - Unique identifier for the lock to release.
+   * @returns {Promise<void>} Resolves whether or not the lock existed.
+   * @throws {Error} When Redis `DEL` command fails.
    */
   async releaseLock(identifier: string): Promise<void> {
     try {
@@ -572,13 +650,16 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Remember pattern (Cache-Aside pattern)
-   * Gets value from cache if exists, otherwise calls factory function and caches the result
-   * @template T - The type of value to cache
-   * @param {string} key - Cache key to store/retrieve the value
-   * @param {() => Promise<T>} factory - Function to generate value if not cached
-   * @param {number} [ttlInSec] - Optional TTL override for the cached value
-   * @returns {Promise<T | null>} The cached or generated value, null if factory fails
+   * Cache-aside helper that returns the cached value or computes and stores it.
+   *
+   * @template T - Type of the value to return and cache.
+   * @param {string} key - Cache key to store/retrieve the value.
+   * @param {() => Promise<T>} factory - Async function to compute the value when cache miss occurs.
+   * @param {number} [ttlInSec] - Optional TTL for the cached value; falls back to default TTL when omitted.
+   * @returns {Promise<T | null>} Cached or freshly computed value. Returns `null` if the factory throws or returns `null`/`undefined`.
+   *
+   * @example
+   * const data = await cacheService.remember('config', loadConfig, 300);
    */
   async remember<T>(
     key: string,
@@ -603,14 +684,17 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Get or Set cache with prefix (Cache-Aside pattern with prefix)
-   * Combines prefix functionality with remember pattern
-   * @template T - The type of value to cache
-   * @param {string} prefix - Key prefix for organizing cache keys
-   * @param {string} key - Cache key (will be combined with prefix)
-   * @param {() => Promise<T>} factory - Function to generate value if not cached
-   * @param {number} [ttl] - Optional TTL for the cached value
-   * @returns {Promise<T | null>} The cached or generated value, null if factory fails
+   * Cache-aside with namespacing using a prefix.
+   *
+   * @template T - Type of the value to return and cache.
+   * @param {string} prefix - Key prefix for organizing cache keys.
+   * @param {string} key - Cache key segment to combine with the prefix.
+   * @param {() => Promise<T>} factory - Async function to compute the value when cache miss occurs.
+   * @param {number} [ttl] - Optional TTL for the cached value.
+   * @returns {Promise<T | null>} Cached or freshly computed value, or `null` if factory fails.
+   *
+   * @example
+   * const profile = await cacheService.getOrSetWithPrefix('user', '123', () => fetchUser(123), 600);
    */
   async getOrSetWithPrefix<T>(
     prefix: string,
@@ -623,23 +707,29 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Get Redis client instance
-   * Provides access to the underlying Redis client for advanced operations
-   * @returns {Redis} The Redis client instance
+   * Get the underlying Redis client instance.
+   *
+   * @returns {Redis} Connected Redis client for advanced or custom operations.
    */
   getRedisClient(): Redis {
     return this.redis;
   }
 
   /**
-   * Atomic increment with rate limiting using Lua script
-   * Prevents race conditions when multiple requests try to increment the same key
-   * Implements sliding window rate limiting
-   * @param {string} key - The key to track increments for
-   * @param {number} limit - Maximum number of increments allowed in the time window
-   * @param {number} windowInSeconds - Time window in seconds for rate limiting
-   * @returns {Promise<{current: number, remaining: number, resetTime: number}>} Rate limit status
-   * @throws {Error} When Redis eval command fails
+   * Atomic increment with sliding window rate limiting using a Lua script.
+   *
+   * @param {string} key - Counter key used to track increments.
+   * @param {number} limit - Maximum number of increments allowed within the window.
+   * @param {number} windowInSeconds - Sliding window size in seconds.
+   * @returns {Promise<{ current: number; remaining: number; resetTime: number }>} Object with:
+   * - `current`: current number of increments in the active window
+   * - `remaining`: how many increments remain before hitting the limit
+   * - `resetTime`: UNIX timestamp (seconds) when the window resets
+   *
+   * @throws {Error} When Lua evaluation fails.
+   *
+   * @example
+   * const { current, remaining, resetTime } = await cacheService.atomicIncrementWithLimit('login:ip:1.2.3.4', 5, 60);
    */
   async atomicIncrementWithLimit(
     key: string,
@@ -703,14 +793,17 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Atomic compare and swap using Lua script
-   * Updates a value only if it matches the expected value (optimistic locking)
-   * @param {string} key - The key to update
-   * @param {unknown} expectedValue - The expected current value (null means key shouldn't exist)
-   * @param {unknown} newValue - The new value to set
-   * @param {number} [ttl] - Optional TTL for the key
-   * @returns {Promise<boolean>} True if update was successful, false if values didn't match
-   * @throws {Error} When Redis eval command fails
+   * Atomic compare-and-swap (CAS) operation using a Lua script.
+   *
+   * @param {string} key - Key to update.
+   * @param {unknown} expectedValue - Expected current value. Use `null` to indicate that the key must not exist.
+   * @param {unknown} newValue - New value to set when the expected value matches. Will be JSON serialized.
+   * @param {number} [ttl] - Optional TTL for the key; if omitted or `<= 0`, no expiration is set.
+   * @returns {Promise<boolean>} `true` if the value was set, `false` when the expected value did not match.
+   * @throws {Error} When Lua evaluation fails.
+   *
+   * @example
+   * const updated = await cacheService.compareAndSwap('config:version', '1', '2', 300);
    */
   async compareAndSwap(
     key: string,
@@ -777,11 +870,19 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Atomic multi-key operation using Lua script
-   * Performs multiple operations atomically in a single Redis transaction
-   * @param {Array<{type: 'set' | 'delete' | 'increment', key: string, value?: unknown, ttl?: number}>} operations - Array of operations to perform
-   * @returns {Promise<boolean>} True if all operations completed successfully
-   * @throws {Error} When Redis eval command fails
+   * Atomically perform multiple operations using a Lua script.
+   *
+   * @param {Array<{type: 'set' | 'delete' | 'increment', key: string, value?: unknown, ttl?: number}>} operations
+   * Array of operations to perform. For `set`, `value` is JSON-stringified and `ttl` is optional.
+   * @returns {Promise<boolean>} `true` if the script executed and returned a non-null response.
+   * @throws {Error} When Lua evaluation fails.
+   *
+   * @example
+   * await cacheService.atomicMultiOperation([
+   *   { type: 'set', key: 'a', value: { x: 1 }, ttl: 60 },
+   *   { type: 'increment', key: 'b' },
+   *   { type: 'delete', key: 'c' },
+   * ]);
    */
   async atomicMultiOperation(
     operations: {
