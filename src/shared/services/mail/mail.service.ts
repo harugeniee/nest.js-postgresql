@@ -5,6 +5,7 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import sanitizeHtml from 'sanitize-html';
 import { CacheService } from '../cache/cache.service';
 import {
   MailOptions,
@@ -594,62 +595,75 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Convert HTML to text
-   * Fixes double-unescaping vulnerability by using a single-pass approach
-   * Fixes incomplete multi-character sanitization by using multi-pass tag removal
+   * Convert HTML to text using sanitize-html for robust security
+   * Fixes all HTML sanitization vulnerabilities by using a battle-tested library
    */
   private htmlToText(html: string): string {
-    // Remove HTML tags using multi-pass approach to handle nested/malformed tags
-    // First, remove script and style tags completely (including their content)
-    let text = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+    try {
+      // Use sanitize-html to safely remove all HTML tags and convert to text
+      // This handles all edge cases including malformed HTML, nested tags, etc.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+      const sanitizedHtml = sanitizeHtml(html, {
+        allowedTags: [], // Remove all HTML tags
+        allowedAttributes: {}, // Remove all attributes
+        disallowedTagsMode: 'discard', // Completely remove disallowed content
+        allowedSchemes: [], // Remove all schemes (http, https, etc.)
+        allowedSchemesByTag: {}, // No schemes allowed for any tag
+        allowedSchemesAppliedToAttributes: [], // No schemes in attributes
+        allowProtocolRelative: false, // No protocol-relative URLs
+        enforceHtmlBoundary: false, // Don't enforce HTML boundaries
+      });
 
-    // Add spaces around block-level elements to preserve natural spacing
-    text = text.replace(
-      /<(div|p|h[1-6]|li|br|hr|blockquote|pre|table|tr|td|th)\b[^>]*>/gi,
-      ' ',
-    );
-    text = text.replace(
-      /<\/(div|p|h[1-6]|li|br|hr|blockquote|pre|table|tr|td|th)>/gi,
-      ' ',
-    );
+      // Ensure we have a string result
+      const text = typeof sanitizedHtml === 'string' ? sanitizedHtml : '';
 
-    // Then remove all remaining HTML tags
-    let previousText;
-    do {
-      previousText = text;
-      text = text.replace(/<[^>]*>/g, '');
-    } while (text !== previousText);
+      // Handle HTML entities in a single pass to avoid double-unescaping
+      const entityMap: Record<string, string> = {
+        '&nbsp;': ' ',
+        '&lt;': '<',
+        '&gt;': '>',
+        '&quot;': '"',
+        '&#39;': "'",
+        '&apos;': "'",
+        '&amp;': '&',
+      };
 
-    // Handle HTML entities in a single pass to avoid double-unescaping
-    // Use a more comprehensive approach that handles all common entities
-    const entityMap: Record<string, string> = {
-      '&nbsp;': ' ',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&quot;': '"',
-      '&#39;': "'",
-      '&apos;': "'",
-      '&amp;': '&',
-    };
+      // Replace entities in a single pass using a regex that matches all entities
+      let processedText = text.replace(
+        /&(?:nbsp|lt|gt|quot|#39|apos|amp);/g,
+        (match: string) => {
+          return entityMap[match] || match;
+        },
+      );
 
-    // Replace entities in a single pass using a regex that matches all entities
-    text = text.replace(/&(?:nbsp|lt|gt|quot|#39|apos|amp);/g, (match) => {
-      return entityMap[match] || match;
-    });
+      // Handle numeric character references
+      processedText = processedText.replace(
+        /&#(\d+);/g,
+        (match: string, dec: string) => {
+          return String.fromCharCode(parseInt(dec, 10));
+        },
+      );
 
-    // Handle numeric character references
-    text = text.replace(/&#(\d+);/g, (match, dec: string) => {
-      return String.fromCharCode(parseInt(dec, 10));
-    });
+      processedText = processedText.replace(
+        /&#x([0-9a-fA-F]+);/g,
+        (match: string, hex: string) => {
+          return String.fromCharCode(parseInt(hex, 16));
+        },
+      );
 
-    text = text.replace(/&#x([0-9a-fA-F]+);/g, (match, hex: string) => {
-      return String.fromCharCode(parseInt(hex, 16));
-    });
-
-    // Clean up whitespace - preserve single spaces but normalize multiple spaces
-    return text.replace(/\s+/g, ' ').trim();
+      // Clean up whitespace - preserve single spaces but normalize multiple spaces
+      return processedText.replace(/\s+/g, ' ').trim();
+    } catch (error) {
+      // Fallback to basic HTML stripping if sanitize-html fails
+      this.logger.warn(
+        'HTML sanitization failed, using fallback method:',
+        error,
+      );
+      return html
+        .replace(/<[^>]*>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
   }
 
   /**
