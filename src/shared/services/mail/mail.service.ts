@@ -659,10 +659,16 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
         'HTML sanitization failed, using fallback method:',
         error,
       );
-      return html
-        .replace(/<[^>]*>/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+
+      // Robustly strip all tags by repeatedly applying the regex until no changes remain
+      let safeText = html;
+      let previous;
+      do {
+        previous = safeText;
+        safeText = safeText.replace(/<[^>]*>/g, '');
+      } while (safeText !== previous);
+
+      return safeText.replace(/\s+/g, ' ').trim();
     }
   }
 
