@@ -1,17 +1,17 @@
 # Mail Queue Implementation
 
 ## Overview
-Tính năng gửi email thông qua queue sử dụng RabbitMQ để xử lý email bất đồng bộ, giúp cải thiện performance và reliability của hệ thống.
+Email sending feature through queue using RabbitMQ to handle asynchronous email processing, improving system performance and reliability.
 
 ## Architecture
 
 ### Components
 
-1. **MailQueueService** - Gửi mail jobs đến RabbitMQ
-2. **MailQueueIntegrationService** - Service tích hợp cho cả direct và queue-based sending
-3. **WorkerController** - Xử lý mail jobs từ RabbitMQ
-4. **WorkerService** - Logic xử lý mail jobs
-5. **MailerEmailOtpSender** - OTP sender sử dụng queue
+1. **MailQueueService** - Sends mail jobs to RabbitMQ
+2. **MailQueueIntegrationService** - Integration service for both direct and queue-based sending
+3. **WorkerController** - Processes mail jobs from RabbitMQ
+4. **WorkerService** - Logic for processing mail jobs
+5. **MailerEmailOtpSender** - OTP sender using queue
 
 ### Flow
 
@@ -111,42 +111,42 @@ async sendPasswordResetEmail(userEmail: string, resetToken: string) {
 
 ### 4. OTP Email via Queue (Automatic)
 
-OTP emails tự động sử dụng queue khi gọi `AuthService.requestOtp()`:
+OTP emails automatically use queue when calling `AuthService.requestOtp()`:
 
 ```typescript
 // OTP request automatically uses queue
 const result = await authService.requestOtp({ email: 'user@example.com' });
-// Email sẽ được gửi qua queue với priority cao
+// Email will be sent through queue with high priority
 ```
 
 ## Job Types
 
 ### 1. SingleEmailQueueJob
-- Gửi 1 email đơn lẻ
+- Sends a single email
 - Job name: `mail_single`
 
 ### 2. BatchEmailQueueJob
-- Gửi email hàng loạt
+- Sends batch emails
 - Job name: `mail_batch`
 
 ### 3. TemplateEmailQueueJob
-- Gửi email sử dụng template
+- Sends email using template
 - Job name: `mail_template`
 
 ### 4. OtpEmailQueueJob
-- Gửi OTP email (priority cao)
+- Sends OTP email (high priority)
 - Job name: `mail_otp`
 
 ## Error Handling
 
 ### Retry Logic
-- Mặc định: 3 lần retry
-- Delay: 5 giây giữa các lần retry
-- Nếu vượt quá max attempts, job sẽ bị reject
+- Default: 3 retry attempts
+- Delay: 5 seconds between retries
+- If max attempts exceeded, job will be rejected
 
 ### Dead Letter Queue
-- Jobs thất bại sẽ được chuyển đến dead letter queue
-- Có thể monitor và xử lý manual
+- Failed jobs will be moved to dead letter queue
+- Can be monitored and handled manually
 
 ## Monitoring
 
@@ -171,15 +171,15 @@ console.log(`Success rate: ${metrics.successRate}`);
 
 ## Performance Benefits
 
-1. **Non-blocking**: Email sending không block main thread
-2. **Scalable**: Có thể scale worker instances
-3. **Reliable**: Retry mechanism và error handling
-4. **Prioritized**: OTP emails có priority cao hơn
-5. **Batched**: Batch processing cho hiệu quả cao
+1. **Non-blocking**: Email sending does not block main thread
+2. **Scalable**: Can scale worker instances
+3. **Reliable**: Retry mechanism and error handling
+4. **Prioritized**: OTP emails have higher priority
+5. **Batched**: Batch processing for high efficiency
 
 ## Fallback to Direct Sending
 
-Nếu queue không available, có thể fallback về direct sending:
+If queue is not available, can fallback to direct sending:
 
 ```typescript
 // Direct sending (synchronous)
@@ -213,7 +213,7 @@ describe('OTP Email Queue', () => {
     });
     
     expect(result.data.requestId).toBeDefined();
-    // Email sẽ được xử lý bởi worker
+    // Email will be processed by worker
   });
 });
 ```
