@@ -75,11 +75,20 @@ export const configValidationSchema = Joi.object({
   // NAVER_AUTH_ACCESS_LINK: Joi.string().uri().optional(),
 
   // Mail configuration
-  // MAIL_HOST: Joi.string().hostname().optional(),
-  // MAIL_USER: Joi.string().email().optional(),
-  // MAIL_PASS: Joi.string().optional(),
-  // MAIL_FROM: Joi.string().email().optional(),
-  // MAIL_ADMIN: Joi.string().email().optional(),
+  MAIL_HOST: Joi.string().hostname().default('smtp.gmail.com'),
+  MAIL_PORT: Joi.number().port().default(587),
+  MAIL_SECURE: Joi.boolean().default(false),
+  MAIL_USER: Joi.string().email().required(),
+  MAIL_PASS: Joi.string().required(),
+  MAIL_FROM: Joi.string().email().required(),
+  MAIL_ADMIN: Joi.string().email().required(),
+  MAIL_SUPPORT: Joi.string().email().optional(),
+
+  // Mail template configuration
+  APP_NAME: Joi.string().default('NestJS App'),
+  APP_URL: Joi.string().uri().default('http://localhost:3000'),
+  COMPANY_NAME: Joi.string().default('Your Company'),
+  COMPANY_ADDRESS: Joi.string().default('Your Address'),
 
   // AWS configuration
   // AWS_BUCKET_NAME: Joi.string().optional(),
