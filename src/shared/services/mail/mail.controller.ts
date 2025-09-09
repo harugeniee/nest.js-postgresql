@@ -1,26 +1,27 @@
-import {
-  Controller,
-  Post,
-  Body,
-  Get,
-  HttpCode,
-  HttpStatus,
-  UseGuards,
-} from '@nestjs/common';
-import { MailService } from './mail.service';
 import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { USER_CONSTANTS } from 'src/shared/constants/user.constants';
+
 import {
-  MailOptions,
-  MailSendResult,
-  MailSendBatchResult,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+
+import {
   MailMetrics,
+  MailOptions,
+  MailSendBatchResult,
+  MailSendResult,
 } from './mail.interface';
+import { MailService } from './mail.service';
 
 @Controller('mail')
-@UseGuards(JwtAccessTokenGuard, RolesGuard)
 export class MailController {
   constructor(private readonly mailService: MailService) {}
 
