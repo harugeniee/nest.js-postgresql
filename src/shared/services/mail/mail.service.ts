@@ -465,11 +465,28 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
     }
 
     const recipientList = Array.isArray(recipients) ? recipients : [recipients];
+
+    // Check recipient count limit
+    if (recipientList.length > this.validationConfig.maxRecipients) {
+      errors.push(
+        `Too many recipients (max ${this.validationConfig.maxRecipients})`,
+      );
+      return;
+    }
+
     for (const recipient of recipientList) {
       const email =
         typeof recipient === 'string'
           ? recipient
           : (recipient as MailAddress).email;
+
+      // Check email length to prevent ReDoS
+      if (email.length > 254) {
+        errors.push(`Email address too long: ${email}`);
+        continue;
+      }
+
+      // Check for basic email format
       if (!this.validationConfig.emailRegex.test(email)) {
         errors.push(`Invalid email address: ${email}`);
       }

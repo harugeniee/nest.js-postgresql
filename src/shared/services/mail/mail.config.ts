@@ -32,8 +32,9 @@ export const mailConfig = () => ({
  * Mail validation configuration
  */
 export const mailValidationConfig = {
-  // Email validation regex
-  emailRegex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  // Email validation regex - ReDoS safe pattern
+  // This pattern uses a simple, non-backtracking approach to avoid ReDoS attacks
+  emailRegex: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   // Max recipients per email
   maxRecipients: 100,
   // Max subject length
