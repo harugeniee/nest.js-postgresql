@@ -536,7 +536,7 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
         : [typeof recipients === 'string' ? recipients : recipients.email];
 
       const rateLimitKey = `mail:rate_limit:${recipientEmails[0]}`;
-      const limit = 1; // 10 emails per hour
+      const limit = 10; // 10 emails per hour
       const window = 3600; // 1 hour in seconds
 
       const result = await this.cacheService.atomicIncrementWithLimit(
