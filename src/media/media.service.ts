@@ -75,8 +75,7 @@ export class MediaService extends BaseService<Media> {
       if (!files || files.length === 0) {
         throw new HttpException(
           {
-            message: 'No files provided',
-            error: MEDIA_CONSTANTS.MESSAGE_CODE.MEDIA_IS_REQUIRED,
+            messageKey: 'media.MEDIA_IS_REQUIRED',
           },
           HttpStatus.BAD_REQUEST,
         );
@@ -100,8 +99,7 @@ export class MediaService extends BaseService<Media> {
       if (mediaData.length === 0) {
         throw new HttpException(
           {
-            message: 'No files were successfully processed',
-            error: MEDIA_CONSTANTS.MESSAGE_CODE.MEDIA_UPLOAD_FAILED,
+            messageKey: 'media.MEDIA_UPLOAD_FAILED',
           },
           HttpStatus.BAD_REQUEST,
         );
@@ -127,8 +125,7 @@ export class MediaService extends BaseService<Media> {
     if (file.size > MEDIA_CONSTANTS.SIZE_LIMITS.MAX) {
       throw new HttpException(
         {
-          message: 'File size exceeds maximum limit',
-          error: MEDIA_CONSTANTS.MESSAGE_CODE.MEDIA_SIZE_EXCEEDED,
+          messageKey: 'media.MEDIA_SIZE_EXCEEDED',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -381,7 +378,6 @@ export class MediaService extends BaseService<Media> {
     return await this.update(id, updateMediaDto);
   }
 
-
   /**
    * Activate media
    * @param id Media ID
@@ -537,22 +533,25 @@ export class MediaService extends BaseService<Media> {
    */
   async deleteMediaFile(id: string): Promise<void> {
     const media = await this.findById(id);
-    
+
     if (media.key) {
       await this.r2Service.deleteFile(media.key);
-      
+
       // Delete thumbnail and preview if they exist
       if (media.type === 'image') {
         const thumbnailKey = this.r2Service.generateThumbnailKey(media.key);
         const previewKey = this.r2Service.generatePreviewKey(media.key);
-        
+
         try {
           await Promise.all([
             this.r2Service.deleteFile(thumbnailKey),
             this.r2Service.deleteFile(previewKey),
           ]);
         } catch (error) {
-          this.logger.warn(`Failed to delete thumbnail/preview for media ${id}:`, error);
+          this.logger.warn(
+            `Failed to delete thumbnail/preview for media ${id}:`,
+            error,
+          );
         }
       }
     }
@@ -595,7 +594,7 @@ export class MediaService extends BaseService<Media> {
   async deleteMedia(id: string): Promise<void> {
     // Delete from R2 first
     await this.deleteMediaFile(id);
-    
+
     // Then soft delete from database
     await this.update(id, { status: 'deleted' as MediaStatus });
   }

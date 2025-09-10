@@ -6,7 +6,7 @@ import {
   IsNumber,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MediaType, MediaStatus } from 'src/shared/constants';
+import { MediaType, MediaStatus, MEDIA_CONSTANTS } from 'src/shared/constants';
 
 export class CreateMediaDto {
   @ApiProperty({ description: 'Media name', example: 'profile-picture.jpg' })
@@ -39,18 +39,18 @@ export class CreateMediaDto {
 
   @ApiPropertyOptional({
     description: 'Media type',
-    enum: Object.values(MediaType),
+    enum: Object.values(MEDIA_CONSTANTS.TYPES),
   })
   @IsOptional()
-  @IsEnum(MediaType)
+  @IsEnum(MEDIA_CONSTANTS.TYPES)
   type?: MediaType;
 
   @ApiPropertyOptional({
     description: 'Media status',
-    enum: Object.values(MediaStatus),
+    enum: Object.values(MEDIA_CONSTANTS.STATUS),
   })
   @IsOptional()
-  @IsEnum(MediaStatus)
+  @IsEnum(MEDIA_CONSTANTS.STATUS)
   status?: MediaStatus;
 
   @ApiPropertyOptional({
@@ -87,32 +87,50 @@ export class CreateMediaDto {
   @IsNumber()
   duration?: number;
 
-  @ApiPropertyOptional({ description: 'Media path', example: 'media/1234567890_123456789.jpg' })
+  @ApiPropertyOptional({
+    description: 'Media path',
+    example: 'media/1234567890_123456789.jpg',
+  })
   @IsOptional()
   @IsString()
   path?: string;
 
-  @ApiPropertyOptional({ description: 'Media URL', example: 'https://example.com/media/1234567890_123456789.jpg' })
+  @ApiPropertyOptional({
+    description: 'Media URL',
+    example: 'https://example.com/media/1234567890_123456789.jpg',
+  })
   @IsOptional()
   @IsString()
   url?: string;
 
-  @ApiPropertyOptional({ description: 'Media key for storage', example: 'media/1234567890_123456789.jpg' })
+  @ApiPropertyOptional({
+    description: 'Media key for storage',
+    example: 'media/1234567890_123456789.jpg',
+  })
   @IsOptional()
   @IsString()
   key?: string;
 
-  @ApiPropertyOptional({ description: 'Original file name', example: 'profile-picture.jpg' })
+  @ApiPropertyOptional({
+    description: 'Original file name',
+    example: 'profile-picture.jpg',
+  })
   @IsOptional()
   @IsString()
   originalName?: string;
 
-  @ApiPropertyOptional({ description: 'Thumbnail URL', example: 'https://example.com/thumbnails/1234567890_123456789.jpg' })
+  @ApiPropertyOptional({
+    description: 'Thumbnail URL',
+    example: 'https://example.com/thumbnails/1234567890_123456789.jpg',
+  })
   @IsOptional()
   @IsString()
   thumbnailUrl?: string;
 
-  @ApiPropertyOptional({ description: 'Preview URL', example: 'https://example.com/previews/1234567890_123456789.jpg' })
+  @ApiPropertyOptional({
+    description: 'Preview URL',
+    example: 'https://example.com/previews/1234567890_123456789.jpg',
+  })
   @IsOptional()
   @IsString()
   previewUrl?: string;

@@ -8,11 +8,7 @@ import { MediaService } from './media.service';
 import { StorageModule } from 'src/shared/services/storage/storage.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Media]),
-    ConfigModule,
-    StorageModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Media]), ConfigModule, StorageModule],
   controllers: [MediaController],
   providers: [MediaService],
   exports: [MediaService],

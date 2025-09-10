@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { MediaType, MediaStatus } from 'src/shared/constants';
+import { MediaType, MediaStatus, MEDIA_CONSTANTS } from 'src/shared/constants';
 
 export class MediaQueryDto {
   @ApiPropertyOptional({ description: 'Page number', example: 1, minimum: 1 })
@@ -41,18 +41,18 @@ export class MediaQueryDto {
 
   @ApiPropertyOptional({
     description: 'Filter by media type',
-    enum: Object.values(MediaType),
+    enum: Object.values(MEDIA_CONSTANTS.TYPES),
   })
   @IsOptional()
-  @IsEnum(MediaType)
+  @IsEnum(MEDIA_CONSTANTS.TYPES)
   type?: MediaType;
 
   @ApiPropertyOptional({
     description: 'Filter by media status',
-    enum: Object.values(MediaStatus),
+    enum: Object.values(MEDIA_CONSTANTS.STATUS),
   })
   @IsOptional()
-  @IsEnum(MediaStatus)
+  @IsEnum(MEDIA_CONSTANTS.STATUS)
   status?: MediaStatus;
 
   @ApiPropertyOptional({

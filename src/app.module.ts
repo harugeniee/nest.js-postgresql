@@ -25,6 +25,7 @@ import {
   mailConfig,
   oauthConfig,
   redisConfig,
+  r2Config,
 } from './shared/config';
 import { configValidationSchema } from './shared/config/schema';
 import { CacheModule, RabbitmqModule, MailModule } from './shared/services';
@@ -47,6 +48,9 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
         () => ({ mail: mailConfig() }),
         () => ({ aws: awsConfig() }),
         () => ({ oauth: oauthConfig() }),
+        () => ({
+          r2: r2Config(),
+        }),
       ],
     }),
     TypeOrmModule.forRootAsync({
