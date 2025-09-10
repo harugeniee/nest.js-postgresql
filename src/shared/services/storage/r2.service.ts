@@ -12,6 +12,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 
 import { R2Config } from 'src/shared/config';
+import { globalSnowflake } from 'src/shared/libs/snowflake';
 
 export interface UploadResult {
   key: string;
@@ -89,7 +90,9 @@ export class R2Service {
       } = options;
 
       // Generate unique filename if not provided
-      const finalFilename = filename || this.generateUniqueFilename();
+      const finalFilename =
+        globalSnowflake.nextId().toString() + '_' + filename ||
+        this.generateUniqueFilename();
       const key = `${folder}/${finalFilename}`;
 
       // Prepare upload parameters

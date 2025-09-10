@@ -189,14 +189,17 @@ export class MediaService extends BaseService<Media> {
    * @returns Media type enum value
    */
   private determineMediaType(mimeType: string): MediaType {
-    for (const [type, mimeTypes] of Object.entries(
+    for (const [typeKey, mimeTypes] of Object.entries(
       MEDIA_CONSTANTS.ALLOWED_MIME_TYPES,
     )) {
       if ((mimeTypes as readonly string[]).includes(mimeType)) {
-        return type as MediaType;
+        // Convert type key (e.g., "IMAGE") to type value (e.g., "image")
+        return MEDIA_CONSTANTS.TYPES[
+          typeKey as keyof typeof MEDIA_CONSTANTS.TYPES
+        ] as MediaType;
       }
     }
-    return 'other' as MediaType;
+    return MEDIA_CONSTANTS.TYPES.OTHER as MediaType;
   }
 
   /**

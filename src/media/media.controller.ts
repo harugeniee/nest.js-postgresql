@@ -21,6 +21,7 @@ import {
   PresignedUploadDto,
   PresignedDownloadQueryDto,
 } from './dto';
+import { Auth } from 'src/common/decorators';
 
 @Controller('media')
 export class MediaController {
@@ -28,6 +29,7 @@ export class MediaController {
 
   @Post()
   @UseInterceptors(FilesInterceptor('files'))
+  @Auth()
   async uploadMedia(@UploadedFiles() files: Array<Express.Multer.File>) {
     if (!files || files.length === 0) {
       throw new HttpException(
