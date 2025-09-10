@@ -6,6 +6,7 @@ import {
 import {
   DeepPartial,
   FindOptionsRelations,
+  FindOptionsSelect,
   FindOptionsWhere,
   QueryRunner,
   Repository,
@@ -55,7 +56,7 @@ export class TypeOrmBaseRepository<T extends { id: string }>
     where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
     opts?: {
       relations?: string[] | FindOptionsRelations<T>;
-      select?: (keyof T)[];
+      select?: FindOptionsSelect<T>;
     },
   ): Promise<T | null> {
     const { relations, select } = opts || {};

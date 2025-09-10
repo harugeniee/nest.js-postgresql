@@ -1,4 +1,4 @@
-import { instanceToPlain } from 'class-transformer';
+import { instanceToPlain, Exclude } from 'class-transformer';
 import { USER_CONSTANTS, UserRole, UserStatus } from 'src/shared/constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column, Entity, Index } from 'typeorm';
@@ -64,6 +64,7 @@ export class User extends BaseEntityCustom {
   })
   phoneNumber: string;
 
+  @Exclude()
   @Column('varchar', {
     length: USER_CONSTANTS.PASSWORD_MAX_LENGTH,
     nullable: true,

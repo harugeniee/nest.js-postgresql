@@ -2,6 +2,7 @@ import {
   DeepPartial,
   FindOptionsOrder,
   FindOptionsRelations,
+  FindOptionsSelect,
   FindOptionsWhere,
   QueryRunner,
 } from 'typeorm';
@@ -9,7 +10,7 @@ import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity
 
 export interface BaseRepositoryFindByIdOpts<T> {
   relations?: string[] | FindOptionsRelations<T>;
-  select?: (keyof T)[];
+  select?: FindOptionsSelect<T>;
   withDeleted?: boolean;
 }
 
@@ -17,7 +18,7 @@ export interface BaseRepositoryFindAndCountOpts<T> {
   where?: FindOptionsWhere<T> | FindOptionsWhere<T>[];
   order?: FindOptionsOrder<T>;
   relations?: string[] | FindOptionsRelations<T>;
-  select?: (keyof T)[];
+  select?: FindOptionsSelect<T>;
   skip?: number;
   take?: number;
   withDeleted?: boolean;
@@ -32,7 +33,7 @@ export interface BaseRepository<T> {
     where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
     opts?: {
       relations?: string[] | FindOptionsRelations<T>;
-      select?: (keyof T)[];
+      select?: FindOptionsSelect<T>;
     },
   ): Promise<T | null>;
   findAndCount(opts: BaseRepositoryFindAndCountOpts<T>): Promise<[T[], number]>;

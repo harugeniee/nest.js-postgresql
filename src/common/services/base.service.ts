@@ -17,6 +17,7 @@ import {
   DeepPartial,
   FindOptionsOrder,
   FindOptionsRelations,
+  FindOptionsSelect,
   FindOptionsWhere,
   LessThan,
   MoreThan,
@@ -28,7 +29,7 @@ import { Injectable, Optional } from '@nestjs/common';
 
 export type QOpts<T> = {
   relations?: string[] | FindOptionsRelations<T>;
-  select?: (keyof T)[];
+  select?: FindOptionsSelect<T>;
   withDeleted?: boolean;
 };
 
@@ -49,7 +50,7 @@ export abstract class BaseService<T extends { id: string }> {
       idKey?: string;
       softDelete?: boolean;
       relationsWhitelist?: string[];
-      selectWhitelist?: (keyof T)[];
+      selectWhitelist?: FindOptionsSelect<T>;
       cache?: CacheOptions & { prefix?: string };
       emitEvents?: boolean;
       defaultSearchField?: string;
@@ -84,26 +85,26 @@ export abstract class BaseService<T extends { id: string }> {
     return data;
   }
 
-  protected async afterCreate(entity: T): Promise<void> {
+  protected async afterCreate(_entity: T): Promise<void> {
     return;
   }
 
   protected async beforeUpdate(
-    id: string,
-    patch: DeepPartial<T>,
+    _id: string,
+    _patch: DeepPartial<T>,
   ): Promise<void> {
     return;
   }
 
-  protected async afterUpdate(entity: T): Promise<void> {
+  protected async afterUpdate(_entity: T): Promise<void> {
     return;
   }
 
-  protected async beforeDelete(id: string): Promise<void> {
+  protected async beforeDelete(_id: string): Promise<void> {
     return;
   }
 
-  protected async afterDelete(id: string): Promise<void> {
+  protected async afterDelete(_id: string): Promise<void> {
     return;
   }
 
@@ -167,7 +168,7 @@ export abstract class BaseService<T extends { id: string }> {
     }
   }
 
-  async findById(id: string, opts?: QOpts<T>, ctx?: TxCtx): Promise<T> {
+  async findById(id: string, opts?: QOpts<T>, _ctx?: TxCtx): Promise<T> {
     const safe = this.applyQueryOpts(opts);
     const cacheKey = this.cache ? `${this.cache.prefix}:id:${id}` : undefined;
     if (cacheKey) {
@@ -556,16 +557,141 @@ export abstract class BaseService<T extends { id: string }> {
       ? applyWhitelist(opts?.relations, this.opts.relationsWhitelist)
       : opts?.relations;
     let select = opts?.select;
-    if (this.opts.selectWhitelist && select) {
-      const whitelist = this.opts.selectWhitelist;
-      select = select.filter((k) => whitelist.includes(k));
+
+    // Apply selectWhitelist security filtering
+    if (this.opts.selectWhitelist) {
+      if (select) {
+        // If select is provided, filter it against whitelist
+        select = this.filterSelectByWhitelist(
+          select,
+          this.opts.selectWhitelist,
+        );
+      } else {
+        // If no select is provided but whitelist exists, use whitelist as default select
+        // This prevents exposing sensitive data when no specific fields are requested
+        select = this.opts.selectWhitelist;
+      }
     }
+
     const withDeleted = opts?.withDeleted ?? false;
     return {
       relations: relations || undefined,
       select,
       withDeleted,
     };
+  }
+
+  /**
+   * Filter select options based on the whitelist
+   * @param select The select options to filter
+   * @param whitelist The allowed select fields
+   * @returns Filtered select options
+   */
+  private filterSelectByWhitelist(
+    select: FindOptionsSelect<T>,
+    whitelist: FindOptionsSelect<T>,
+  ): FindOptionsSelect<T> {
+    const filtered: FindOptionsSelect<T> = {};
+
+    for (const key in select) {
+      if (Object.hasOwn(select, key) && key in whitelist) {
+        const selectValue = select[key];
+        const whitelistValue = whitelist[key];
+
+        if (this.isNestedSelect(selectValue, whitelistValue)) {
+          this.handleNestedSelect(filtered, key, selectValue, whitelistValue);
+        } else if (this.isBooleanSelect(selectValue)) {
+          this.handleBooleanSelect(filtered, key, selectValue);
+        }
+      }
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Check if the select value is a nested select object
+   */
+  private isNestedSelect(
+    selectValue: unknown,
+    whitelistValue: unknown,
+  ): boolean {
+    return (
+      typeof selectValue === 'object' &&
+      selectValue !== null &&
+      typeof whitelistValue === 'object' &&
+      whitelistValue !== null &&
+      !Array.isArray(selectValue) &&
+      !Array.isArray(whitelistValue)
+    );
+  }
+
+  /**
+   * Check if the select value is a boolean true
+   */
+  private isBooleanSelect(selectValue: unknown): boolean {
+    return typeof selectValue === 'boolean' && selectValue;
+  }
+
+  /**
+   * Handle nested select filtering
+   */
+  private handleNestedSelect(
+    filtered: FindOptionsSelect<T>,
+    key: string,
+    selectValue: unknown,
+    whitelistValue: unknown,
+  ): void {
+    const nestedFiltered = this.filterSelectByWhitelist(
+      selectValue as FindOptionsSelect<any>,
+      whitelistValue as FindOptionsSelect<any>,
+    );
+    if (Object.keys(nestedFiltered).length > 0) {
+      (filtered as Record<string, unknown>)[key] = nestedFiltered;
+    }
+  }
+
+  /**
+   * Handle boolean select filtering
+   */
+  private handleBooleanSelect(
+    filtered: FindOptionsSelect<T>,
+    key: string,
+    selectValue: unknown,
+  ): void {
+    (filtered as Record<string, unknown>)[key] = selectValue;
+  }
+
+  /**
+   * Create a select object from an array of field names
+   * @param fields Array of field names to select
+   * @returns FindOptionsSelect object
+   */
+  protected createSelectFromFields(fields: (keyof T)[]): FindOptionsSelect<T> {
+    const select: FindOptionsSelect<T> = {};
+    for (const field of fields) {
+      (select as Record<string, unknown>)[field as string] = true;
+    }
+    return select;
+  }
+
+  /**
+   * Check if a field is allowed in select based on whitelist
+   * @param field The field to check
+   * @returns True if field is allowed
+   */
+  protected isFieldAllowedInSelect(field: keyof T): boolean {
+    if (!this.opts.selectWhitelist) return true;
+    return field in this.opts.selectWhitelist;
+  }
+
+  /**
+   * Get all allowed select fields from whitelist
+   * @returns Array of allowed field names
+   */
+  protected getAllowedSelectFields(): (keyof T)[] {
+    if (!this.opts.selectWhitelist) return [];
+    return Object.keys(this.opts.selectWhitelist) as (keyof T)[];
   }
 
   protected async invalidateCacheForEntity(id: string): Promise<void> {

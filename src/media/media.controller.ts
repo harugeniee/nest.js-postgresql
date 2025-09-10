@@ -49,11 +49,13 @@ export class MediaController {
   }
 
   @Get()
+  @Auth()
   async getMedia(@Query() query: MediaQueryDto) {
     return this.mediaService.getMedia(query);
   }
 
   @Get(':id')
+  @Auth()
   async getMediaById(@Param('id') id: string) {
     return this.mediaService.getMediaById(id);
   }
