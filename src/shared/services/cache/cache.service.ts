@@ -104,6 +104,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Start Redis monitoring mode to log all commands (development only)
    * Enables real-time command logging for debugging purposes
+   * Note: Lua scripts (EVAL/EVALSHA) are logged but internal Redis commands within scripts are not visible
    * @private
    * @returns {Promise<void>}
    */
@@ -115,13 +116,28 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         'monitor',
         (time: number, args: string[], source: string, database: number) => {
           const timestamp = new Date(time * 1000).toISOString();
-          this.logger.debug(
-            `🔍 [${timestamp}] Redis ${source} DB${database}: ${args.join(' ')}`,
-          );
+          const command = args.join(' ');
+
+          // Special handling for Lua scripts
+          if (args[0] === 'EVAL' || args[0] === 'EVALSHA') {
+            this.logger.debug(
+              `🔍 [${timestamp}] Redis ${source} DB${database}: ${args[0]} (Lua Script) - ${args.length - 2} keys, ${args[args.length - 1]} args`,
+            );
+            this.logger.debug(
+              `📜 Lua Script Preview: ${args[1]?.substring(0, 100)}${args[1]?.length > 100 ? '...' : ''}`,
+            );
+          } else {
+            this.logger.debug(
+              `🔍 [${timestamp}] Redis ${source} DB${database}: ${command}`,
+            );
+          }
         },
       );
 
       this.logger.log('📊 Redis monitoring started');
+      this.logger.warn(
+        '⚠️ Note: Lua script internal commands are not visible in MONITOR output',
+      );
     } catch (error) {
       this.logger.error('❌ Failed to start Redis monitoring:', error);
     }

@@ -5,7 +5,7 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
-import sanitizeHtml from 'sanitize-html';
+import * as sanitizeHtml from 'sanitize-html';
 import { CacheService } from '../cache/cache.service';
 import {
   MailOptions,
