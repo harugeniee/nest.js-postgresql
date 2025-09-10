@@ -11,6 +11,7 @@ import {
   Body,
   HttpException,
   HttpStatus,
+  Request,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 
@@ -22,6 +23,7 @@ import {
   PresignedDownloadQueryDto,
 } from './dto';
 import { Auth } from 'src/common/decorators';
+import { AuthPayload } from 'src/common/interface';
 
 @Controller('media')
 export class MediaController {
@@ -30,7 +32,10 @@ export class MediaController {
   @Post()
   @UseInterceptors(FilesInterceptor('files'))
   @Auth()
-  async uploadMedia(@UploadedFiles() files: Array<Express.Multer.File>) {
+  async uploadMedia(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Request() req: Request & { user: AuthPayload },
+  ) {
     if (!files || files.length === 0) {
       throw new HttpException(
         {
@@ -40,7 +45,7 @@ export class MediaController {
       );
     }
 
-    return this.mediaService.uploadMedia(files);
+    return this.mediaService.uploadMedia(files, req.user.uid);
   }
 
   @Get()

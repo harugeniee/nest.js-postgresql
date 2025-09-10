@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Readable } from 'stream';
 
-import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
+import { AdvancedPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
@@ -43,8 +43,7 @@ export class MediaService extends BaseService<Media> {
           'description',
           'type',
           'url',
-          'thumbnailUrl',
-          'previewUrl',
+          'key',
           'status',
           'isPublic',
           'width',
@@ -70,7 +69,10 @@ export class MediaService extends BaseService<Media> {
    * @param files Array of uploaded files
    * @returns Array of created media entities
    */
-  async uploadMedia(files: Array<Express.Multer.File>): Promise<Media[]> {
+  async uploadMedia(
+    files: Array<Express.Multer.File>,
+    userId: string,
+  ): Promise<Media[]> {
     try {
       if (!files || files.length === 0) {
         throw new HttpException(
@@ -85,7 +87,7 @@ export class MediaService extends BaseService<Media> {
 
       for (const file of files) {
         try {
-          const processedFile = await this.processUploadedFile(file);
+          const processedFile = await this.processUploadedFile(file, userId);
           mediaData.push(processedFile);
         } catch (error: any) {
           this.logger.error(
@@ -120,6 +122,7 @@ export class MediaService extends BaseService<Media> {
    */
   private async processUploadedFile(
     file: Express.Multer.File,
+    userId: string,
   ): Promise<CreateMediaDto> {
     // Validate file size
     if (file.size > MEDIA_CONSTANTS.SIZE_LIMITS.MAX) {
@@ -146,22 +149,9 @@ export class MediaService extends BaseService<Media> {
       metadata: {
         originalName: file.originalname,
         mediaType: mediaType,
-        uploadedBy: 'system', // This should be replaced with actual user ID
+        uploadedBy: userId,
       },
     });
-
-    // Generate thumbnail and preview URLs for images
-    let thumbnailUrl: string | undefined;
-    let previewUrl: string | undefined;
-
-    if (mediaType === 'image') {
-      thumbnailUrl = this.r2Service.generatePublicUrl(
-        this.r2Service.generateThumbnailKey(uploadResult.key, 'medium'),
-      );
-      previewUrl = this.r2Service.generatePublicUrl(
-        this.r2Service.generatePreviewKey(uploadResult.key),
-      );
-    }
 
     // Return CreateMediaDto for BaseService to handle
     return {
@@ -177,9 +167,8 @@ export class MediaService extends BaseService<Media> {
       url: uploadResult.url,
       originalName: file.originalname,
       key: uploadResult.key,
-      thumbnailUrl,
-      previewUrl,
       storageProvider: 'r2',
+      userId: userId,
     } as CreateMediaDto;
   }
 
@@ -208,51 +197,10 @@ export class MediaService extends BaseService<Media> {
    * @returns Paginated media results
    */
   async getMedia(query: MediaQueryDto): Promise<IPagination<Media>> {
-    const {
-      page = 1,
-      limit = 10,
-      search,
-      type,
-      status,
-      isPublic,
-      userId,
-      sortBy = 'createdAt',
-      sortOrder = 'DESC',
-      startDate,
-      endDate,
-      minSize,
-      maxSize,
-    } = query;
+    const { minSize, maxSize } = query;
 
     // Build extra filters for BaseService
     const extraFilter: Record<string, unknown> = {};
-
-    if (search) {
-      extraFilter.query = search;
-    }
-
-    if (type) {
-      extraFilter.type = type;
-    }
-
-    if (status) {
-      extraFilter.status = status;
-    }
-
-    if (isPublic !== undefined) {
-      extraFilter.isPublic = isPublic;
-    }
-
-    if (userId) {
-      extraFilter.userId = userId;
-    }
-
-    if (startDate && endDate) {
-      extraFilter.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      };
-    }
 
     if (minSize !== undefined) {
       extraFilter.size = {
@@ -269,16 +217,7 @@ export class MediaService extends BaseService<Media> {
     }
 
     // Use BaseService listOffset method
-    return await this.listOffset(
-      {
-        page,
-        limit,
-        sortBy,
-        order: sortOrder,
-        ...extraFilter,
-      } as AdvancedPaginationDto,
-      extraFilter,
-    );
+    return await this.listOffset(query, extraFilter);
   }
 
   /**
@@ -289,50 +228,17 @@ export class MediaService extends BaseService<Media> {
   async getMediaCursor(
     query: MediaQueryDto & { cursor?: string },
   ): Promise<IPaginationCursor<Media>> {
-    const {
-      limit = 10,
-      search,
-      type,
-      status,
-      isPublic,
-      userId,
-      sortBy = 'createdAt',
-      sortOrder = 'DESC',
-      startDate,
-      endDate,
-      minSize,
-      maxSize,
-      cursor,
-    } = query;
+    const { type, isPublic, minSize, maxSize } = query;
 
     // Build extra filters for BaseService
     const extraFilter: Record<string, unknown> = {};
 
-    if (search) {
-      extraFilter.query = search;
-    }
-
-    if (type) {
+    if (type !== undefined) {
       extraFilter.type = type;
-    }
-
-    if (status) {
-      extraFilter.status = status;
     }
 
     if (isPublic !== undefined) {
       extraFilter.isPublic = isPublic;
-    }
-
-    if (userId) {
-      extraFilter.userId = userId;
-    }
-
-    if (startDate && endDate) {
-      extraFilter.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      };
     }
 
     if (minSize !== undefined) {
@@ -350,13 +256,7 @@ export class MediaService extends BaseService<Media> {
     }
 
     // Use BaseService listCursor method
-    return await this.listCursor({
-      limit,
-      sortBy,
-      order: sortOrder,
-      cursor,
-      ...extraFilter,
-    } as CursorPaginationDto);
+    return await this.listCursor(query, extraFilter);
   }
 
   /**
