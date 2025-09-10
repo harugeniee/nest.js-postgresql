@@ -13,6 +13,7 @@ import {
 import { CursorPaginationDto } from '../dto/cursor-pagination.dto';
 import { IPaginationCursor } from '../interface';
 import { encodeCursor } from '../utils';
+import { FindOptionsSelect } from 'typeorm';
 
 // Extended interface for GraphQL-specific repository methods
 interface GraphQLBaseRepository<T> extends BaseRepository<T> {
@@ -34,7 +35,7 @@ export abstract class GraphQLBaseService<
       idKey?: string;
       softDelete?: boolean;
       relationsWhitelist?: string[];
-      selectWhitelist?: (keyof T)[];
+      selectWhitelist?: FindOptionsSelect<T>;
       cache?: CacheOptions & { prefix?: string };
       emitEvents?: boolean;
       defaultSearchField?: string;
@@ -99,7 +100,7 @@ export abstract class GraphQLBaseService<
     opts?: QOpts<T>,
     ctx?: TxCtx,
   ): Promise<GraphQLConnection<T>> {
-    const { first, after, last, before, sortBy, order } = pagination;
+    const { first, after, last, before, sortBy } = pagination;
 
     // Validate pagination parameters
     if (first && last) {
@@ -200,7 +201,7 @@ export abstract class GraphQLBaseService<
     // Apply field selection if available
     const graphQLOpts: QOpts<T> = {
       ...opts,
-      select: selectedFields.length > 0 ? selectedFields : opts?.select,
+      select: selectedFields ?? opts?.select,
     };
 
     return this.findOne(where, graphQLOpts, ctx);
@@ -222,19 +223,19 @@ export abstract class GraphQLBaseService<
     // Apply field selection if available
     const graphQLOpts: QOpts<T> = {
       ...opts,
-      select: selectedFields.length > 0 ? selectedFields : opts?.select,
+      select: selectedFields ?? opts?.select,
     };
 
     return this.listGraphQL(pagination, extraFilter, graphQLOpts, ctx);
   }
 
   /**
-   * Extract field names from GraphQL resolve info
+   * Extract field names from GraphQL resolve info and convert to FindOptionsSelect
    * This is a simplified version - in practice you might want to use a GraphQL library
    */
   private extractFieldsFromGraphQLInfo(graphQLInfo: {
     fieldNodes: GraphQLFieldNode[];
-  }): (keyof T)[] {
+  }): FindOptionsSelect<T> | undefined {
     try {
       // This is a simplified field extraction
       // In a real implementation, you'd use a GraphQL library to parse the selection set
@@ -254,14 +255,26 @@ export abstract class GraphQLBaseService<
 
       extractFields(graphQLInfo.fieldNodes);
 
-      // Filter out non-entity fields and return as keyof T
-      return fields.filter(
+      // Filter out non-entity fields
+      const validFields = fields.filter(
         (field) =>
           field !== '__typename' && field !== 'id' && field !== 'cursor',
-      ) as (keyof T)[];
+      );
+
+      // Convert to FindOptionsSelect format
+      if (validFields.length === 0) {
+        return undefined;
+      }
+
+      const select: FindOptionsSelect<T> = {};
+      for (const field of validFields) {
+        (select as Record<string, unknown>)[field] = true;
+      }
+
+      return select;
     } catch {
-      // If field extraction fails, return empty array (will use default selection)
-      return [];
+      // If field extraction fails, return undefined (will use default selection)
+      return undefined;
     }
   }
 

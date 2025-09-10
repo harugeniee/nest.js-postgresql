@@ -8,3 +8,5 @@ export * from './rabbitmq/rabbitmq.module';
 export * from './mail/mail.service';
 export * from './mail/mail.module';
 export * from './mail/mail.interface';
+export * from './storage/r2.service';
+export * from './storage/storage.module';

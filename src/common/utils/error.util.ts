@@ -15,6 +15,7 @@ export function mapTypeOrmError(error: any): never {
       throw new BadRequestException('Foreign key constraint');
     }
   }
+  console.log(error);
   throw new InternalServerErrorException();
 }
 

@@ -15,7 +15,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { FilesModule } from './files/files.module';
+import { MediaModule } from './media/media.module';
 import { QrModule } from './qr/qr.module';
 import {
   appConfig,
@@ -25,6 +25,7 @@ import {
   mailConfig,
   oauthConfig,
   redisConfig,
+  r2Config,
 } from './shared/config';
 import { configValidationSchema } from './shared/config/schema';
 import { CacheModule, RabbitmqModule, MailModule } from './shared/services';
@@ -47,6 +48,9 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
         () => ({ mail: mailConfig() }),
         () => ({ aws: awsConfig() }),
         () => ({ oauth: oauthConfig() }),
+        () => ({
+          r2: r2Config(),
+        }),
       ],
     }),
     TypeOrmModule.forRootAsync({
@@ -82,7 +86,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
     WorkerModule,
     RabbitmqModule,
     MailModule,
-    FilesModule,
+    MediaModule,
     AuthModule,
     QrModule,
     RateLimitModule,
