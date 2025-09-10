@@ -15,7 +15,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { FilesModule } from './files/files.module';
+import { MediaModule } from './media/media.module';
 import { QrModule } from './qr/qr.module';
 import {
   appConfig,
@@ -82,7 +82,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
     WorkerModule,
     RabbitmqModule,
     MailModule,
-    FilesModule,
+    MediaModule,
     AuthModule,
     QrModule,
     RateLimitModule,

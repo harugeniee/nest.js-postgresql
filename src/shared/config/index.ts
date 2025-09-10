@@ -5,3 +5,4 @@ export * from './redis.config';
 export * from './mail.config';
 export * from './aws.config';
 export * from './oauth.config';
+export * from './r2.config';
