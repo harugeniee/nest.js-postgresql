@@ -128,9 +128,10 @@ describe('UsersController', () => {
 
       const result = await controller.getMe(mockRequest);
 
-      expect(usersService.findOne).toHaveBeenCalledWith({
-        id: mockAuthPayload.uid,
-      });
+      expect(usersService.findOne).toHaveBeenCalledWith(
+        { id: mockAuthPayload.uid },
+        { relations: ['avatar'] },
+      );
       expect(result).toEqual(mockUser);
     });
   });

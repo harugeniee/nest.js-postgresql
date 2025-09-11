@@ -52,6 +52,5 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(20)
-  avatar?: string;
+  avatarId?: string;
 }

@@ -1,4 +1,4 @@
-import { instanceToPlain } from 'class-transformer';
+import { Exclude, instanceToPlain } from 'class-transformer';
 import { globalSnowflake } from 'src/shared/libs/snowflake';
 import {
   BaseEntity,
@@ -35,6 +35,7 @@ export abstract class BaseEntityCustom extends BaseEntity {
    * UUID for external references and API responses
    * Indexed for fast lookups
    */
+  @Exclude()
   @Index({ unique: true })
   @Column('uuid', { nullable: false, generated: 'uuid' })
   uuid!: string;
@@ -80,6 +81,7 @@ export abstract class BaseEntityCustom extends BaseEntity {
    * Optimistic locking version for concurrency control
    * Automatically incremented on each update
    */
+  @Exclude()
   @VersionColumn({ default: 1 })
   version!: number;
 
