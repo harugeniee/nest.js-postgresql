@@ -7,14 +7,14 @@ export class QueryReactionsDto extends PaginationDto {
   subjectType?: string;
 
   @IsOptional()
-  @IsNumber()
-  subjectId?: number;
+  @IsString()
+  subjectId?: string;
 
   @IsOptional()
   @IsString()
   kind?: string;
 
   @IsOptional()
-  @IsNumber()
-  userId?: number;
+  @IsString()
+  userId?: string;
 }

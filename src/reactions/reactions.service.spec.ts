@@ -16,10 +16,10 @@ describe('ReactionsService', () => {
   let eventEmitter: EventEmitter2;
 
   const mockReaction = {
-    id: 1,
-    userId: 1,
+    id: '1',
+    userId: '1',
     subjectType: 'article',
-    subjectId: 1,
+    subjectId: '1',
     kind: 'like',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -34,11 +34,22 @@ describe('ReactionsService', () => {
   } as unknown as Reaction;
 
   const mockReactionCount = {
+    id: '1',
     subjectType: 'article',
-    subjectId: 1,
+    subjectId: '1',
     kind: 'like',
     count: 5,
-  } as ReactionCount;
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
+    uuid: 'test-uuid',
+    version: 1,
+    generateId: jest.fn(),
+    toJSON: jest.fn(),
+    isDeleted: jest.fn(),
+    getAge: jest.fn(),
+    getTimeSinceUpdate: jest.fn(),
+  } as unknown as ReactionCount;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -50,6 +61,7 @@ describe('ReactionsService', () => {
             findOne: jest.fn(),
             save: jest.fn(),
             update: jest.fn(),
+            findAndCount: jest.fn(),
             createQueryBuilder: jest.fn(() => ({
               where: jest.fn().mockReturnThis(),
               andWhere: jest.fn().mockReturnThis(),
@@ -58,6 +70,27 @@ describe('ReactionsService', () => {
               take: jest.fn().mockReturnThis(),
               getManyAndCount: jest.fn(),
             })),
+            metadata: {
+              columns: [
+                { propertyName: 'deletedAt' },
+              ],
+            },
+            manager: {
+              connection: {
+                createQueryRunner: jest.fn(() => ({
+                  connect: jest.fn(),
+                  startTransaction: jest.fn(),
+                  commitTransaction: jest.fn(),
+                  rollbackTransaction: jest.fn(),
+                  release: jest.fn(),
+                  manager: {
+                    save: jest.fn(),
+                    update: jest.fn(),
+                    findOne: jest.fn(),
+                  },
+                })),
+              },
+            },
           },
         },
         {
@@ -115,10 +148,10 @@ describe('ReactionsService', () => {
 
   describe('toggle', () => {
     it('should create a new reaction when none exists', async () => {
-      const userId = 1;
+      const userId = '1';
       const dto = {
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
         action: 'toggle' as const,
       };
@@ -133,10 +166,10 @@ describe('ReactionsService', () => {
     });
 
     it('should remove existing reaction when one exists', async () => {
-      const userId = 1;
+      const userId = '1';
       const dto = {
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
         action: 'toggle' as const,
       };
@@ -153,10 +186,10 @@ describe('ReactionsService', () => {
 
   describe('set', () => {
     it('should create a new reaction and update count', async () => {
-      const userId = 1;
+      const userId = '1';
       const dto = {
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
         action: 'set' as const,
       };
@@ -186,10 +219,10 @@ describe('ReactionsService', () => {
 
   describe('unset', () => {
     it('should soft delete reaction and update count', async () => {
-      const userId = 1;
+      const userId = '1';
       const dto = {
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
         action: 'unset' as const,
       };
@@ -224,23 +257,21 @@ describe('ReactionsService', () => {
         sortBy: 'createdAt',
         order: 'DESC' as const,
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
-        userId: 1,
+        userId: '1',
       };
 
-      const mockQueryBuilder = {
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[mockReaction], 1]),
-      };
-
-      jest
-        .spyOn(reactionRepository, 'createQueryBuilder')
-        .mockReturnValue(mockQueryBuilder as any);
+      jest.spyOn(service, 'listOffset').mockResolvedValue({
+        result: [mockReaction],
+        metaData: {
+          currentPage: 1,
+          pageSize: 10,
+          totalRecords: 1,
+          totalPages: 1,
+          hasNextPage: false,
+        },
+      });
 
       const result = await service.list(dto);
 
@@ -253,9 +284,9 @@ describe('ReactionsService', () => {
 
   describe('hasReacted', () => {
     it('should return true when user has reacted', async () => {
-      const userId = 1;
+      const userId = '1';
       const subjectType = 'article';
-      const subjectId = 1;
+      const subjectId = '1';
       const kind = 'like';
 
       jest.spyOn(reactionRepository, 'findOne').mockResolvedValue(mockReaction);
@@ -271,9 +302,9 @@ describe('ReactionsService', () => {
     });
 
     it('should return false when user has not reacted', async () => {
-      const userId = 1;
+      const userId = '1';
       const subjectType = 'article';
-      const subjectId = 1;
+      const subjectId = '1';
       const kind = 'like';
 
       jest.spyOn(reactionRepository, 'findOne').mockResolvedValue(null);
@@ -292,7 +323,7 @@ describe('ReactionsService', () => {
   describe('getCounts', () => {
     it('should return cached counts when available', async () => {
       const subjectType = 'article';
-      const subjectId = 1;
+      const subjectId = '1';
       const kinds = ['like', 'bookmark'];
 
       jest.spyOn(cacheService, 'get').mockResolvedValue([mockReactionCount]);
@@ -307,7 +338,7 @@ describe('ReactionsService', () => {
 
     it('should fetch and cache counts when not cached', async () => {
       const subjectType = 'article';
-      const subjectId = 1;
+      const subjectId = '1';
       const kinds = ['like', 'bookmark'];
 
       jest.spyOn(cacheService, 'get').mockResolvedValue(null);
@@ -329,7 +360,7 @@ describe('ReactionsService', () => {
       expect(cacheService.set).toHaveBeenCalledWith(
         `reactions:counts:${subjectType}:${subjectId}:${kinds.join(',')}`,
         [mockReactionCount],
-        { ttl: 60 },
+        60,
       );
     });
   });
@@ -338,7 +369,7 @@ describe('ReactionsService', () => {
     it('should return cached batch counts when available', async () => {
       const dto = {
         subjectType: 'article',
-        subjectIds: [1, 2, 3],
+        subjectIds: ['1', '2', '3'],
         kinds: ['like', 'bookmark'],
       };
 
@@ -355,7 +386,7 @@ describe('ReactionsService', () => {
     it('should fetch and cache batch counts when not cached', async () => {
       const dto = {
         subjectType: 'article',
-        subjectIds: [1, 2, 3],
+        subjectIds: ['1', '2', '3'],
         kinds: ['like', 'bookmark'],
       };
 
@@ -378,7 +409,7 @@ describe('ReactionsService', () => {
       expect(cacheService.set).toHaveBeenCalledWith(
         `reactions:counts:batch:${dto.subjectType}:${dto.subjectIds.join(',')}:${dto.kinds.join(',')}`,
         [mockReactionCount],
-        { ttl: 60 },
+        60,
       );
     });
   });

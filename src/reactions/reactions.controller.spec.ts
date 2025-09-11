@@ -12,10 +12,10 @@ describe('ReactionsController', () => {
   let service: ReactionsService;
 
   const mockReaction = {
-    id: 1,
-    userId: 1,
+    id: '1',
+    userId: '1',
     subjectType: 'article',
-    subjectId: 1,
+    subjectId: '1',
     kind: 'like',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -30,11 +30,22 @@ describe('ReactionsController', () => {
   } as unknown as Reaction;
 
   const mockReactionCount = {
+    id: '1',
     subjectType: 'article',
-    subjectId: 1,
+    subjectId: '1',
     kind: 'like',
     count: 5,
-  } as ReactionCount;
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
+    uuid: 'test-uuid',
+    version: 1,
+    generateId: jest.fn(),
+    toJSON: jest.fn(),
+    isDeleted: jest.fn(),
+    getAge: jest.fn(),
+    getTimeSinceUpdate: jest.fn(),
+  } as unknown as ReactionCount;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -65,10 +76,10 @@ describe('ReactionsController', () => {
 
   describe('createOrSetReaction', () => {
     it('should call toggle when action is toggle', async () => {
-      const req = { user: { id: 1 } };
+      const req = { user: { id: '1' } };
       const dto: CreateOrSetReactionDto = {
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
         action: 'toggle',
       };
@@ -78,14 +89,14 @@ describe('ReactionsController', () => {
       const result = await controller.createOrSetReaction(req, dto);
 
       expect(result).toEqual(mockReaction);
-      expect(service.toggle).toHaveBeenCalledWith(1, dto);
+      expect(service.toggle).toHaveBeenCalledWith('1', dto);
     });
 
     it('should call set when action is set', async () => {
-      const req = { user: { id: 1 } };
+      const req = { user: { id: '1' } };
       const dto: CreateOrSetReactionDto = {
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
         action: 'set',
       };
@@ -95,14 +106,14 @@ describe('ReactionsController', () => {
       const result = await controller.createOrSetReaction(req, dto);
 
       expect(result).toEqual(mockReaction);
-      expect(service.set).toHaveBeenCalledWith(1, dto);
+      expect(service.set).toHaveBeenCalledWith('1', dto);
     });
 
     it('should call unset when action is unset', async () => {
-      const req = { user: { id: 1 } };
+      const req = { user: { id: '1' } };
       const dto: CreateOrSetReactionDto = {
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
         action: 'unset',
       };
@@ -112,16 +123,16 @@ describe('ReactionsController', () => {
       const result = await controller.createOrSetReaction(req, dto);
 
       expect(result).toBeNull();
-      expect(service.unset).toHaveBeenCalledWith(1, dto);
+      expect(service.unset).toHaveBeenCalledWith('1', dto);
     });
   });
 
   describe('unsetReaction', () => {
     it('should call unset service method', async () => {
-      const req = { user: { id: 1 } };
+      const req = { user: { id: '1' } };
       const dto: CreateOrSetReactionDto = {
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
       };
 
@@ -130,7 +141,7 @@ describe('ReactionsController', () => {
       const result = await controller.unsetReaction(req, dto);
 
       expect(result).toBeNull();
-      expect(service.unset).toHaveBeenCalledWith(1, dto);
+      expect(service.unset).toHaveBeenCalledWith('1', dto);
     });
   });
 
@@ -142,9 +153,9 @@ describe('ReactionsController', () => {
         sortBy: 'createdAt',
         order: 'DESC',
         subjectType: 'article',
-        subjectId: 1,
+        subjectId: '1',
         kind: 'like',
-        userId: 1,
+        userId: '1',
       };
 
       const mockResult = {
@@ -163,9 +174,9 @@ describe('ReactionsController', () => {
 
   describe('hasReacted', () => {
     it('should call hasReacted service method with correct parameters', async () => {
-      const req = { user: { id: 1 } };
+      const req = { user: { id: '1' } };
       const subjectType = 'article';
-      const subjectId = 1;
+      const subjectId = '1';
       const kind = 'like';
 
       jest.spyOn(service, 'hasReacted').mockResolvedValue(true);
@@ -179,7 +190,7 @@ describe('ReactionsController', () => {
 
       expect(result).toBe(true);
       expect(service.hasReacted).toHaveBeenCalledWith(
-        1,
+        '1',
         subjectType,
         subjectId,
         kind,
@@ -191,7 +202,7 @@ describe('ReactionsController', () => {
     it('should call getCountsBatch service method', async () => {
       const dto: BatchCountsDto = {
         subjectType: 'article',
-        subjectIds: [1, 2, 3],
+        subjectIds: ['1', '2', '3'],
         kinds: ['like', 'bookmark'],
       };
 
@@ -209,7 +220,7 @@ describe('ReactionsController', () => {
   describe('getCounts', () => {
     it('should call getCounts service method with correct parameters', async () => {
       const subjectType = 'article';
-      const subjectId = 1;
+      const subjectId = '1';
       const kinds = 'like,bookmark';
 
       jest.spyOn(service, 'getCounts').mockResolvedValue([mockReactionCount]);
@@ -225,7 +236,7 @@ describe('ReactionsController', () => {
 
     it('should call getCounts service method without kinds when not provided', async () => {
       const subjectType = 'article';
-      const subjectId = 1;
+      const subjectId = '1';
 
       jest.spyOn(service, 'getCounts').mockResolvedValue([mockReactionCount]);
 

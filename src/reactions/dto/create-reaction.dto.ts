@@ -4,8 +4,8 @@ export class CreateOrSetReactionDto {
   @IsString()
   subjectType: string;
 
-  @IsNumber()
-  subjectId: number;
+  @IsString()
+  subjectId: string;
 
   @IsString()
   kind: string;

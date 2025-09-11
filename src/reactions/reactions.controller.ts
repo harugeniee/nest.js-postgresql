@@ -54,7 +54,7 @@ export class ReactionsController {
   async hasReacted(
     @Request() req,
     @Query('subjectType') subjectType: string,
-    @Query('subjectId') subjectId: number,
+    @Query('subjectId') subjectId: string,
     @Query('kind') kind: string,
   ) {
     if (!subjectType || !subjectId || !kind) {
@@ -81,7 +81,7 @@ export class ReactionsController {
   @Get('counts')
   async getCounts(
     @Query('subjectType') subjectType: string,
-    @Query('subjectId') subjectId: number,
+    @Query('subjectId') subjectId: string,
     @Query('kinds') kinds?: string,
   ) {
     if (!subjectType || !subjectId) {

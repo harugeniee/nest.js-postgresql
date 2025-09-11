@@ -5,8 +5,8 @@ export class BatchCountsDto {
   subjectType: string;
 
   @IsArray()
-  @IsNumber({}, { each: true })
-  subjectIds: number[];
+  @IsString({ each: true })
+  subjectIds: string[];
 
   @IsOptional()
   @IsArray()

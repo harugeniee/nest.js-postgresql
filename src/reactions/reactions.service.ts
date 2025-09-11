@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Reaction } from './entities/reaction.entity';
 import { ReactionCount } from './entities/reaction-count.entity';
 import { CreateOrSetReactionDto } from './dto/create-reaction.dto';
@@ -8,33 +8,56 @@ import { QueryReactionsDto } from './dto/query-reactions.dto';
 import { BatchCountsDto } from './dto/batch-counts.dto';
 import { CacheService } from 'src/shared/services';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { BaseService } from 'src/common/services';
+import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
+import { AdvancedPaginationDto } from 'src/common/dto';
 
 @Injectable()
-export class ReactionsService {
+export class ReactionsService extends BaseService<Reaction> {
   constructor(
     @InjectRepository(Reaction)
-    private readonly reactionRepository: Repository<Reaction>,
+    protected readonly reactionRepository: Repository<Reaction>,
     @InjectRepository(ReactionCount)
-    private readonly reactionCountRepository: Repository<ReactionCount>,
-    private readonly dataSource: DataSource,
-    private readonly cacheService: CacheService,
-    private readonly eventEmitter: EventEmitter2,
-  ) {}
+    protected readonly reactionCountRepository: Repository<ReactionCount>,
+    protected readonly dataSource: DataSource,
+    protected readonly cacheService: CacheService,
+    protected readonly eventEmitter: EventEmitter2,
+  ) {
+    super(
+      new TypeOrmBaseRepository<Reaction>(reactionRepository),
+      {
+        entityName: 'Reaction',
+        cache: { enabled: true, ttlSec: 60, prefix: 'reactions', swrSec: 30 },
+        defaultSearchField: 'kind',
+        relationsWhitelist: {
+          user: true,
+        },
+        emitEvents: true,
+      },
+      cacheService,
+      eventEmitter,
+    );
+  }
+
+  /**
+   * Define searchable columns for Reaction entity
+   * @returns Array of searchable column names
+   */
+  protected getSearchableColumns(): (keyof Reaction)[] {
+    return ['kind', 'subjectType'];
+  }
 
   async toggle(
-    userId: number,
+    userId: string,
     dto: CreateOrSetReactionDto,
   ): Promise<Reaction | null> {
     const { subjectType, subjectId, kind } = dto;
 
-    const existingReaction = await this.reactionRepository.findOne({
-      where: {
-        userId,
-        subjectType,
-        subjectId,
-        kind,
-        deletedAt: undefined,
-      },
+    const existingReaction = await this.findOne({
+      userId,
+      subjectType,
+      subjectId: String(subjectId),
+      kind,
     });
 
     if (existingReaction) {
@@ -44,21 +67,29 @@ export class ReactionsService {
     }
   }
 
-  async set(userId: number, dto: CreateOrSetReactionDto): Promise<Reaction> {
+  async set(userId: string, dto: CreateOrSetReactionDto): Promise<Reaction> {
     const { subjectType, subjectId, kind } = dto;
 
-    return this.dataSource.transaction(async (manager) => {
+    return this.runInTransaction(async (queryRunner) => {
       // Create or restore reaction
-      const reaction = await manager.save(Reaction, {
-        userId,
-        subjectType,
-        subjectId,
-        kind,
-        deletedAt: undefined,
-      });
+      const reaction = await this.create(
+        {
+          userId,
+          subjectType,
+          subjectId: String(subjectId),
+          kind,
+        },
+        { queryRunner },
+      );
 
       // Update count
-      await this.updateCount(manager, subjectType, subjectId, kind, 1);
+      await this.updateCount(
+        queryRunner.manager,
+        subjectType,
+        String(subjectId),
+        kind,
+        1,
+      );
 
       // Emit event
       this.eventEmitter.emit('reaction.set', {
@@ -66,95 +97,88 @@ export class ReactionsService {
         subjectType,
         subjectId,
         kind,
-        count: await this.getCount(subjectType, subjectId, kind),
+        count: await this.getCount(subjectType, String(subjectId), kind),
       });
 
       return reaction;
-    }) as Promise<Reaction>;
+    });
   }
 
-  async unset(userId: number, dto: CreateOrSetReactionDto): Promise<null> {
+  async unset(userId: string, dto: CreateOrSetReactionDto): Promise<null> {
     const { subjectType, subjectId, kind } = dto;
 
-    return this.dataSource.transaction(async (manager) => {
-      // Soft delete reaction
-      await manager.update(
-        Reaction,
-        {
+    return this.runInTransaction(async (queryRunner) => {
+      // Find the reaction first
+      const reaction = await this.findOne({
+        userId,
+        subjectType,
+        subjectId: String(subjectId),
+        kind,
+      });
+
+      if (reaction) {
+        // Soft delete reaction
+        await this.softDelete(reaction.id, { queryRunner });
+
+        // Update count
+        await this.updateCount(
+          queryRunner.manager,
+          subjectType,
+          String(subjectId),
+          kind,
+          -1,
+        );
+
+        // Emit event
+        this.eventEmitter.emit('reaction.unset', {
           userId,
           subjectType,
           subjectId,
           kind,
-          deletedAt: undefined,
-        },
-        {
-          deletedAt: new Date(),
-        },
-      );
-
-      // Update count
-      await this.updateCount(manager, subjectType, subjectId, kind, -1);
-
-      // Emit event
-      this.eventEmitter.emit('reaction.unset', {
-        userId,
-        subjectType,
-        subjectId,
-        kind,
-        count: await this.getCount(subjectType, subjectId, kind),
-      });
+          count: await this.getCount(subjectType, String(subjectId), kind),
+        });
+      }
 
       return null;
-    }) as Promise<null>;
+    });
   }
 
   async list(
     dto: QueryReactionsDto,
   ): Promise<{ reactions: Reaction[]; total: number }> {
-    const { page, limit, sortBy, order, subjectType, subjectId, kind, userId } =
-      dto;
-    const skip = (page - 1) * limit;
+    const { subjectType, subjectId, kind, userId, ...paginationDto } = dto;
 
-    const query = this.reactionRepository
-      .createQueryBuilder('reaction')
-      .where('reaction.deletedAt IS NULL');
+    // Build extra filter for BaseService
+    const extraFilter: Record<string, unknown> = {};
+    if (subjectType) extraFilter.subjectType = subjectType;
+    if (subjectId) extraFilter.subjectId = subjectId;
+    if (kind) extraFilter.kind = kind;
+    if (userId) extraFilter.userId = userId;
 
-    if (subjectType) {
-      query.andWhere('reaction.subjectType = :subjectType', { subjectType });
-    }
-    if (subjectId) {
-      query.andWhere('reaction.subjectId = :subjectId', { subjectId });
-    }
-    if (kind) {
-      query.andWhere('reaction.kind = :kind', { kind });
-    }
-    if (userId) {
-      query.andWhere('reaction.userId = :userId', { userId });
-    }
+    // Use BaseService.listOffset for pagination
+    const result = await this.listOffset(
+      paginationDto as AdvancedPaginationDto,
+      extraFilter,
+      { relations: ['user'] },
+    );
 
-    const [reactions, total] = await query
-      .orderBy(`reaction.${sortBy}`, order)
-      .skip(skip)
-      .take(limit)
-      .getManyAndCount();
-
-    return { reactions, total };
+    return {
+      reactions: result.result,
+      total: result.metaData.totalRecords || 0,
+    };
   }
 
   async hasReacted(
-    userId: number,
+    userId: string,
     subjectType: string,
-    subjectId: number,
+    subjectId: string,
     kind: string,
   ): Promise<boolean> {
-    const reaction = await this.reactionRepository.findOne({
-      where: {
-        userId,
-        subjectType,
-        subjectId,
-        kind,
-        deletedAt: undefined,
-      },
+    const reaction = await this.findOne({
+      userId,
+      subjectType,
+      subjectId: String(subjectId),
+      kind,
     });
 
     return !!reaction;
@@ -162,7 +186,7 @@ export class ReactionsService {
 
   async getCounts(
     subjectType: string,
-    subjectId: number,
+    subjectId: string,
     kinds?: string[],
   ): Promise<ReactionCount[]> {
     const cacheKey = `reactions:counts:${subjectType}:${subjectId}:${kinds?.join(',') || 'all'}`;
@@ -214,9 +238,9 @@ export class ReactionsService {
   }
 
   private async updateCount(
-    manager: any,
+    manager: EntityManager,
     subjectType: string,
-    subjectId: number,
+    subjectId: string,
     kind: string,
     delta: number,
   ): Promise<void> {
@@ -252,7 +276,7 @@ export class ReactionsService {
 
   private async getCount(
     subjectType: string,
-    subjectId: number,
+    subjectId: string,
     kind: string,
   ): Promise<number> {
     const count = await this.reactionCountRepository.findOne({
