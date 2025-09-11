@@ -1,23 +1,23 @@
-# Hướng dẫn sử dụng tính năng Hẹn giờ đăng bài viết
+# Scheduled Publishing Feature Guide
 
-## Tổng quan
+## Overview
 
-Tính năng hẹn giờ đăng bài viết cho phép bạn lên lịch các bài viết để tự động xuất bản vào thời điểm mong muốn trong tương lai. Hệ thống sẽ tự động kiểm tra và xuất bản các bài viết đã đến thời gian.
+The scheduled publishing feature allows you to schedule articles for automatic publication at a desired future time. The system will automatically check and publish articles when their scheduled time arrives.
 
-## Các thay đổi trong Entity
+## Entity Changes
 
-### 1. **Cập nhật Status Enum**
+### 1. **Updated Status Enum**
 ```typescript
-// Trước
+// Before
 status: 'draft' | 'published' | 'archived'
 
-// Sau
+// After
 status: 'draft' | 'scheduled' | 'published' | 'archived'
 ```
 
-### 2. **Thêm các field mới**
+### 2. **Added New Fields**
 ```typescript
-// Thời gian hẹn đăng bài
+// Scheduled publication time
 @Index()
 @Column({
   type: 'timestamp',
@@ -26,7 +26,7 @@ status: 'draft' | 'scheduled' | 'published' | 'archived'
 })
 scheduledAt?: Date;
 
-// Thời gian thực tế đăng bài (đã có sẵn)
+// Actual publication time (already exists)
 @Index()
 @Column({
   type: 'timestamp',
@@ -36,26 +36,26 @@ scheduledAt?: Date;
 publishedAt?: Date;
 ```
 
-## Cách sử dụng
+## Usage
 
-### 1. **Hẹn giờ đăng bài**
+### 1. **Schedule Article Publication**
 
 ```typescript
-// Hẹn giờ đăng bài vào ngày mai lúc 9:00
+// Schedule article for tomorrow at 9:00 AM
 const scheduleDate = new Date();
 scheduleDate.setDate(scheduleDate.getDate() + 1);
 scheduleDate.setHours(9, 0, 0, 0);
 
 await articlesService.scheduleArticle(articleId, {
   scheduledAt: scheduleDate,
-  customSlug: 'optional-custom-slug' // Tùy chọn
+  customSlug: 'optional-custom-slug' // Optional
 });
 ```
 
-### 2. **Thay đổi thời gian hẹn giờ**
+### 2. **Reschedule Article**
 
 ```typescript
-// Thay đổi thời gian hẹn giờ
+// Change scheduled time
 const newScheduleDate = new Date();
 newScheduleDate.setDate(newScheduleDate.getDate() + 2);
 newScheduleDate.setHours(14, 30, 0, 0);
@@ -65,43 +65,43 @@ await articlesService.rescheduleArticle(articleId, {
 });
 ```
 
-### 3. **Hủy hẹn giờ**
+### 3. **Unschedule Article**
 
 ```typescript
-// Hủy hẹn giờ, chuyển về draft
+// Cancel scheduling, revert to draft
 await articlesService.unscheduleArticle(articleId);
 ```
 
-### 4. **Đăng ngay bài viết đã hẹn giờ**
+### 4. **Publish Scheduled Article Immediately**
 
 ```typescript
-// Đăng ngay bài viết đã hẹn giờ
+// Publish scheduled article immediately
 await articlesService.publishScheduledArticle(articleId);
 ```
 
-### 5. **Cập nhật trạng thái bài viết**
+### 5. **Update Article Status**
 
 ```typescript
-// Chuyển sang trạng thái scheduled
+// Change to scheduled status
 await articlesService.updateStatus(articleId, {
   status: 'scheduled',
   scheduledAt: new Date('2024-12-25T10:00:00Z')
 });
 
-// Chuyển sang trạng thái published
+// Change to published status
 await articlesService.updateStatus(articleId, {
   status: 'published'
 });
 
-// Chuyển về draft
+// Revert to draft
 await articlesService.updateStatus(articleId, {
   status: 'draft'
 });
 ```
 
-## API Endpoints (Ví dụ)
+## API Endpoints (Examples)
 
-### 1. **Hẹn giờ đăng bài**
+### 1. **Schedule Article**
 ```http
 POST /articles/{id}/schedule
 Content-Type: application/json
@@ -112,7 +112,7 @@ Content-Type: application/json
 }
 ```
 
-### 2. **Thay đổi thời gian hẹn giờ**
+### 2. **Reschedule Article**
 ```http
 PUT /articles/{id}/reschedule
 Content-Type: application/json
@@ -122,79 +122,79 @@ Content-Type: application/json
 }
 ```
 
-### 3. **Hủy hẹn giờ**
+### 3. **Unschedule Article**
 ```http
 DELETE /articles/{id}/schedule
 ```
 
-### 4. **Đăng ngay bài viết đã hẹn giờ**
+### 4. **Publish Scheduled Article Immediately**
 ```http
 POST /articles/{id}/publish-now
 ```
 
-### 5. **Lấy danh sách bài viết đã hẹn giờ**
+### 5. **Get Scheduled Articles List**
 ```http
 GET /articles/scheduled?limit=20&offset=0
 ```
 
-### 6. **Lấy thống kê hẹn giờ**
+### 6. **Get Scheduling Statistics**
 ```http
 GET /articles/scheduling-stats
 ```
 
-## Cron Job tự động
+## Automatic Cron Job
 
-Hệ thống có cron job chạy mỗi phút để kiểm tra và đăng các bài viết đã đến thời gian:
+The system has a cron job that runs every minute to check and publish articles when their scheduled time arrives:
 
 ```typescript
 @Cron(CronExpression.EVERY_MINUTE)
 async publishScheduledArticles(): Promise<void> {
-  // Tự động đăng các bài viết đã đến thời gian
+  // Automatically publish articles that have reached their scheduled time
 }
 ```
 
 ## Validation Rules
 
-### 1. **Thời gian hẹn giờ**
-- Phải là thời gian trong tương lai
-- Không được quá 1 năm trong tương lai
-- Phải là định dạng ISO 8601
+### 1. **Scheduled Time**
+- Must be a future time
+- Cannot be more than 1 year in the future
+- Must be in ISO 8601 format
 
-### 2. **Trạng thái bài viết**
-- Chỉ có thể hẹn giờ bài viết ở trạng thái `draft`
-- Không thể hẹn giờ bài viết đã `published` hoặc `archived`
-- Khi hẹn giờ, trạng thái sẽ chuyển thành `scheduled`
+### 2. **Article Status**
+- Can only schedule articles in `draft` status
+- Cannot schedule articles that are already `published` or `archived`
+- When scheduled, status changes to `scheduled`
 
 ## Database Indexes
 
-Các index được tạo để tối ưu hiệu suất:
+Indexes are created to optimize performance:
 
 ```sql
--- Index cho scheduledAt để query nhanh
+-- Index for scheduledAt for fast queries
 CREATE INDEX idx_article_scheduled_at ON articles(scheduledAt);
 
--- Index cho publishedAt để query nhanh  
+-- Index for publishedAt for fast queries  
 CREATE INDEX idx_article_published_at ON articles(publishedAt);
 
--- Index cho status để filter nhanh
+-- Index for status for fast filtering
 CREATE INDEX idx_article_status ON articles(status);
 ```
 
-## Monitoring và Logging
+## Monitoring and Logging
 
-### 1. **Logs tự động**
+### 1. **Automatic Logs**
 ```typescript
-// Log khi hẹn giờ thành công
+// Log when scheduling is successful
 this.logger.log(`Article ${articleId} scheduled for publication at ${scheduledAt.toISOString()}`);
 
-// Log khi đăng bài thành công
+// Log when publishing is successful
 this.logger.log(`Successfully published article ${articleId}`);
 
-// Log khi có lỗi
+// Log when errors occur
 this.logger.error(`Failed to publish article ${articleId}: ${error.message}`);
 ```
 
-### 2. **Thống kê**
+### 2. **Statistics**
 ```typescript
 const stats = await articlesService.getSchedulingStats();
 console.log(stats);
@@ -207,47 +207,47 @@ console.log(stats);
 
 ## Error Handling
 
-### 1. **Lỗi thường gặp**
+### 1. **Common Errors**
 ```typescript
-// Thời gian hẹn giờ trong quá khứ
+// Scheduled time in the past
 throw new Error('Scheduled date must be in the future');
 
-// Hẹn giờ bài viết đã đăng
+// Scheduling an already published article
 throw new Error('Cannot schedule an already published article');
 
-// Slug không hợp lệ
+// Invalid slug
 throw new Error('Invalid slug: Slug already exists. Suggestion: my-article-1');
 ```
 
-### 2. **Xử lý lỗi trong cron job**
+### 2. **Error Handling in Cron Job**
 ```typescript
 try {
   await this.publishArticle(article);
 } catch (error) {
   this.logger.error(`Failed to publish article ${article.id}: ${error.message}`);
-  // Không dừng việc xử lý các bài viết khác
+  // Don't stop processing other articles
 }
 ```
 
 ## Best Practices
 
-### 1. **Thời gian hẹn giờ**
-- Nên hẹn giờ trước ít nhất 5-10 phút để đảm bảo hệ thống có thời gian xử lý
-- Tránh hẹn giờ vào giờ cao điểm (9:00, 12:00, 18:00) nếu muốn tối ưu hiệu suất
+### 1. **Scheduling Time**
+- Schedule at least 5-10 minutes in advance to ensure system processing time
+- Avoid scheduling during peak hours (9:00, 12:00, 18:00) if you want to optimize performance
 
 ### 2. **Monitoring**
-- Theo dõi logs để đảm bảo cron job hoạt động bình thường
-- Kiểm tra thống kê định kỳ để phát hiện vấn đề sớm
+- Monitor logs to ensure cron job is working properly
+- Check statistics regularly to detect issues early
 
 ### 3. **Backup**
-- Luôn có kế hoạch backup cho các bài viết quan trọng
-- Test tính năng hẹn giờ trước khi sử dụng cho bài viết thật
+- Always have a backup plan for important articles
+- Test the scheduling feature before using it for real articles
 
-## Ví dụ thực tế
+## Real-world Examples
 
-### 1. **Hẹn giờ đăng bài cho ngày lễ**
+### 1. **Holiday Article Scheduling**
 ```typescript
-// Hẹn giờ đăng bài chúc mừng Giáng sinh
+// Schedule Christmas greeting article
 const christmasDate = new Date('2024-12-25T00:00:00Z');
 await articlesService.scheduleArticle(articleId, {
   scheduledAt: christmasDate,
@@ -255,9 +255,9 @@ await articlesService.scheduleArticle(articleId, {
 });
 ```
 
-### 2. **Hẹn giờ đăng bài series**
+### 2. **Series Article Scheduling**
 ```typescript
-// Hẹn giờ đăng bài series trong 7 ngày
+// Schedule series articles over 7 days
 const articles = ['bai-1', 'bai-2', 'bai-3', 'bai-4', 'bai-5', 'bai-6', 'bai-7'];
 
 for (let i = 0; i < articles.length; i++) {
@@ -271,13 +271,13 @@ for (let i = 0; i < articles.length; i++) {
 }
 ```
 
-### 3. **Hẹn giờ đăng bài theo múi giờ**
+### 3. **Time Zone Scheduling**
 ```typescript
-// Hẹn giờ đăng bài theo múi giờ Việt Nam (UTC+7)
+// Schedule article for Vietnam timezone (UTC+7)
 const vietnamTime = new Date('2024-12-25T09:00:00+07:00');
 await articlesService.scheduleArticle(articleId, {
   scheduledAt: vietnamTime
 });
 ```
 
-Tính năng hẹn giờ đăng bài viết giúp bạn quản lý nội dung một cách chủ động và chuyên nghiệp hơn! 🚀
+The scheduled publishing feature helps you manage content more proactively and professionally! 🚀

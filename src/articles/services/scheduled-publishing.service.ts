@@ -1,7 +1,7 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
-// import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Article } from '../entities/article.entity';
 import { ARTICLE_CONSTANTS } from 'src/shared/constants';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
@@ -255,36 +255,36 @@ export class ScheduledPublishingService extends BaseService<Article> {
    * Cron job to automatically publish scheduled articles
    * Runs every minute to check for articles ready to publish
    */
-  // @Cron(CronExpression.EVERY_MINUTE)
-  // async publishScheduledArticles(): Promise<void> {
-  //   try {
-  //     const readyArticles = await this.getReadyToPublishArticles();
+  @Cron(CronExpression.EVERY_MINUTE)
+  async publishScheduledArticles(): Promise<void> {
+    try {
+      const readyArticles = await this.getReadyToPublishArticles();
 
-  //     if (readyArticles.length === 0) {
-  //       return;
-  //     }
+      if (readyArticles.length === 0) {
+        return;
+      }
 
-  //     this.logger.log(
-  //       `Found ${readyArticles.length} articles ready for publication`,
-  //     );
+      this.logger.log(
+        `Found ${readyArticles.length} articles ready for publication`,
+      );
 
-  //     // Process each article
-  //     for (const article of readyArticles) {
-  //       try {
-  //         await this.publishArticle(article);
-  //         this.logger.log(`Successfully published article ${article.id}`);
-  //       } catch (error: any) {
-  //         this.logger.error(
-  //           `Failed to publish article ${article.id}: ${error?.message || 'Unknown error'}`,
-  //         );
-  //       }
-  //     }
-  //   } catch (error: any) {
-  //     this.logger.error(
-  //       `Error in scheduled publishing cron job: ${error?.message || 'Unknown error'}`,
-  //     );
-  //   }
-  // }
+      // Process each article
+      for (const article of readyArticles) {
+        try {
+          await this.publishArticle(article);
+          this.logger.log(`Successfully published article ${article.id}`);
+        } catch (error: any) {
+          this.logger.error(
+            `Failed to publish article ${article.id}: ${error?.message || 'Unknown error'}`,
+          );
+        }
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `Error in scheduled publishing cron job: ${error?.message || 'Unknown error'}`,
+      );
+    }
+  }
 
   /**
    * Publish a single article

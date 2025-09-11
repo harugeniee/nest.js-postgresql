@@ -33,9 +33,11 @@ import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { ArticlesModule } from './articles/articles.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       validationSchema: configValidationSchema,
       isGlobal: true,

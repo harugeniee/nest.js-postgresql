@@ -1,22 +1,22 @@
-# Hướng dẫn sử dụng Slug Utility
+# Slug Utility Usage Guide
 
-## Tổng quan
+## Overview
 
-Slug utility cung cấp các hàm helper để tạo ra các slug URL-friendly từ tiếng Việt và tiếng Anh. Slug là các chuỗi ký tự thân thiện với URL, thường được sử dụng trong các đường dẫn web.
+Slug utility provides helper functions to create URL-friendly slugs from Vietnamese and English text. Slugs are URL-friendly character strings commonly used in web paths.
 
-## Các hàm chính
+## Main Functions
 
 ### 1. `createSlug(text, options)`
-Tạo slug cơ bản từ một chuỗi văn bản.
+Creates a basic slug from a text string.
 
 ```typescript
 import { createSlug } from 'src/common/utils/slug.util';
 
-// Ví dụ cơ bản
+// Basic examples
 createSlug('Hello World!') // 'hello-world'
 createSlug('Xin chào thế giới!') // 'xin-chao-the-gioi'
 
-// Với tùy chọn
+// With options
 createSlug('Article Title', { 
   maxLength: 20, 
   separator: '_' 
@@ -24,52 +24,52 @@ createSlug('Article Title', {
 ```
 
 ### 2. `createArticleSlug(title, existingSlugs, options)`
-Tạo slug cho bài viết với kiểm tra trùng lặp tự động.
+Creates a slug for articles with automatic duplicate checking.
 
 ```typescript
 import { createArticleSlug } from 'src/common/utils/slug.util';
 
 const existingSlugs = ['bai-viet-1', 'bai-viet-2'];
 const slug = createArticleSlug('Bài viết mới', existingSlugs);
-// Kết quả: 'bai-viet-moi' (nếu chưa tồn tại)
-// Hoặc: 'bai-viet-moi-1' (nếu đã tồn tại)
+// Result: 'bai-viet-moi' (if not exists)
+// Or: 'bai-viet-moi-1' (if already exists)
 ```
 
 ### 3. `generateUniqueSlug(baseSlug, existingSlugs, options)`
-Tạo slug duy nhất bằng cách thêm số thứ tự.
+Creates a unique slug by adding sequential numbers.
 
 ```typescript
 import { generateUniqueSlug } from 'src/common/utils/slug.util';
 
 const existingSlugs = ['hello-world', 'hello-world-1'];
 const uniqueSlug = generateUniqueSlug('hello-world', existingSlugs);
-// Kết quả: 'hello-world-2'
+// Result: 'hello-world-2'
 ```
 
 ### 4. `isValidSlug(slug, options)`
-Kiểm tra tính hợp lệ của slug.
+Validates slug format.
 
 ```typescript
 import { isValidSlug } from 'src/common/utils/slug.util';
 
 isValidSlug('hello-world') // true
-isValidSlug('hello world') // false (có khoảng trắng)
-isValidSlug('hello--world') // false (có dấu gạch ngang kép)
+isValidSlug('hello world') // false (contains spaces)
+isValidSlug('hello--world') // false (contains double dashes)
 ```
 
 ### 5. `createTimestampedSlug(baseText, options)`
-Tạo slug với timestamp để đảm bảo tính duy nhất.
+Creates a slug with timestamp to ensure uniqueness.
 
 ```typescript
 import { createTimestampedSlug } from 'src/common/utils/slug.util';
 
 const slug = createTimestampedSlug('Draft Article');
-// Kết quả: 'draft-article-20231201-143022'
+// Result: 'draft-article-20231201-143022'
 ```
 
-## Sử dụng trong Article Service
+## Usage in Article Service
 
-### Tạo bài viết mới với slug tự động
+### Creating new articles with automatic slug generation
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -90,13 +90,13 @@ export class ArticlesService {
     content: string;
     authorId: string;
   }) {
-    // Lấy danh sách slug hiện có
+    // Get existing slugs
     const existingSlugs = await this.getExistingSlugs();
     
-    // Tạo slug duy nhất
+    // Create unique slug
     const slug = createArticleSlug(articleData.title, existingSlugs);
     
-    // Tạo bài viết
+    // Create article
     const article = this.articleRepository.create({
       ...articleData,
       slug,
@@ -117,7 +117,7 @@ export class ArticlesService {
 }
 ```
 
-### Cập nhật tiêu đề và slug
+### Updating title and slug
 
 ```typescript
 async updateArticleTitle(articleId: string, newTitle: string) {
@@ -126,14 +126,14 @@ async updateArticleTitle(articleId: string, newTitle: string) {
   });
 
   if (!article) {
-    throw new Error('Bài viết không tồn tại');
+    throw new Error('Article not found');
   }
 
-  // Tạo slug mới từ tiêu đề mới
+  // Create new slug from new title
   const existingSlugs = await this.getExistingSlugs(articleId);
   const newSlug = createArticleSlug(newTitle, existingSlugs);
 
-  // Cập nhật bài viết
+  // Update article
   article.title = newTitle;
   article.slug = newSlug;
   
@@ -141,22 +141,22 @@ async updateArticleTitle(articleId: string, newTitle: string) {
 }
 ```
 
-### Kiểm tra slug tùy chỉnh
+### Validating custom slug
 
 ```typescript
 async validateCustomSlug(slug: string, excludeArticleId?: string) {
-  // Kiểm tra định dạng slug
+  // Check slug format
   const isValid = isValidSlug(slug, { minLength: 3, maxLength: 80 });
   
   if (!isValid) {
     return {
       isValid: false,
-      error: 'Định dạng slug không hợp lệ',
+      error: 'Invalid slug format',
       suggestion: createSlug(slug, { maxLength: 80 }),
     };
   }
 
-  // Kiểm tra slug có tồn tại không
+  // Check if slug already exists
   const existingArticle = await this.articleRepository.findOne({
     where: { slug },
   });
@@ -164,7 +164,7 @@ async validateCustomSlug(slug: string, excludeArticleId?: string) {
   if (existingArticle && existingArticle.id !== excludeArticleId) {
     return {
       isValid: false,
-      error: 'Slug đã tồn tại',
+      error: 'Slug already exists',
       suggestion: generateUniqueSlug(slug, await this.getExistingSlugs(excludeArticleId)),
     };
   }
@@ -173,32 +173,32 @@ async validateCustomSlug(slug: string, excludeArticleId?: string) {
 }
 ```
 
-## Tùy chọn cấu hình
+## Configuration Options
 
-### Options cho `createSlug`
+### Options for `createSlug`
 
 ```typescript
 interface SlugOptions {
-  maxLength?: number;      // Độ dài tối đa (mặc định: 100)
-  separator?: string;      // Ký tự phân cách (mặc định: '-')
-  preserveCase?: boolean;  // Giữ nguyên chữ hoa/thường (mặc định: false)
+  maxLength?: number;      // Maximum length (default: 100)
+  separator?: string;      // Separator character (default: '-')
+  preserveCase?: boolean;  // Preserve case (default: false)
 }
 ```
 
-### Options cho `isValidSlug`
+### Options for `isValidSlug`
 
 ```typescript
 interface ValidationOptions {
-  minLength?: number;      // Độ dài tối thiểu (mặc định: 1)
-  maxLength?: number;      // Độ dài tối đa (mặc định: 100)
-  separator?: string;      // Ký tự phân cách (mặc định: '-')
-  allowEmpty?: boolean;    // Cho phép chuỗi rỗng (mặc định: false)
+  minLength?: number;      // Minimum length (default: 1)
+  maxLength?: number;      // Maximum length (default: 100)
+  separator?: string;      // Separator character (default: '-')
+  allowEmpty?: boolean;    // Allow empty string (default: false)
 }
 ```
 
-## Xử lý tiếng Việt
+## Vietnamese Text Processing
 
-Utility tự động xử lý các ký tự tiếng Việt:
+The utility automatically handles Vietnamese characters:
 
 - `à, á, ạ, ả, ã` → `a`
 - `è, é, ẹ, ẻ, ẽ` → `e`
@@ -208,26 +208,26 @@ Utility tự động xử lý các ký tự tiếng Việt:
 - `ỳ, ý, ỵ, ỷ, ỹ` → `y`
 - `đ` → `d`
 
-## Ví dụ thực tế
+## Real-world Examples
 
 ```typescript
-// Tiêu đề tiếng Việt
+// Vietnamese title
 createSlug('Hướng dẫn lập trình NestJS cho người mới bắt đầu')
-// Kết quả: 'huong-dan-lap-trinh-nestjs-cho-nguoi-moi-bat-dau'
+// Result: 'huong-dan-lap-trinh-nestjs-cho-nguoi-moi-bat-dau'
 
-// Tiêu đề có ký tự đặc biệt
+// Title with special characters
 createSlug('React & TypeScript: Best Practices 2024!')
-// Kết quả: 'react-typescript-best-practices-2024'
+// Result: 'react-typescript-best-practices-2024'
 
-// Tiêu đề dài với giới hạn độ dài
+// Long title with length limit
 createSlug('Một bài viết rất dài về lập trình web hiện đại', { maxLength: 30 })
-// Kết quả: 'mot-bai-viet-rat-dai-ve-lap'
+// Result: 'mot-bai-viet-rat-dai-ve-lap'
 ```
 
-## Lưu ý quan trọng
+## Important Notes
 
-1. **Tính duy nhất**: Luôn kiểm tra slug trước khi lưu vào database
-2. **Độ dài**: Giới hạn độ dài slug để tránh URL quá dài
-3. **SEO**: Slug nên mô tả nội dung bài viết
-4. **Tương thích**: Slug chỉ chứa ký tự an toàn cho URL
-5. **Hiệu suất**: Index cột slug trong database để tìm kiếm nhanh
+1. **Uniqueness**: Always check slug before saving to database
+2. **Length**: Limit slug length to avoid overly long URLs
+3. **SEO**: Slug should describe article content
+4. **Compatibility**: Slug should only contain URL-safe characters
+5. **Performance**: Index slug column in database for fast searching
