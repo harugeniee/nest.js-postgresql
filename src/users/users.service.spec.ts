@@ -222,16 +222,12 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
     });
 
-    it('should throw error if user not found', async () => {
+    it('should return null if user not found', async () => {
       const where = { id: '999' };
       userRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.findOne(where)).rejects.toThrow(
-        new HttpException(
-          { messageKey: 'user.USER_NOT_FOUND' },
-          HttpStatus.NOT_FOUND,
-        ),
-      );
+      const result = await service.findOne(where);
+      expect(result).toBeNull();
     });
   });
 
