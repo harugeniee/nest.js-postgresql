@@ -6,11 +6,11 @@ import { ReactionCount } from './entities/reaction-count.entity';
 import { CreateOrSetReactionDto } from './dto/create-reaction.dto';
 import { QueryReactionsDto } from './dto/query-reactions.dto';
 import { BatchCountsDto } from './dto/batch-counts.dto';
-import { CacheService } from 'src/shared/services';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CacheService, RabbitMQService } from 'src/shared/services';
 import { BaseService } from 'src/common/services';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { AdvancedPaginationDto } from 'src/common/dto';
+import { JOB_NAME } from 'src/shared/constants';
 
 @Injectable()
 export class ReactionsService extends BaseService<Reaction> {
@@ -22,7 +22,7 @@ export class ReactionsService extends BaseService<Reaction> {
     protected readonly reactionCountRepository: Repository<ReactionCount>,
 
     protected readonly cacheService: CacheService,
-    protected readonly eventEmitter: EventEmitter2,
+    private readonly rabbitMQService: RabbitMQService,
   ) {
     super(
       new TypeOrmBaseRepository<Reaction>(reactionRepository),
@@ -33,10 +33,9 @@ export class ReactionsService extends BaseService<Reaction> {
         relationsWhitelist: {
           user: true,
         },
-        emitEvents: true,
+        emitEvents: false, // Disable EventEmitter, use RabbitMQ instead
       },
       cacheService,
-      eventEmitter,
     );
   }
 
@@ -92,14 +91,17 @@ export class ReactionsService extends BaseService<Reaction> {
         1,
       );
 
-      // Emit event, need send to RabbitMQ
-      this.eventEmitter.emit('reaction.set', {
-        userId,
-        subjectType,
-        subjectId,
-        kind,
-        count: await this.getCount(subjectType, String(subjectId), kind),
-      });
+      // Send event to RabbitMQ
+      await this.rabbitMQService.sendDataToRabbitMQAsync(
+        JOB_NAME.REACTION_SET,
+        {
+          userId,
+          subjectType,
+          subjectId,
+          kind,
+          count: await this.getCount(subjectType, String(subjectId), kind),
+        },
+      );
 
       return reaction;
     });
@@ -130,14 +132,17 @@ export class ReactionsService extends BaseService<Reaction> {
           -1,
         );
 
-        // Emit event, need send to RabbitMQ
-        this.eventEmitter.emit('reaction.unset', {
-          userId,
-          subjectType,
-          subjectId,
-          kind,
-          count: await this.getCount(subjectType, String(subjectId), kind),
-        });
+        // Send event to RabbitMQ
+        await this.rabbitMQService.sendDataToRabbitMQAsync(
+          JOB_NAME.REACTION_UNSET,
+          {
+            userId,
+            subjectType,
+            subjectId,
+            kind,
+            count: await this.getCount(subjectType, String(subjectId), kind),
+          },
+        );
       }
 
       return null;

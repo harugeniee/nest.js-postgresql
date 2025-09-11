@@ -115,4 +115,42 @@ export class WorkerController {
       channel.nack(originalMsg, false, true);
     }
   }
+
+  @MessagePattern(JOB_NAME.REACTION_SET)
+  async handleReactionSet(@Payload() data: any, @Ctx() context: RmqContext) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Reaction set event received:', data);
+      // Process reaction set event here
+      // You can add logic to update other systems, send notifications, etc.
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error) {
+      console.log('Error processing reaction set event:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern(JOB_NAME.REACTION_UNSET)
+  async handleReactionUnset(@Payload() data: any, @Ctx() context: RmqContext) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Reaction unset event received:', data);
+      // Process reaction unset event here
+      // You can add logic to update other systems, send notifications, etc.
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error) {
+      console.log('Error processing reaction unset event:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
 }

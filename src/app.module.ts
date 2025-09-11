@@ -32,6 +32,7 @@ import { CacheModule, RabbitmqModule, MailModule } from './shared/services';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { ReactionsModule } from './reactions/reactions.module';
 import { ArticlesModule } from './articles/articles.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
@@ -94,6 +95,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     QrModule,
     RateLimitModule,
     ArticlesModule,
+    ReactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

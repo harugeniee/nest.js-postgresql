@@ -4,13 +4,12 @@ import { ReactionsController } from './reactions.controller';
 import { ReactionsService } from './reactions.service';
 import { Reaction } from './entities/reaction.entity';
 import { ReactionCount } from './entities/reaction-count.entity';
-import { CacheService } from 'src/shared/services';
-import { EventEmitterModule } from '@nestjs/event-emitter';
+import { CacheService, RabbitmqModule } from 'src/shared/services';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Reaction, ReactionCount]),
-    EventEmitterModule,
+    RabbitmqModule,
   ],
   controllers: [ReactionsController],
   providers: [ReactionsService, CacheService],

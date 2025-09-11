@@ -4,8 +4,7 @@ import { Repository, DataSource } from 'typeorm';
 import { ReactionsService } from './reactions.service';
 import { Reaction } from './entities/reaction.entity';
 import { ReactionCount } from './entities/reaction-count.entity';
-import { CacheService } from 'src/shared/services';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CacheService, RabbitMQService } from 'src/shared/services';
 
 describe('ReactionsService', () => {
   let service: ReactionsService;
@@ -13,7 +12,7 @@ describe('ReactionsService', () => {
   let reactionCountRepository: Repository<ReactionCount>;
   let dataSource: DataSource;
   let cacheService: CacheService;
-  let eventEmitter: EventEmitter2;
+  let rabbitMQService: RabbitMQService;
 
   const mockReaction = {
     id: '1',
@@ -121,9 +120,9 @@ describe('ReactionsService', () => {
           },
         },
         {
-          provide: EventEmitter2,
+          provide: RabbitMQService,
           useValue: {
-            emit: jest.fn(),
+            sendDataToRabbitMQAsync: jest.fn().mockResolvedValue(true),
           },
         },
       ],
@@ -138,7 +137,7 @@ describe('ReactionsService', () => {
     );
     dataSource = module.get<DataSource>(DataSource);
     cacheService = module.get<CacheService>(CacheService);
-    eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+    rabbitMQService = module.get<RabbitMQService>(RabbitMQService);
   });
 
   it('should be defined', () => {
@@ -207,13 +206,16 @@ describe('ReactionsService', () => {
       const result = await service.set(userId, dto);
 
       expect(result).toEqual(mockReaction);
-      expect(eventEmitter.emit).toHaveBeenCalledWith('reaction.set', {
-        userId,
-        subjectType: dto.subjectType,
-        subjectId: dto.subjectId,
-        kind: dto.kind,
-        count: 5,
-      });
+      expect(rabbitMQService.sendDataToRabbitMQAsync).toHaveBeenCalledWith(
+        'reaction_set',
+        {
+          userId,
+          subjectType: dto.subjectType,
+          subjectId: dto.subjectId,
+          kind: dto.kind,
+          count: 5,
+        },
+      );
     });
   });
 
@@ -241,13 +243,16 @@ describe('ReactionsService', () => {
       const result = await service.unset(userId, dto);
 
       expect(result).toBeNull();
-      expect(eventEmitter.emit).toHaveBeenCalledWith('reaction.unset', {
-        userId,
-        subjectType: dto.subjectType,
-        subjectId: dto.subjectId,
-        kind: dto.kind,
-        count: 4,
-      });
+      expect(rabbitMQService.sendDataToRabbitMQAsync).toHaveBeenCalledWith(
+        'reaction_unset',
+        {
+          userId,
+          subjectType: dto.subjectType,
+          subjectId: dto.subjectId,
+          kind: dto.kind,
+          count: 4,
+        },
+      );
     });
   });
 

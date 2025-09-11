@@ -5,4 +5,6 @@ export const JOB_NAME = {
   MAIL_BATCH: 'mail_batch',
   MAIL_TEMPLATE: 'mail_template',
   MAIL_OTP: 'mail_otp',
+  REACTION_SET: 'reaction_set',
+  REACTION_UNSET: 'reaction_unset',
 } as const;
