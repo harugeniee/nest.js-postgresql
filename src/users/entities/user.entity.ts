@@ -6,9 +6,9 @@ import { Column, Entity, Index } from 'typeorm';
 @Entity({
   name: 'users',
 })
-@Index(['oauthProvider', 'oauthId'], { unique: true }) // Composite unique index cho OAuth
-@Index(['status', 'role']) // Composite index cho filtering
-@Index(['isEmailVerified', 'isPhoneVerified']) // Composite index cho verification
+@Index(['oauthProvider', 'oauthId'], { unique: true }) // Composite unique index for OAuth
+@Index(['status', 'role']) // Composite index for filtering
+@Index(['isEmailVerified', 'isPhoneVerified']) // Composite index for verification
 export class User extends BaseEntityCustom {
   @Column({
     type: 'varchar',
@@ -18,7 +18,7 @@ export class User extends BaseEntityCustom {
   })
   name: string;
 
-  @Index({ unique: true }) // Unique index cho username
+  @Index({ unique: true }) // Unique index for username
   @Column({
     type: 'varchar',
     length: USER_CONSTANTS.NAME_MAX_LENGTH,
@@ -26,7 +26,7 @@ export class User extends BaseEntityCustom {
   })
   username: string;
 
-  @Index() // Index cho status filtering
+  @Index() // Index for status filtering
   @Column({
     type: 'varchar',
     nullable: false,
@@ -35,7 +35,7 @@ export class User extends BaseEntityCustom {
   })
   status: UserStatus;
 
-  @Index() // Index cho role filtering
+  @Index() // Index for role filtering
   @Column({
     type: 'varchar',
     nullable: false,
@@ -57,7 +57,7 @@ export class User extends BaseEntityCustom {
   })
   dob: Date;
 
-  @Index() // Index cho phone search (optional)
+  @Index() // Index for phone search (optional)
   @Column('varchar', {
     length: USER_CONSTANTS.PHONE_MAX_LENGTH,
     nullable: true,
@@ -84,7 +84,7 @@ export class User extends BaseEntityCustom {
   })
   oauthId: string; // Unique ID from OAuth provider
 
-  @Index() // Index cho auth method filtering
+  @Index() // Index for auth method filtering
   @Column('varchar', {
     length: USER_CONSTANTS.AUTH_METHOD_MAX_LENGTH,
     nullable: false,
@@ -92,13 +92,13 @@ export class User extends BaseEntityCustom {
   })
   authMethod: string; // email_password, oauth, phone_otp
 
-  @Index() // Index cho email verification filtering
+  @Index() // Index for email verification filtering
   @Column('boolean', {
     default: false,
   })
   isEmailVerified: boolean;
 
-  @Index() // Index cho phone verification filtering
+  @Index() // Index for phone verification filtering
   @Column('boolean', {
     default: false,
   })
