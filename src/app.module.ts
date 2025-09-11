@@ -32,6 +32,7 @@ import { CacheModule, RabbitmqModule, MailModule } from './shared/services';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { ArticlesModule } from './articles/articles.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
     AuthModule,
     QrModule,
     RateLimitModule,
+    ArticlesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

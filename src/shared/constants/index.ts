@@ -5,3 +5,4 @@ export * from './file.constants';
 export * from './media.constants';
 export * from './qr.constants';
 export * from './common.constants';
+export * from './article.constants';
