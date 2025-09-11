@@ -17,8 +17,10 @@ export class ReactionsService extends BaseService<Reaction> {
   constructor(
     @InjectRepository(Reaction)
     protected readonly reactionRepository: Repository<Reaction>,
+
     @InjectRepository(ReactionCount)
     protected readonly reactionCountRepository: Repository<ReactionCount>,
+
     protected readonly cacheService: CacheService,
     protected readonly eventEmitter: EventEmitter2,
   ) {
