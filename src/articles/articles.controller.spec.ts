@@ -158,7 +158,6 @@ describe('ArticlesController', () => {
     });
   });
 
-
   describe('update', () => {
     it('should update an article', async () => {
       const articleId = 'article-123';
@@ -199,6 +198,4 @@ describe('ArticlesController', () => {
       expect(articlesService.remove).toHaveBeenCalledWith(articleId);
     });
   });
-
-
 });

@@ -195,9 +195,7 @@ describe('ArticlesService', () => {
         updatedAt: new Date(),
       } as unknown as Article;
 
-      jest
-        .spyOn(service, 'findBySlug')
-        .mockResolvedValue(mockArticle);
+      jest.spyOn(service, 'findBySlug').mockResolvedValue(mockArticle);
 
       const result = await service.findBySlug(slug);
 
@@ -238,9 +236,7 @@ describe('ArticlesService', () => {
         updatedAt: new Date(),
       } as unknown as Article;
 
-      jest
-        .spyOn(service, 'update')
-        .mockResolvedValue(mockUpdatedArticle);
+      jest.spyOn(service, 'update').mockResolvedValue(mockUpdatedArticle);
 
       const result = await service.update(articleId, updateData);
 

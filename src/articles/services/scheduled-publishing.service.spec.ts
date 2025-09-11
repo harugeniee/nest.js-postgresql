@@ -120,9 +120,7 @@ describe('ScheduledPublishingService', () => {
       const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
 
       jest.spyOn(service, 'findById').mockResolvedValue(mockArticle);
-      jest
-        .spyOn(service, 'update')
-        .mockResolvedValue(mockScheduledArticle);
+      jest.spyOn(service, 'update').mockResolvedValue(mockScheduledArticle);
 
       const result = await service.scheduleArticle(articleId, scheduledAt);
 
@@ -142,9 +140,7 @@ describe('ScheduledPublishingService', () => {
         status: ARTICLE_CONSTANTS.STATUS.PUBLISHED,
       } as unknown as Article;
 
-      jest
-        .spyOn(service, 'findById')
-        .mockResolvedValue(publishedArticle);
+      jest.spyOn(service, 'findById').mockResolvedValue(publishedArticle);
 
       await expect(
         service.scheduleArticle(articleId, scheduledAt),
@@ -164,9 +160,7 @@ describe('ScheduledPublishingService', () => {
         status: ARTICLE_CONSTANTS.STATUS.ARCHIVED,
       } as unknown as Article;
 
-      jest
-        .spyOn(service, 'findById')
-        .mockResolvedValue(archivedArticle);
+      jest.spyOn(service, 'findById').mockResolvedValue(archivedArticle);
 
       await expect(
         service.scheduleArticle(articleId, scheduledAt),
@@ -221,12 +215,8 @@ describe('ScheduledPublishingService', () => {
         scheduledAt: undefined,
       } as unknown as Article;
 
-      jest
-        .spyOn(service, 'findById')
-        .mockResolvedValue(mockScheduledArticle);
-      jest
-        .spyOn(service, 'update')
-        .mockResolvedValue(unscheduledArticle);
+      jest.spyOn(service, 'findById').mockResolvedValue(mockScheduledArticle);
+      jest.spyOn(service, 'update').mockResolvedValue(unscheduledArticle);
 
       const result = await service.unscheduleArticle(articleId);
 
@@ -261,12 +251,8 @@ describe('ScheduledPublishingService', () => {
         scheduledAt: newScheduledAt,
       } as unknown as Article;
 
-      jest
-        .spyOn(service, 'findById')
-        .mockResolvedValue(mockScheduledArticle);
-      jest
-        .spyOn(service, 'update')
-        .mockResolvedValue(rescheduledArticle);
+      jest.spyOn(service, 'findById').mockResolvedValue(mockScheduledArticle);
+      jest.spyOn(service, 'update').mockResolvedValue(rescheduledArticle);
 
       const result = await service.rescheduleArticle(articleId, newScheduledAt);
 
@@ -297,9 +283,7 @@ describe('ScheduledPublishingService', () => {
       const articleId = 'article-123';
       const pastDate = new Date('2020-01-01T12:00:00Z');
 
-      jest
-        .spyOn(service, 'findById')
-        .mockResolvedValue(mockScheduledArticle);
+      jest.spyOn(service, 'findById').mockResolvedValue(mockScheduledArticle);
 
       await expect(
         service.rescheduleArticle(articleId, pastDate),
@@ -322,12 +306,8 @@ describe('ScheduledPublishingService', () => {
         scheduledAt: undefined,
       } as unknown as Article;
 
-      jest
-        .spyOn(service, 'findById')
-        .mockResolvedValue(mockScheduledArticle);
-      jest
-        .spyOn(service, 'update')
-        .mockResolvedValue(publishedArticle);
+      jest.spyOn(service, 'findById').mockResolvedValue(mockScheduledArticle);
+      jest.spyOn(service, 'update').mockResolvedValue(publishedArticle);
 
       const result = await service.publishScheduledArticle(articleId);
 
@@ -477,13 +457,9 @@ describe('ScheduledPublishingService', () => {
         scheduledAt: undefined,
       } as unknown as Article;
 
-      jest
-        .spyOn(service, 'update')
-        .mockResolvedValue(publishedArticle);
+      jest.spyOn(service, 'update').mockResolvedValue(publishedArticle);
 
-      const result = await service['publishArticle'](
-        mockScheduledArticle,
-      );
+      const result = await service['publishArticle'](mockScheduledArticle);
 
       expect(result).toEqual(publishedArticle);
       expect(service.update).toHaveBeenCalledWith(mockScheduledArticle.id, {
