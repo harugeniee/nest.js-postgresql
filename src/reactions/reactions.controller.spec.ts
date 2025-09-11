@@ -107,7 +107,7 @@ describe('ReactionsController', () => {
 
   describe('createOrSetReaction', () => {
     it('should call toggle when action is toggle', async () => {
-      const req = { user: { id: '1' } };
+      const req = { user: { uid: '1' } } as any;
       const dto: CreateOrSetReactionDto = {
         subjectType: 'article',
         subjectId: '1',
@@ -124,7 +124,7 @@ describe('ReactionsController', () => {
     });
 
     it('should call set when action is set', async () => {
-      const req = { user: { id: '1' } };
+      const req = { user: { uid: '1' } } as any;
       const dto: CreateOrSetReactionDto = {
         subjectType: 'article',
         subjectId: '1',
@@ -141,7 +141,7 @@ describe('ReactionsController', () => {
     });
 
     it('should call unset when action is unset', async () => {
-      const req = { user: { id: '1' } };
+      const req = { user: { uid: '1' } } as any;
       const dto: CreateOrSetReactionDto = {
         subjectType: 'article',
         subjectId: '1',
@@ -160,7 +160,7 @@ describe('ReactionsController', () => {
 
   describe('unsetReaction', () => {
     it('should call unset service method', async () => {
-      const req = { user: { id: '1' } };
+      const req = { user: { uid: '1' } } as any;
       const dto: CreateOrSetReactionDto = {
         subjectType: 'article',
         subjectId: '1',
@@ -205,7 +205,7 @@ describe('ReactionsController', () => {
 
   describe('hasReacted', () => {
     it('should call hasReacted service method with correct parameters', async () => {
-      const req = { user: { id: '1' } };
+      const req = { user: { uid: '1' } } as any;
       const subjectType = 'article';
       const subjectId = '1';
       const kind = 'like';
