@@ -96,6 +96,7 @@ describe('ReactionsService', () => {
         {
           provide: getRepositoryToken(ReactionCount),
           useValue: {
+            find: jest.fn(),
             findOne: jest.fn(),
             save: jest.fn(),
             update: jest.fn(),
@@ -203,6 +204,7 @@ describe('ReactionsService', () => {
 
       jest.spyOn(dataSource, 'transaction').mockImplementation(mockTransaction);
       jest.spyOn(service as any, 'getCount').mockResolvedValue(5);
+      jest.spyOn(service, 'create').mockResolvedValue(mockReaction);
 
       const result = await service.set(userId, dto);
 
@@ -235,6 +237,8 @@ describe('ReactionsService', () => {
 
       jest.spyOn(dataSource, 'transaction').mockImplementation(mockTransaction);
       jest.spyOn(service as any, 'getCount').mockResolvedValue(4);
+      jest.spyOn(service, 'findOne').mockResolvedValue(mockReaction);
+      jest.spyOn(service, 'softDelete').mockResolvedValue(undefined);
 
       const result = await service.unset(userId, dto);
 
@@ -354,6 +358,11 @@ describe('ReactionsService', () => {
         .spyOn(reactionCountRepository, 'createQueryBuilder')
         .mockReturnValue(mockQueryBuilder as any);
 
+      // Mock the find method for TypeORM native usage
+      jest
+        .spyOn(reactionCountRepository, 'find')
+        .mockResolvedValue([mockReactionCount]);
+
       const result = await service.getCounts(subjectType, subjectId, kinds);
 
       expect(result).toEqual([mockReactionCount]);
@@ -402,6 +411,11 @@ describe('ReactionsService', () => {
       jest
         .spyOn(reactionCountRepository, 'createQueryBuilder')
         .mockReturnValue(mockQueryBuilder as any);
+
+      // Mock the find method for TypeORM native usage
+      jest
+        .spyOn(reactionCountRepository, 'find')
+        .mockResolvedValue([mockReactionCount]);
 
       const result = await service.getCountsBatch(dto);
 

@@ -6,6 +6,10 @@ import { ReactionCount } from './entities/reaction-count.entity';
 import { CreateOrSetReactionDto } from './dto/create-reaction.dto';
 import { QueryReactionsDto } from './dto/query-reactions.dto';
 import { BatchCountsDto } from './dto/batch-counts.dto';
+import { JwtAccessTokenGuard } from 'src/auth/guard';
+import { JwtService } from '@nestjs/jwt';
+import { CacheService } from 'src/shared/services';
+import { ConfigService } from '@nestjs/config';
 
 describe('ReactionsController', () => {
   let controller: ReactionsController;
@@ -61,6 +65,33 @@ describe('ReactionsController', () => {
             hasReacted: jest.fn(),
             getCounts: jest.fn(),
             getCountsBatch: jest.fn(),
+          },
+        },
+        {
+          provide: JwtAccessTokenGuard,
+          useValue: {
+            canActivate: jest.fn().mockReturnValue(true),
+          },
+        },
+        {
+          provide: JwtService,
+          useValue: {
+            verify: jest.fn(),
+            sign: jest.fn(),
+          },
+        },
+        {
+          provide: CacheService,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            delete: jest.fn(),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
           },
         },
       ],

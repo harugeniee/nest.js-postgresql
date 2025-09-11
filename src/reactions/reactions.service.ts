@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager } from 'typeorm';
+import { Repository, EntityManager, In, FindOptionsWhere } from 'typeorm';
 import { Reaction } from './entities/reaction.entity';
 import { ReactionCount } from './entities/reaction-count.entity';
 import { CreateOrSetReactionDto } from './dto/create-reaction.dto';
@@ -19,7 +19,6 @@ export class ReactionsService extends BaseService<Reaction> {
     protected readonly reactionRepository: Repository<Reaction>,
     @InjectRepository(ReactionCount)
     protected readonly reactionCountRepository: Repository<ReactionCount>,
-    protected readonly dataSource: DataSource,
     protected readonly cacheService: CacheService,
     protected readonly eventEmitter: EventEmitter2,
   ) {
@@ -91,7 +90,7 @@ export class ReactionsService extends BaseService<Reaction> {
         1,
       );
 
-      // Emit event
+      // Emit event, need send to RabbitMQ
       this.eventEmitter.emit('reaction.set', {
         userId,
         subjectType,
@@ -129,7 +128,7 @@ export class ReactionsService extends BaseService<Reaction> {
           -1,
         );
 
-        // Emit event
+        // Emit event, need send to RabbitMQ
         this.eventEmitter.emit('reaction.unset', {
           userId,
           subjectType,
@@ -196,16 +195,18 @@ export class ReactionsService extends BaseService<Reaction> {
       return cached;
     }
 
-    const query = this.reactionCountRepository
-      .createQueryBuilder('count')
-      .where('count.subjectType = :subjectType', { subjectType })
-      .andWhere('count.subjectId = :subjectId', { subjectId });
+    const whereCondition: FindOptionsWhere<ReactionCount> = {
+      subjectType,
+      subjectId,
+    };
 
     if (kinds && kinds.length > 0) {
-      query.andWhere('count.kind IN (:...kinds)', { kinds });
+      whereCondition.kind = In(kinds);
     }
 
-    const counts = await query.getMany();
+    const counts = await this.reactionCountRepository.find({
+      where: whereCondition,
+    });
 
     await this.cacheService.set(cacheKey, counts, 60);
 
@@ -221,16 +222,18 @@ export class ReactionsService extends BaseService<Reaction> {
       return cached;
     }
 
-    const query = this.reactionCountRepository
-      .createQueryBuilder('count')
-      .where('count.subjectType = :subjectType', { subjectType })
-      .andWhere('count.subjectId IN (:...subjectIds)', { subjectIds });
+    const whereCondition: FindOptionsWhere<ReactionCount> = {
+      subjectType,
+      subjectId: In(subjectIds),
+    };
 
     if (kinds && kinds.length > 0) {
-      query.andWhere('count.kind IN (:...kinds)', { kinds });
+      whereCondition.kind = In(kinds);
     }
 
-    const counts = await query.getMany();
+    const counts = await this.reactionCountRepository.find({
+      where: whereCondition,
+    });
 
     await this.cacheService.set(cacheKey, counts, 60);
 
