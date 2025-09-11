@@ -2,7 +2,6 @@ import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { BaseRepository } from 'src/common/repositories/base.repository';
 import {
-  applyWhitelist,
   decodeSignedCursor,
   encodeSignedCursor,
   mapTypeOrmError,
@@ -25,7 +24,7 @@ import {
 } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
-import { Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 
 export type QOpts<T> = {
   relations?: string[] | FindOptionsRelations<T>;
@@ -49,7 +48,7 @@ export abstract class BaseService<T extends { id: string }> {
       entityName: string;
       idKey?: string;
       softDelete?: boolean;
-      relationsWhitelist?: string[];
+      relationsWhitelist?: FindOptionsRelations<T>;
       selectWhitelist?: FindOptionsSelect<T>;
       cache?: CacheOptions & { prefix?: string };
       emitEvents?: boolean;
@@ -76,9 +75,19 @@ export abstract class BaseService<T extends { id: string }> {
     }
   }
 
-  // Hooks for child services to override
+  /**
+   * Get searchable columns for text search functionality
+   * Override this method in child services to define which fields can be searched
+   * @returns Array of column names that can be searched
+   * @example
+   * // In UserService:
+   * protected getSearchableColumns(): (keyof User)[] {
+   *   return ['name', 'email', 'username'];
+   * }
+   */
   protected getSearchableColumns(): (keyof T)[] {
-    return [];
+    // Return default search field if no specific searchable columns are defined
+    return [this.defaultSearchField as keyof T];
   }
 
   protected async beforeCreate(data: DeepPartial<T>): Promise<DeepPartial<T>> {
@@ -117,6 +126,10 @@ export abstract class BaseService<T extends { id: string }> {
   }
 
   async create(data: DeepPartial<T>, ctx?: TxCtx): Promise<T> {
+    if (!data || typeof data !== 'object') {
+      throw new BadRequestException('Invalid data provided for creation');
+    }
+
     try {
       const prepared = await this.beforeCreate(data);
       const entity = this.repo.create(prepared);
@@ -169,6 +182,10 @@ export abstract class BaseService<T extends { id: string }> {
   }
 
   async findById(id: string, opts?: QOpts<T>, _ctx?: TxCtx): Promise<T> {
+    if (!id || typeof id !== 'string') {
+      throw new BadRequestException('Invalid ID provided');
+    }
+
     const safe = this.applyQueryOpts(opts);
     const cacheKey = this.cache ? `${this.cache.prefix}:id:${id}` : undefined;
     if (cacheKey) {
@@ -200,89 +217,60 @@ export abstract class BaseService<T extends { id: string }> {
   ): Promise<IPagination<T>> {
     const { page, limit, sortBy, order, ...rest } = pagination;
     if (rest.query) rest.query = normalizeSearchInput(rest.query);
+
+    // Validate and prepare search fields
+    const searchFields = this.validateAndPrepareSearchFields(rest.fields);
+
     const where = ConditionBuilder.build(
-      { ...rest, ...(extraFilter || {}) },
+      {
+        ...rest,
+        ...(extraFilter || {}),
+        // Pass validated search fields to ConditionBuilder
+        fields: searchFields,
+      },
       this.defaultSearchField,
     );
+
     const safe = this.applyQueryOpts(opts);
-    const orderObj: FindOptionsOrder<T> = {};
-    (orderObj as Record<string, 'ASC' | 'DESC'>)[sortBy] = order;
-    (orderObj as Record<string, 'ASC' | 'DESC'>)[String(this.idKey)] = order;
+    const orderObj = this.buildOrderObject(sortBy, order);
     await this.onListQueryBuilt({ where, order: orderObj, dto: pagination });
-    console.log('where', where);
-    const cacheKey = this.cache
-      ? `${this.cache.prefix}:list:${sha256Hex(
-          stableStringify({
-            where,
-            page,
-            limit,
-            sortBy,
-            order,
-            select: safe.select,
-            relations: safe.relations,
-          }),
-        )}`
-      : undefined;
+
+    // Try to get from cache first
+    const cacheKey = this.buildCacheKey('list', {
+      where,
+      page,
+      limit,
+      sortBy,
+      order,
+      select: safe.select,
+      relations: safe.relations,
+    });
 
     if (cacheKey) {
-      const cached = (await this.cacheService?.get(
-        cacheKey,
-      )) as IPagination<T> | null;
+      const cached = await this.getCachedResult<IPagination<T>>(cacheKey);
       if (cached) {
-        // Optional SWR: if ttl is within swr window, refresh in background
-        const cacheSvc = this.cacheService;
-        if (this.cache?.swrSec && cacheSvc) {
-          void (async () => {
-            const ttl = await cacheSvc.getTtl(cacheKey);
-            if (
-              this.cache &&
-              this.cache.swrSec &&
-              ttl >= 0 &&
-              ttl <= this.cache.swrSec
-            ) {
-              const [freshData, freshTotal] = await this.repo.findAndCount({
-                skip: (page - 1) * limit,
-                take: limit,
-                order: orderObj,
-                where,
-                relations: safe.relations,
-                select: safe.select,
-                withDeleted: safe.withDeleted,
-              });
-              const freshEnvelope = PaginationFormatter.offset<T>(
-                freshData,
-                freshTotal,
-                page,
-                limit,
-              );
-              if (this.cache) {
-                await this.cacheService?.set(
-                  cacheKey,
-                  freshEnvelope,
-                  this.cache.ttlSec,
-                );
-              }
-            }
-          })();
-        }
+        // Background refresh if within SWR window
+        this.refreshCacheInBackground(cacheKey, () =>
+          this.fetchAndFormatOffsetData(where, orderObj, safe, page, limit),
+        );
         return cached;
       }
     }
 
-    const [data, total] = await this.repo.findAndCount({
-      skip: (page - 1) * limit,
-      take: limit,
-      order: orderObj,
+    // Fetch fresh data
+    const envelope = await this.fetchAndFormatOffsetData(
       where,
-      relations: safe.relations,
-      select: safe.select,
-      withDeleted: safe.withDeleted,
-    });
+      orderObj,
+      safe,
+      page,
+      limit,
+    );
 
-    const envelope = PaginationFormatter.offset<T>(data, total, page, limit);
+    // Cache the result
     if (cacheKey && this.cache) {
       await this.cacheService?.set(cacheKey, envelope, this.cache.ttlSec);
     }
+
     return envelope;
   }
 
@@ -304,7 +292,15 @@ export abstract class BaseService<T extends { id: string }> {
     if (typeof restAdv.query === 'string') {
       restAdv.query = normalizeSearchInput(restAdv.query);
     }
-    const baseFilter: Record<string, unknown> = restAdv;
+
+    // Validate and prepare search fields
+    const searchFields = this.validateAndPrepareSearchFields(restAdv.fields);
+
+    const baseFilter: Record<string, unknown> = {
+      ...restAdv,
+      // Pass validated search fields to ConditionBuilder
+      fields: searchFields,
+    };
     if (extraFilter) {
       Object.assign(baseFilter, extraFilter);
     }
@@ -553,9 +549,10 @@ export abstract class BaseService<T extends { id: string }> {
   }
 
   protected applyQueryOpts(opts?: QOpts<T>): QOpts<T> {
-    const relations = Array.isArray(opts?.relations)
-      ? applyWhitelist(opts?.relations, this.opts.relationsWhitelist)
-      : opts?.relations;
+    const relations = this.filterRelationsByWhitelist(
+      opts?.relations,
+      this.opts.relationsWhitelist,
+    );
     let select = opts?.select;
 
     // Apply selectWhitelist security filtering
@@ -579,6 +576,144 @@ export abstract class BaseService<T extends { id: string }> {
       select,
       withDeleted,
     };
+  }
+
+  /**
+   * Filter relations based on the whitelist
+   * @param relations The relations to filter
+   * @param whitelist The allowed relations
+   * @returns Filtered relations
+   */
+  private filterRelationsByWhitelist(
+    relations?: string[] | FindOptionsRelations<T>,
+    whitelist?: FindOptionsRelations<T>,
+  ): string[] | FindOptionsRelations<T> | undefined {
+    if (!relations) return undefined;
+    if (!whitelist) return relations;
+
+    // Handle string array relations
+    if (Array.isArray(relations)) {
+      const whitelistKeys = this.extractRelationKeys(whitelist);
+      return relations.filter((rel) => whitelistKeys.includes(rel));
+    }
+
+    // Handle FindOptionsRelations object
+    if (typeof relations === 'object' && relations !== null) {
+      return this.filterRelationsObject(relations, whitelist);
+    }
+
+    return relations;
+  }
+
+  /**
+   * Extract relation keys from FindOptionsRelations object
+   * @param relations The relations object
+   * @returns Array of relation keys
+   */
+  private extractRelationKeys(relations: FindOptionsRelations<T>): string[] {
+    const keys: string[] = [];
+
+    for (const key in relations) {
+      if (Object.hasOwn(relations, key)) {
+        keys.push(key);
+        const nested = relations[key];
+        if (typeof nested === 'object' && nested !== null) {
+          // Recursively extract nested relation keys
+          const nestedKeys = this.extractRelationKeys(
+            nested as FindOptionsRelations<any>,
+          );
+          keys.push(...nestedKeys.map((nestedKey) => `${key}.${nestedKey}`));
+        }
+      }
+    }
+
+    return keys;
+  }
+
+  /**
+   * Filter relations object based on whitelist
+   * @param relations The relations to filter
+   * @param whitelist The allowed relations
+   * @returns Filtered relations object
+   */
+  private filterRelationsObject(
+    relations: FindOptionsRelations<T>,
+    whitelist: FindOptionsRelations<T>,
+  ): FindOptionsRelations<T> {
+    const filtered: FindOptionsRelations<T> = {};
+
+    for (const key in relations) {
+      if (Object.hasOwn(relations, key) && key in whitelist) {
+        const relationValue = relations[key];
+        const whitelistValue = whitelist[key];
+
+        if (this.isNestedRelation(relationValue, whitelistValue)) {
+          this.handleNestedRelation(
+            filtered,
+            key,
+            relationValue,
+            whitelistValue,
+          );
+        } else if (this.isBooleanRelation(relationValue)) {
+          this.handleBooleanRelation(filtered, key, relationValue);
+        }
+      }
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Check if the relation value is a nested relation object
+   */
+  private isNestedRelation(
+    relationValue: unknown,
+    whitelistValue: unknown,
+  ): boolean {
+    return (
+      typeof relationValue === 'object' &&
+      relationValue !== null &&
+      typeof whitelistValue === 'object' &&
+      whitelistValue !== null &&
+      !Array.isArray(relationValue) &&
+      !Array.isArray(whitelistValue)
+    );
+  }
+
+  /**
+   * Check if the relation value is a boolean true
+   */
+  private isBooleanRelation(relationValue: unknown): boolean {
+    return typeof relationValue === 'boolean' && relationValue;
+  }
+
+  /**
+   * Handle nested relation filtering
+   */
+  private handleNestedRelation(
+    filtered: FindOptionsRelations<T>,
+    key: string,
+    relationValue: unknown,
+    whitelistValue: unknown,
+  ): void {
+    const nestedFiltered = this.filterRelationsObject(
+      relationValue as FindOptionsRelations<any>,
+      whitelistValue as FindOptionsRelations<any>,
+    );
+    if (Object.keys(nestedFiltered).length > 0) {
+      (filtered as Record<string, unknown>)[key] = nestedFiltered;
+    }
+  }
+
+  /**
+   * Handle boolean relation filtering
+   */
+  private handleBooleanRelation(
+    filtered: FindOptionsRelations<T>,
+    key: string,
+    relationValue: unknown,
+  ): void {
+    (filtered as Record<string, unknown>)[key] = relationValue;
   }
 
   /**
@@ -692,6 +827,151 @@ export abstract class BaseService<T extends { id: string }> {
   protected getAllowedSelectFields(): (keyof T)[] {
     if (!this.opts.selectWhitelist) return [];
     return Object.keys(this.opts.selectWhitelist) as (keyof T)[];
+  }
+
+  /**
+   * Check if a relation is allowed based on whitelist
+   * @param relation The relation to check
+   * @returns True if relation is allowed
+   */
+  protected isRelationAllowed(relation: string): boolean {
+    if (!this.opts.relationsWhitelist) return true;
+    const allowedKeys = this.extractRelationKeys(this.opts.relationsWhitelist);
+    return allowedKeys.includes(relation);
+  }
+
+  /**
+   * Get all allowed relations from whitelist
+   * @returns Array of allowed relation names
+   */
+  protected getAllowedRelations(): string[] {
+    if (!this.opts.relationsWhitelist) return [];
+    return this.extractRelationKeys(this.opts.relationsWhitelist);
+  }
+
+  /**
+   * Validate and prepare search fields based on user input and searchable columns
+   * @param userFields Fields provided by user (can be string, string[], or undefined)
+   * @returns Array of validated search fields
+   * @throws BadRequestException if user provides invalid fields
+   *
+   * @example
+   * // With UsersService (only 'name' is searchable):
+   * validateAndPrepareSearchFields() // Returns ['name']
+   * validateAndPrepareSearchFields('name') // Returns ['name']
+   * validateAndPrepareSearchFields(['name', 'email']) // Throws BadRequestException
+   * validateAndPrepareSearchFields('username') // Throws BadRequestException
+   */
+  protected validateAndPrepareSearchFields(
+    userFields?: string | string[],
+  ): string[] {
+    const searchableColumns = this.getSearchableColumns();
+    const allowedFields = searchableColumns.map((col) => String(col));
+
+    // If no user fields provided, use all allowed fields
+    if (!userFields) {
+      return allowedFields;
+    }
+
+    const userFieldsArray = Array.isArray(userFields)
+      ? userFields
+      : [userFields];
+
+    // Check if all user fields are allowed
+    const invalidFields = userFieldsArray.filter(
+      (field) => !allowedFields.includes(field),
+    );
+
+    if (invalidFields.length > 0) {
+      throw new BadRequestException(
+        `Invalid search fields: ${invalidFields.join(', ')}. ` +
+          `Allowed fields: ${allowedFields.join(', ')}`,
+      );
+    }
+
+    return userFieldsArray;
+  }
+
+  /**
+   * Build order object for TypeORM queries
+   */
+  protected buildOrderObject(
+    sortBy: string,
+    order: 'ASC' | 'DESC',
+  ): FindOptionsOrder<T> {
+    const orderObj: FindOptionsOrder<T> = {};
+    (orderObj as Record<string, 'ASC' | 'DESC'>)[sortBy] = order;
+    (orderObj as Record<string, 'ASC' | 'DESC'>)[String(this.idKey)] = order;
+    return orderObj;
+  }
+
+  /**
+   * Build cache key for different operations
+   */
+  protected buildCacheKey(
+    operation: string,
+    data: Record<string, unknown>,
+  ): string | undefined {
+    if (!this.cache) return undefined;
+    return `${this.cache.prefix}:${operation}:${sha256Hex(stableStringify(data))}`;
+  }
+
+  /**
+   * Get cached result with type safety
+   */
+  protected async getCachedResult<R>(cacheKey: string): Promise<R | null> {
+    if (!this.cacheService) return null;
+    return (await this.cacheService.get(cacheKey)) as R | null;
+  }
+
+  /**
+   * Refresh cache in background using SWR pattern
+   */
+  protected refreshCacheInBackground<R>(
+    cacheKey: string,
+    fetchFn: () => Promise<R>,
+  ): void {
+    if (!this.cache?.swrSec || !this.cacheService) return;
+
+    void (async () => {
+      try {
+        const ttl = await this.cacheService?.getTtl(cacheKey);
+        if (ttl && ttl >= 0 && ttl <= (this.cache?.swrSec ?? 0)) {
+          const freshData = await fetchFn();
+          await this.cacheService?.set(
+            cacheKey,
+            freshData,
+            this.cache?.ttlSec ?? 0,
+          );
+        }
+      } catch (error) {
+        // Ignore background refresh errors to avoid impacting main flow
+        console.warn('Background cache refresh failed:', error);
+      }
+    })();
+  }
+
+  /**
+   * Fetch and format offset pagination data
+   */
+  protected async fetchAndFormatOffsetData(
+    where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
+    orderObj: FindOptionsOrder<T>,
+    safe: QOpts<T>,
+    page: number,
+    limit: number,
+  ): Promise<IPagination<T>> {
+    const [data, total] = await this.repo.findAndCount({
+      skip: (page - 1) * limit,
+      take: limit,
+      order: orderObj,
+      where,
+      relations: safe.relations,
+      select: safe.select,
+      withDeleted: safe.withDeleted,
+    });
+
+    return PaginationFormatter.offset<T>(data, total, page, limit);
   }
 
   protected async invalidateCacheForEntity(id: string): Promise<void> {

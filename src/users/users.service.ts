@@ -51,9 +51,16 @@ export class UsersService extends BaseService<User> {
         entityName: 'User',
         cache: { enabled: true, ttlSec: 60, prefix: 'users', swrSec: 30 },
         defaultSearchField: 'name',
+        relationsWhitelist: {
+          avatar: true,
+        },
       },
       cacheService,
     );
+  }
+
+  protected getSearchableColumns(): (keyof User)[] {
+    return ['name', 'email', 'username'];
   }
 
   async register(userRegister: RegisterDto) {
@@ -92,17 +99,7 @@ export class UsersService extends BaseService<User> {
     return await this.userRepository.findOne({ where: { email } });
   }
 
-  async findOne(where: FindOptionsWhere<User>): Promise<User> {
-    const user = await this.userRepository.findOne({ where });
-    if (!user) {
-      throw new HttpException(
-        { messageKey: 'user.USER_NOT_FOUND' },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-    return user;
-  }
-
+  // Inherit BaseService.findOne
   // Inherit BaseService.findById
 
   async createSession(

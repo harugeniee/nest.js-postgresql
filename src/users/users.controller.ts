@@ -28,7 +28,12 @@ export class UsersController {
   @Get(['@me', 'me'])
   @Auth()
   async getMe(@Request() req: Request & { user: AuthPayload }) {
-    return await this.usersService.findOne({ id: req.user.uid });
+    return await this.usersService.findOne(
+      { id: req.user.uid },
+      {
+        relations: ['avatar'],
+      },
+    );
   }
 
   @Get()
