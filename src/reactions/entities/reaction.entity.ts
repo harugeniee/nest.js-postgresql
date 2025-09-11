@@ -4,7 +4,7 @@ import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 
 /**
  * Reaction Entity
- * 
+ *
  * Stores user reactions/interactions with various objects like articles, comments, users, etc.
  * Examples: like article, bookmark comment, upvote user, etc.
  */

@@ -3,7 +3,7 @@ import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 
 /**
  * Reaction Count Entity
- * 
+ *
  * Stores denormalized reaction counts for performance optimization.
  * Instead of counting from reactions table every time, we store pre-calculated counts.
  */

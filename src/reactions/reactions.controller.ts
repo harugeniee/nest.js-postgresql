@@ -5,7 +5,6 @@ import {
   Delete,
   Body,
   Query,
-  UseGuards,
   Request,
   HttpStatus,
   HttpException,
@@ -14,19 +13,20 @@ import { ReactionsService } from './reactions.service';
 import { CreateOrSetReactionDto } from './dto/create-reaction.dto';
 import { QueryReactionsDto } from './dto/query-reactions.dto';
 import { BatchCountsDto } from './dto/batch-counts.dto';
-import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
+import { Auth } from 'src/common/decorators';
+import { AuthPayload } from 'src/common/interface';
 
 @Controller('reactions')
 export class ReactionsController {
   constructor(private readonly reactionsService: ReactionsService) {}
 
   @Post()
-  @UseGuards(JwtAccessTokenGuard)
+  @Auth()
   async createOrSetReaction(
-    @Request() req,
+    @Request() req: Request & { user: AuthPayload },
     @Body() dto: CreateOrSetReactionDto,
   ) {
-    const userId = req.user.id;
+    const userId = req.user.uid;
 
     if (dto.action === 'set') {
       return this.reactionsService.set(userId, dto);
@@ -38,21 +38,25 @@ export class ReactionsController {
   }
 
   @Delete()
-  @UseGuards(JwtAccessTokenGuard)
-  async unsetReaction(@Request() req, @Body() dto: CreateOrSetReactionDto) {
-    const userId = req.user.id;
+  @Auth()
+  async unsetReaction(
+    @Request() req: Request & { user: AuthPayload },
+    @Body() dto: CreateOrSetReactionDto,
+  ) {
+    const userId = req.user.uid;
     return this.reactionsService.unset(userId, dto);
   }
 
   @Get()
+  @Auth()
   async listReactions(@Query() dto: QueryReactionsDto) {
     return this.reactionsService.list(dto);
   }
 
   @Get('has')
-  @UseGuards(JwtAccessTokenGuard)
+  @Auth()
   async hasReacted(
-    @Request() req,
+    @Request() req: Request & { user: AuthPayload },
     @Query('subjectType') subjectType: string,
     @Query('subjectId') subjectId: string,
     @Query('kind') kind: string,
@@ -64,7 +68,7 @@ export class ReactionsController {
       );
     }
 
-    const userId = req.user.id;
+    const userId = req.user.uid;
     return this.reactionsService.hasReacted(
       userId,
       subjectType,
@@ -74,11 +78,13 @@ export class ReactionsController {
   }
 
   @Post('counts')
+  @Auth()
   async getCountsBatch(@Body() dto: BatchCountsDto) {
     return this.reactionsService.getCountsBatch(dto);
   }
 
   @Get('counts')
+  @Auth()
   async getCounts(
     @Query('subjectType') subjectType: string,
     @Query('subjectId') subjectId: string,

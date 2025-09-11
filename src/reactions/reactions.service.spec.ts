@@ -71,9 +71,7 @@ describe('ReactionsService', () => {
               getManyAndCount: jest.fn(),
             })),
             metadata: {
-              columns: [
-                { propertyName: 'deletedAt' },
-              ],
+              columns: [{ propertyName: 'deletedAt' }],
             },
             manager: {
               connection: {
