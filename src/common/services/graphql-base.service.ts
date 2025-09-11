@@ -13,7 +13,7 @@ import {
 import { CursorPaginationDto } from '../dto/cursor-pagination.dto';
 import { IPaginationCursor } from '../interface';
 import { encodeCursor } from '../utils';
-import { FindOptionsSelect } from 'typeorm';
+import { FindOptionsSelect, FindOptionsRelations } from 'typeorm';
 
 // Extended interface for GraphQL-specific repository methods
 interface GraphQLBaseRepository<T> extends BaseRepository<T> {
@@ -34,7 +34,7 @@ export abstract class GraphQLBaseService<
       entityName: string;
       idKey?: string;
       softDelete?: boolean;
-      relationsWhitelist?: string[];
+      relationsWhitelist?: FindOptionsRelations<T>;
       selectWhitelist?: FindOptionsSelect<T>;
       cache?: CacheOptions & { prefix?: string };
       emitEvents?: boolean;
@@ -327,5 +327,175 @@ export abstract class GraphQLBaseService<
   protected async invalidateCacheForEntity(id: string): Promise<void> {
     await super.invalidateCacheForEntity(id);
     await this.invalidateBatchCache();
+  }
+
+  /**
+   * Check if a relation is allowed based on whitelist
+   * @param relation The relation to check
+   * @returns True if relation is allowed
+   */
+  protected isRelationAllowed(relation: string): boolean {
+    if (!this.opts.relationsWhitelist) return true;
+    const allowedKeys = this.getAllowedRelations();
+    return allowedKeys.includes(relation);
+  }
+
+  /**
+   * Get all allowed relations from whitelist
+   * @returns Array of allowed relation names
+   */
+  protected getAllowedRelations(): string[] {
+    if (!this.opts.relationsWhitelist) return [];
+    return super.getAllowedRelations();
+  }
+
+  /**
+   * Filter relations based on GraphQL field selection and whitelist
+   * @param graphQLInfo GraphQL resolve info
+   * @param opts Query options
+   * @returns Filtered relations
+   */
+  protected filterRelationsForGraphQL(
+    graphQLInfo: { fieldNodes: GraphQLFieldNode[] },
+    opts?: QOpts<T>,
+  ): string[] | FindOptionsRelations<T> | undefined {
+    if (!opts?.relations) return opts?.relations;
+
+    // Extract relations from GraphQL field selection
+    const graphQLRelations = this.extractRelationsFromGraphQLInfo(graphQLInfo);
+
+    if (!graphQLRelations || graphQLRelations.length === 0) {
+      return opts.relations;
+    }
+
+    // Filter relations based on whitelist
+    const allowedRelations = this.getAllowedRelations();
+    const filteredRelations = graphQLRelations.filter(
+      (rel) =>
+        allowedRelations.includes(rel) ||
+        allowedRelations.some((allowed) => rel.startsWith(allowed + '.')),
+    );
+
+    return filteredRelations;
+  }
+
+  /**
+   * Extract relations from GraphQL resolve info
+   * @param graphQLInfo GraphQL resolve info
+   * @returns Array of relation names
+   */
+  private extractRelationsFromGraphQLInfo(graphQLInfo: {
+    fieldNodes: GraphQLFieldNode[];
+  }): string[] {
+    try {
+      const relations: string[] = [];
+
+      const extractRelations = (
+        nodes: GraphQLFieldNode[],
+        prefix = '',
+      ): void => {
+        nodes.forEach((node: GraphQLFieldNode) => {
+          if (node.kind === 'Field' && node.name?.value) {
+            const fieldName = node.name.value;
+
+            // Check if this field is a relation (not a scalar field)
+            if (this.isRelationField(fieldName)) {
+              const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
+              relations.push(fullPath);
+
+              // Recursively extract nested relations
+              if (node.selectionSet?.selections) {
+                extractRelations(node.selectionSet.selections, fullPath);
+              }
+            }
+          }
+        });
+      };
+
+      extractRelations(graphQLInfo.fieldNodes);
+      return relations;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Check if a field is a relation field (simplified implementation)
+   * In a real implementation, you'd check against your entity metadata
+   * @param fieldName The field name to check
+   * @returns True if field is a relation
+   */
+  private isRelationField(fieldName: string): boolean {
+    // This is a simplified check - in practice you'd use entity metadata
+    // Common relation field patterns
+    const relationPatterns = [
+      'profile',
+      'roles',
+      'posts',
+      'comments',
+      'author',
+      'user',
+      'category',
+      'tags',
+      'images',
+      'sessions',
+      'permissions',
+    ];
+
+    return relationPatterns.some((pattern) =>
+      fieldName.toLowerCase().includes(pattern.toLowerCase()),
+    );
+  }
+
+  /**
+   * Find entities with GraphQL-optimized field selection and relation filtering
+   * Automatically extracts fields and relations from GraphQL resolve info
+   */
+  async findWithGraphQLFieldsAndRelations(
+    where: Parameters<this['findOne']>[0],
+    graphQLInfo: { fieldNodes: GraphQLFieldNode[] },
+    opts?: QOpts<T>,
+    ctx?: TxCtx,
+  ): Promise<T | null> {
+    // Extract selected fields from GraphQL info
+    const selectedFields = this.extractFieldsFromGraphQLInfo(graphQLInfo);
+
+    // Filter relations based on GraphQL selection and whitelist
+    const filteredRelations = this.filterRelationsForGraphQL(graphQLInfo, opts);
+
+    // Apply field selection and relation filtering
+    const graphQLOpts: QOpts<T> = {
+      ...opts,
+      select: selectedFields ?? opts?.select,
+      relations: filteredRelations ?? opts?.relations,
+    };
+
+    return this.findOne(where, graphQLOpts, ctx);
+  }
+
+  /**
+   * List entities with GraphQL-optimized field selection and relation filtering
+   */
+  async listWithGraphQLFieldsAndRelations(
+    pagination: GraphQLPaginationDto,
+    graphQLInfo: { fieldNodes: GraphQLFieldNode[] },
+    extraFilter?: Record<string, unknown>,
+    opts?: QOpts<T>,
+    ctx?: TxCtx,
+  ): Promise<GraphQLConnection<T>> {
+    // Extract selected fields from GraphQL info
+    const selectedFields = this.extractFieldsFromGraphQLInfo(graphQLInfo);
+
+    // Filter relations based on GraphQL selection and whitelist
+    const filteredRelations = this.filterRelationsForGraphQL(graphQLInfo, opts);
+
+    // Apply field selection and relation filtering
+    const graphQLOpts: QOpts<T> = {
+      ...opts,
+      select: selectedFields ?? opts?.select,
+      relations: filteredRelations ?? opts?.relations,
+    };
+
+    return this.listGraphQL(pagination, extraFilter, graphQLOpts, ctx);
   }
 }

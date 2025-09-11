@@ -1,7 +1,8 @@
 import { instanceToPlain, Exclude } from 'class-transformer';
+import { Media } from 'src/media/entities/media.entity';
 import { USER_CONSTANTS, UserRole, UserStatus } from 'src/shared/constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
-import { Column, Entity, Index } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 
 @Entity({
   name: 'users',
@@ -103,6 +104,15 @@ export class User extends BaseEntityCustom {
     default: false,
   })
   isPhoneVerified: boolean;
+
+  @Column('bigint', {
+    nullable: true,
+  })
+  avatarId: string;
+
+  @ManyToOne(() => Media, { nullable: true })
+  @JoinColumn({ name: 'avatarId', referencedColumnName: 'id' })
+  avatar: Media; // Avatar media
 
   toJSON() {
     const result = instanceToPlain(this);

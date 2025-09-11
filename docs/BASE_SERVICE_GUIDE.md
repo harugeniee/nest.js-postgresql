@@ -167,6 +167,18 @@ protected getSearchableColumns(): (keyof T)[] {
     email: true
   }
 }
+
+// Relations whitelist (object format)
+{
+  relationsWhitelist: {
+    profile: true,
+    roles: true,
+    posts: {
+      author: true,
+      comments: true
+    }
+  }
+}
 ```
 
 #### Input Validation
@@ -246,7 +258,7 @@ interface BaseServiceOptions {
   entityName: string;                    // Entity name for events/logging
   idKey?: string;                       // Primary key field (default: 'id')
   softDelete?: boolean;                 // Enable soft delete (auto-detected)
-  relationsWhitelist?: string[];        // Allowed relations
+  relationsWhitelist?: FindOptionsRelations<T>; // Allowed relations (object format)
   selectWhitelist?: FindOptionsSelect<T>; // Allowed select fields
   cache?: CacheOptions & { prefix?: string }; // Cache configuration
   emitEvents?: boolean;                 // Enable event emission
@@ -363,6 +375,37 @@ async getUsersFeed(cursor?: string) {
 ```typescript
 @Injectable()
 export class UserService extends BaseService<User> {
+  constructor(
+    protected readonly repo: BaseRepository<User>,
+    protected readonly cacheService: CacheService,
+  ) {
+    super(repo, {
+      entityName: 'User',
+      cache: { enabled: true, ttlSec: 300, prefix: 'users' },
+      emitEvents: true,
+      defaultSearchField: 'name',
+      // Relations whitelist - only allow specific relations
+      relationsWhitelist: {
+        profile: true,
+        roles: true,
+        posts: {
+          author: true,
+          comments: {
+            user: true
+          }
+        }
+      },
+      // Select whitelist - only allow specific fields
+      selectWhitelist: {
+        id: true,
+        name: true,
+        email: true,
+        status: true,
+        createdAt: true
+      }
+    }, cacheService);
+  }
+
   // Override searchable columns
   protected getSearchableColumns(): (keyof User)[] {
     return ['name', 'email', 'username'];
@@ -381,6 +424,13 @@ export class UserService extends BaseService<User> {
       },
       { isActive: true } // Additional filter
     );
+  }
+
+  // Get user with allowed relations only
+  async getUserWithRelations(id: string) {
+    return this.findById(id, {
+      relations: ['profile', 'roles'] // Only allowed relations
+    });
   }
 }
 ```
@@ -509,7 +559,38 @@ protected emitEvent(event: string, payload: unknown): void {
 }
 ```
 
-### 4. Field Validation
+### 4. Relations Whitelist
+
+```typescript
+// Configure relations whitelist
+{
+  relationsWhitelist: {
+    profile: true,
+    roles: true,
+    posts: {
+      author: true,
+      comments: {
+        user: true
+      }
+    }
+  }
+}
+
+// Check if relation is allowed
+const isAllowed = this.isRelationAllowed('profile');
+const allowedRelations = this.getAllowedRelations();
+
+// Custom relations filtering
+protected applyQueryOpts(opts?: QOpts<T>): QOpts<T> {
+  const relations = this.filterRelationsByWhitelist(
+    opts?.relations,
+    this.opts.relationsWhitelist,
+  );
+  // ... rest of the method
+}
+```
+
+### 5. Field Validation
 
 ```typescript
 // Custom field validation
@@ -628,7 +709,7 @@ async getUsersList(page: number, filters: UserFilters) {
 ### 5. Security
 
 ```typescript
-// ✅ Good: Implement field whitelisting
+// ✅ Good: Implement field and relations whitelisting
 {
   selectWhitelist: {
     id: true,
@@ -636,7 +717,15 @@ async getUsersList(page: number, filters: UserFilters) {
     email: true,
     // Exclude sensitive fields like password
   },
-  relationsWhitelist: ['profile', 'roles']
+  relationsWhitelist: {
+    profile: true,
+    roles: true,
+    posts: {
+      author: true,
+      comments: true
+    }
+    // Exclude sensitive relations
+  }
 }
 ```
 
@@ -767,6 +856,8 @@ export class UserService extends BaseService<User> {
 - [Caching Best Practices](./CACHING_GUIDE.md)
 - [Event System Documentation](./EVENT_SYSTEM.md)
 - [Pagination Strategies](./PAGINATION_GUIDE.md)
+- [GraphQL Base Service Guide](./GRAPHQL_BASE_SERVICE_GUIDE.md)
+- [Relations Whitelist Examples](./RELATIONS_WHITELIST_EXAMPLES.md)
 
 ---
 

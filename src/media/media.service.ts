@@ -31,7 +31,9 @@ export class MediaService extends BaseService<Media> {
         entityName: 'Media',
         cache: { enabled: true, ttlSec: 300, prefix: 'media', swrSec: 60 },
         defaultSearchField: 'name',
-        relationsWhitelist: ['user'],
+        relationsWhitelist: {
+          user: true,
+        },
         selectWhitelist: {
           id: true,
           name: true,

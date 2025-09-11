@@ -2,7 +2,6 @@ import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { BaseRepository } from 'src/common/repositories/base.repository';
 import {
-  applyWhitelist,
   decodeSignedCursor,
   encodeSignedCursor,
   mapTypeOrmError,
@@ -49,7 +48,7 @@ export abstract class BaseService<T extends { id: string }> {
       entityName: string;
       idKey?: string;
       softDelete?: boolean;
-      relationsWhitelist?: string[];
+      relationsWhitelist?: FindOptionsRelations<T>;
       selectWhitelist?: FindOptionsSelect<T>;
       cache?: CacheOptions & { prefix?: string };
       emitEvents?: boolean;
@@ -550,9 +549,10 @@ export abstract class BaseService<T extends { id: string }> {
   }
 
   protected applyQueryOpts(opts?: QOpts<T>): QOpts<T> {
-    const relations = Array.isArray(opts?.relations)
-      ? applyWhitelist(opts?.relations, this.opts.relationsWhitelist)
-      : opts?.relations;
+    const relations = this.filterRelationsByWhitelist(
+      opts?.relations,
+      this.opts.relationsWhitelist,
+    );
     let select = opts?.select;
 
     // Apply selectWhitelist security filtering
@@ -576,6 +576,144 @@ export abstract class BaseService<T extends { id: string }> {
       select,
       withDeleted,
     };
+  }
+
+  /**
+   * Filter relations based on the whitelist
+   * @param relations The relations to filter
+   * @param whitelist The allowed relations
+   * @returns Filtered relations
+   */
+  private filterRelationsByWhitelist(
+    relations?: string[] | FindOptionsRelations<T>,
+    whitelist?: FindOptionsRelations<T>,
+  ): string[] | FindOptionsRelations<T> | undefined {
+    if (!relations) return undefined;
+    if (!whitelist) return relations;
+
+    // Handle string array relations
+    if (Array.isArray(relations)) {
+      const whitelistKeys = this.extractRelationKeys(whitelist);
+      return relations.filter((rel) => whitelistKeys.includes(rel));
+    }
+
+    // Handle FindOptionsRelations object
+    if (typeof relations === 'object' && relations !== null) {
+      return this.filterRelationsObject(relations, whitelist);
+    }
+
+    return relations;
+  }
+
+  /**
+   * Extract relation keys from FindOptionsRelations object
+   * @param relations The relations object
+   * @returns Array of relation keys
+   */
+  private extractRelationKeys(relations: FindOptionsRelations<T>): string[] {
+    const keys: string[] = [];
+
+    for (const key in relations) {
+      if (Object.hasOwn(relations, key)) {
+        keys.push(key);
+        const nested = relations[key];
+        if (typeof nested === 'object' && nested !== null) {
+          // Recursively extract nested relation keys
+          const nestedKeys = this.extractRelationKeys(
+            nested as FindOptionsRelations<any>,
+          );
+          keys.push(...nestedKeys.map((nestedKey) => `${key}.${nestedKey}`));
+        }
+      }
+    }
+
+    return keys;
+  }
+
+  /**
+   * Filter relations object based on whitelist
+   * @param relations The relations to filter
+   * @param whitelist The allowed relations
+   * @returns Filtered relations object
+   */
+  private filterRelationsObject(
+    relations: FindOptionsRelations<T>,
+    whitelist: FindOptionsRelations<T>,
+  ): FindOptionsRelations<T> {
+    const filtered: FindOptionsRelations<T> = {};
+
+    for (const key in relations) {
+      if (Object.hasOwn(relations, key) && key in whitelist) {
+        const relationValue = relations[key];
+        const whitelistValue = whitelist[key];
+
+        if (this.isNestedRelation(relationValue, whitelistValue)) {
+          this.handleNestedRelation(
+            filtered,
+            key,
+            relationValue,
+            whitelistValue,
+          );
+        } else if (this.isBooleanRelation(relationValue)) {
+          this.handleBooleanRelation(filtered, key, relationValue);
+        }
+      }
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Check if the relation value is a nested relation object
+   */
+  private isNestedRelation(
+    relationValue: unknown,
+    whitelistValue: unknown,
+  ): boolean {
+    return (
+      typeof relationValue === 'object' &&
+      relationValue !== null &&
+      typeof whitelistValue === 'object' &&
+      whitelistValue !== null &&
+      !Array.isArray(relationValue) &&
+      !Array.isArray(whitelistValue)
+    );
+  }
+
+  /**
+   * Check if the relation value is a boolean true
+   */
+  private isBooleanRelation(relationValue: unknown): boolean {
+    return typeof relationValue === 'boolean' && relationValue;
+  }
+
+  /**
+   * Handle nested relation filtering
+   */
+  private handleNestedRelation(
+    filtered: FindOptionsRelations<T>,
+    key: string,
+    relationValue: unknown,
+    whitelistValue: unknown,
+  ): void {
+    const nestedFiltered = this.filterRelationsObject(
+      relationValue as FindOptionsRelations<any>,
+      whitelistValue as FindOptionsRelations<any>,
+    );
+    if (Object.keys(nestedFiltered).length > 0) {
+      (filtered as Record<string, unknown>)[key] = nestedFiltered;
+    }
+  }
+
+  /**
+   * Handle boolean relation filtering
+   */
+  private handleBooleanRelation(
+    filtered: FindOptionsRelations<T>,
+    key: string,
+    relationValue: unknown,
+  ): void {
+    (filtered as Record<string, unknown>)[key] = relationValue;
   }
 
   /**
@@ -689,6 +827,26 @@ export abstract class BaseService<T extends { id: string }> {
   protected getAllowedSelectFields(): (keyof T)[] {
     if (!this.opts.selectWhitelist) return [];
     return Object.keys(this.opts.selectWhitelist) as (keyof T)[];
+  }
+
+  /**
+   * Check if a relation is allowed based on whitelist
+   * @param relation The relation to check
+   * @returns True if relation is allowed
+   */
+  protected isRelationAllowed(relation: string): boolean {
+    if (!this.opts.relationsWhitelist) return true;
+    const allowedKeys = this.extractRelationKeys(this.opts.relationsWhitelist);
+    return allowedKeys.includes(relation);
+  }
+
+  /**
+   * Get all allowed relations from whitelist
+   * @returns Array of allowed relation names
+   */
+  protected getAllowedRelations(): string[] {
+    if (!this.opts.relationsWhitelist) return [];
+    return this.extractRelationKeys(this.opts.relationsWhitelist);
   }
 
   /**
