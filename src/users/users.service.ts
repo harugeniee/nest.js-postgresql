@@ -56,6 +56,10 @@ export class UsersService extends BaseService<User> {
     );
   }
 
+  protected getSearchableColumns(): (keyof User)[] {
+    return ['name', 'email', 'username'];
+  }
+
   async register(userRegister: RegisterDto) {
     try {
       const user = await this.findByEmail(userRegister.email);

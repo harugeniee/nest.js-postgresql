@@ -25,7 +25,7 @@ import {
 } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
-import { Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 
 export type QOpts<T> = {
   relations?: string[] | FindOptionsRelations<T>;
@@ -76,9 +76,19 @@ export abstract class BaseService<T extends { id: string }> {
     }
   }
 
-  // Hooks for child services to override
+  /**
+   * Get searchable columns for text search functionality
+   * Override this method in child services to define which fields can be searched
+   * @returns Array of column names that can be searched
+   * @example
+   * // In UserService:
+   * protected getSearchableColumns(): (keyof User)[] {
+   *   return ['name', 'email', 'username'];
+   * }
+   */
   protected getSearchableColumns(): (keyof T)[] {
-    return [];
+    // Return default search field if no specific searchable columns are defined
+    return [this.defaultSearchField as keyof T];
   }
 
   protected async beforeCreate(data: DeepPartial<T>): Promise<DeepPartial<T>> {
@@ -200,8 +210,17 @@ export abstract class BaseService<T extends { id: string }> {
   ): Promise<IPagination<T>> {
     const { page, limit, sortBy, order, ...rest } = pagination;
     if (rest.query) rest.query = normalizeSearchInput(rest.query);
+
+    // Validate and prepare search fields
+    const searchFields = this.validateAndPrepareSearchFields(rest.fields);
+
     const where = ConditionBuilder.build(
-      { ...rest, ...(extraFilter || {}) },
+      {
+        ...rest,
+        ...(extraFilter || {}),
+        // Pass validated search fields to ConditionBuilder
+        fields: searchFields,
+      },
       this.defaultSearchField,
     );
     const safe = this.applyQueryOpts(opts);
@@ -304,7 +323,15 @@ export abstract class BaseService<T extends { id: string }> {
     if (typeof restAdv.query === 'string') {
       restAdv.query = normalizeSearchInput(restAdv.query);
     }
-    const baseFilter: Record<string, unknown> = restAdv;
+
+    // Validate and prepare search fields
+    const searchFields = this.validateAndPrepareSearchFields(restAdv.fields);
+
+    const baseFilter: Record<string, unknown> = {
+      ...restAdv,
+      // Pass validated search fields to ConditionBuilder
+      fields: searchFields,
+    };
     if (extraFilter) {
       Object.assign(baseFilter, extraFilter);
     }
@@ -692,6 +719,49 @@ export abstract class BaseService<T extends { id: string }> {
   protected getAllowedSelectFields(): (keyof T)[] {
     if (!this.opts.selectWhitelist) return [];
     return Object.keys(this.opts.selectWhitelist) as (keyof T)[];
+  }
+
+  /**
+   * Validate and prepare search fields based on user input and searchable columns
+   * @param userFields Fields provided by user (can be string, string[], or undefined)
+   * @returns Array of validated search fields
+   * @throws BadRequestException if user provides invalid fields
+   *
+   * @example
+   * // With UsersService (only 'name' is searchable):
+   * validateAndPrepareSearchFields() // Returns ['name']
+   * validateAndPrepareSearchFields('name') // Returns ['name']
+   * validateAndPrepareSearchFields(['name', 'email']) // Throws BadRequestException
+   * validateAndPrepareSearchFields('username') // Throws BadRequestException
+   */
+  protected validateAndPrepareSearchFields(
+    userFields?: string | string[],
+  ): string[] {
+    const searchableColumns = this.getSearchableColumns();
+    const allowedFields = searchableColumns.map((col) => String(col));
+
+    // If no user fields provided, use all allowed fields
+    if (!userFields) {
+      return allowedFields;
+    }
+
+    const userFieldsArray = Array.isArray(userFields)
+      ? userFields
+      : [userFields];
+
+    // Check if all user fields are allowed
+    const invalidFields = userFieldsArray.filter(
+      (field) => !allowedFields.includes(field),
+    );
+
+    if (invalidFields.length > 0) {
+      throw new BadRequestException(
+        `Invalid search fields: ${invalidFields.join(', ')}. ` +
+          `Allowed fields: ${allowedFields.join(', ')}`,
+      );
+    }
+
+    return userFieldsArray;
   }
 
   protected async invalidateCacheForEntity(id: string): Promise<void> {
