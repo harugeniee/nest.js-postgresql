@@ -127,6 +127,10 @@ export abstract class BaseService<T extends { id: string }> {
   }
 
   async create(data: DeepPartial<T>, ctx?: TxCtx): Promise<T> {
+    if (!data || typeof data !== 'object') {
+      throw new BadRequestException('Invalid data provided for creation');
+    }
+
     try {
       const prepared = await this.beforeCreate(data);
       const entity = this.repo.create(prepared);
@@ -179,6 +183,10 @@ export abstract class BaseService<T extends { id: string }> {
   }
 
   async findById(id: string, opts?: QOpts<T>, _ctx?: TxCtx): Promise<T> {
+    if (!id || typeof id !== 'string') {
+      throw new BadRequestException('Invalid ID provided');
+    }
+
     const safe = this.applyQueryOpts(opts);
     const cacheKey = this.cache ? `${this.cache.prefix}:id:${id}` : undefined;
     if (cacheKey) {
@@ -223,85 +231,47 @@ export abstract class BaseService<T extends { id: string }> {
       },
       this.defaultSearchField,
     );
+
     const safe = this.applyQueryOpts(opts);
-    const orderObj: FindOptionsOrder<T> = {};
-    (orderObj as Record<string, 'ASC' | 'DESC'>)[sortBy] = order;
-    (orderObj as Record<string, 'ASC' | 'DESC'>)[String(this.idKey)] = order;
+    const orderObj = this.buildOrderObject(sortBy, order);
     await this.onListQueryBuilt({ where, order: orderObj, dto: pagination });
-    console.log('where', where);
-    const cacheKey = this.cache
-      ? `${this.cache.prefix}:list:${sha256Hex(
-          stableStringify({
-            where,
-            page,
-            limit,
-            sortBy,
-            order,
-            select: safe.select,
-            relations: safe.relations,
-          }),
-        )}`
-      : undefined;
+
+    // Try to get from cache first
+    const cacheKey = this.buildCacheKey('list', {
+      where,
+      page,
+      limit,
+      sortBy,
+      order,
+      select: safe.select,
+      relations: safe.relations,
+    });
 
     if (cacheKey) {
-      const cached = (await this.cacheService?.get(
-        cacheKey,
-      )) as IPagination<T> | null;
+      const cached = await this.getCachedResult<IPagination<T>>(cacheKey);
       if (cached) {
-        // Optional SWR: if ttl is within swr window, refresh in background
-        const cacheSvc = this.cacheService;
-        if (this.cache?.swrSec && cacheSvc) {
-          void (async () => {
-            const ttl = await cacheSvc.getTtl(cacheKey);
-            if (
-              this.cache &&
-              this.cache.swrSec &&
-              ttl >= 0 &&
-              ttl <= this.cache.swrSec
-            ) {
-              const [freshData, freshTotal] = await this.repo.findAndCount({
-                skip: (page - 1) * limit,
-                take: limit,
-                order: orderObj,
-                where,
-                relations: safe.relations,
-                select: safe.select,
-                withDeleted: safe.withDeleted,
-              });
-              const freshEnvelope = PaginationFormatter.offset<T>(
-                freshData,
-                freshTotal,
-                page,
-                limit,
-              );
-              if (this.cache) {
-                await this.cacheService?.set(
-                  cacheKey,
-                  freshEnvelope,
-                  this.cache.ttlSec,
-                );
-              }
-            }
-          })();
-        }
+        // Background refresh if within SWR window
+        this.refreshCacheInBackground(cacheKey, () =>
+          this.fetchAndFormatOffsetData(where, orderObj, safe, page, limit),
+        );
         return cached;
       }
     }
 
-    const [data, total] = await this.repo.findAndCount({
-      skip: (page - 1) * limit,
-      take: limit,
-      order: orderObj,
+    // Fetch fresh data
+    const envelope = await this.fetchAndFormatOffsetData(
       where,
-      relations: safe.relations,
-      select: safe.select,
-      withDeleted: safe.withDeleted,
-    });
+      orderObj,
+      safe,
+      page,
+      limit,
+    );
 
-    const envelope = PaginationFormatter.offset<T>(data, total, page, limit);
+    // Cache the result
     if (cacheKey && this.cache) {
       await this.cacheService?.set(cacheKey, envelope, this.cache.ttlSec);
     }
+
     return envelope;
   }
 
@@ -762,6 +732,88 @@ export abstract class BaseService<T extends { id: string }> {
     }
 
     return userFieldsArray;
+  }
+
+  /**
+   * Build order object for TypeORM queries
+   */
+  protected buildOrderObject(
+    sortBy: string,
+    order: 'ASC' | 'DESC',
+  ): FindOptionsOrder<T> {
+    const orderObj: FindOptionsOrder<T> = {};
+    (orderObj as Record<string, 'ASC' | 'DESC'>)[sortBy] = order;
+    (orderObj as Record<string, 'ASC' | 'DESC'>)[String(this.idKey)] = order;
+    return orderObj;
+  }
+
+  /**
+   * Build cache key for different operations
+   */
+  protected buildCacheKey(
+    operation: string,
+    data: Record<string, unknown>,
+  ): string | undefined {
+    if (!this.cache) return undefined;
+    return `${this.cache.prefix}:${operation}:${sha256Hex(stableStringify(data))}`;
+  }
+
+  /**
+   * Get cached result with type safety
+   */
+  protected async getCachedResult<R>(cacheKey: string): Promise<R | null> {
+    if (!this.cacheService) return null;
+    return (await this.cacheService.get(cacheKey)) as R | null;
+  }
+
+  /**
+   * Refresh cache in background using SWR pattern
+   */
+  protected refreshCacheInBackground<R>(
+    cacheKey: string,
+    fetchFn: () => Promise<R>,
+  ): void {
+    if (!this.cache?.swrSec || !this.cacheService) return;
+
+    void (async () => {
+      try {
+        const ttl = await this.cacheService?.getTtl(cacheKey);
+        if (ttl && ttl >= 0 && ttl <= (this.cache?.swrSec ?? 0)) {
+          const freshData = await fetchFn();
+          await this.cacheService?.set(
+            cacheKey,
+            freshData,
+            this.cache?.ttlSec ?? 0,
+          );
+        }
+      } catch (error) {
+        // Ignore background refresh errors to avoid impacting main flow
+        console.warn('Background cache refresh failed:', error);
+      }
+    })();
+  }
+
+  /**
+   * Fetch and format offset pagination data
+   */
+  protected async fetchAndFormatOffsetData(
+    where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
+    orderObj: FindOptionsOrder<T>,
+    safe: QOpts<T>,
+    page: number,
+    limit: number,
+  ): Promise<IPagination<T>> {
+    const [data, total] = await this.repo.findAndCount({
+      skip: (page - 1) * limit,
+      take: limit,
+      order: orderObj,
+      where,
+      relations: safe.relations,
+      select: safe.select,
+      withDeleted: safe.withDeleted,
+    });
+
+    return PaginationFormatter.offset<T>(data, total, page, limit);
   }
 
   protected async invalidateCacheForEntity(id: string): Promise<void> {
