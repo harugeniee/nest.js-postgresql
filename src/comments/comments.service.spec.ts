@@ -189,7 +189,9 @@ describe('CommentsService', () => {
       const result = await service.createComment(userId, dto);
 
       expect(result).toBeDefined();
-      expect((service as any).rabbitMQService.sendDataToRabbitMQAsync).toHaveBeenCalledWith(
+      expect(
+        (service as any).rabbitMQService.sendDataToRabbitMQAsync,
+      ).toHaveBeenCalledWith(
         'comment_created',
         expect.objectContaining({
           commentId: mockComment.id,
@@ -311,7 +313,9 @@ describe('CommentsService', () => {
       const result = await service.updateComment(commentId, userId, dto);
 
       expect(result).toBeDefined();
-      expect((service as any).rabbitMQService.sendDataToRabbitMQAsync).toHaveBeenCalledWith(
+      expect(
+        (service as any).rabbitMQService.sendDataToRabbitMQAsync,
+      ).toHaveBeenCalledWith(
         'comment_updated',
         expect.objectContaining({
           commentId,
@@ -378,7 +382,9 @@ describe('CommentsService', () => {
       const result = await service.deleteComment(commentId, userId);
 
       expect(result).toBeUndefined();
-      expect((service as any).rabbitMQService.sendDataToRabbitMQAsync).toHaveBeenCalledWith(
+      expect(
+        (service as any).rabbitMQService.sendDataToRabbitMQAsync,
+      ).toHaveBeenCalledWith(
         'comment_deleted',
         expect.objectContaining({
           commentId,
@@ -469,7 +475,9 @@ describe('CommentsService', () => {
       const commentId = 'nonexistent';
       const options = {};
 
-      jest.spyOn(service as any, 'findById').mockRejectedValue(new HttpException('Not found', 404));
+      jest
+        .spyOn(service as any, 'findById')
+        .mockRejectedValue(new HttpException('Not found', 404));
 
       await expect(service.getById(commentId, options)).rejects.toThrow(
         HttpException,
@@ -522,7 +530,9 @@ describe('CommentsService', () => {
       const result = await service.togglePin(commentId, userId, pinned);
 
       expect(result).toBeDefined();
-      expect((service as any).rabbitMQService.sendDataToRabbitMQAsync).toHaveBeenCalledWith(
+      expect(
+        (service as any).rabbitMQService.sendDataToRabbitMQAsync,
+      ).toHaveBeenCalledWith(
         'comment_pinned',
         expect.objectContaining({
           commentId,
