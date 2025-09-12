@@ -38,7 +38,7 @@ export class Sticker extends BaseEntityCustom {
 
   /**
    * Sticker name for identification
-   * Maximum length: 100 characters
+   * Maximum length: STICKER_CONSTANTS.NAME_MAX_LENGTH characters
    */
   @Column({
     type: 'varchar',
@@ -49,7 +49,7 @@ export class Sticker extends BaseEntityCustom {
 
   /**
    * Comma-separated tags for categorization and search
-   * Maximum length: 255 characters
+   * Maximum length: STICKER_CONSTANTS.TAGS_MAX_LENGTH characters
    */
   @Column({
     type: 'varchar',
@@ -60,7 +60,7 @@ export class Sticker extends BaseEntityCustom {
 
   /**
    * Short description of the sticker
-   * Maximum length: 100 characters
+   * Maximum length: STICKER_CONSTANTS.DESCRIPTION_MAX_LENGTH characters
    */
   @Column({
     type: 'varchar',

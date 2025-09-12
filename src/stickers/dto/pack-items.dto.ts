@@ -1,11 +1,14 @@
 import {
-  IsArray,
-  IsString,
-  IsInt,
-  Min,
-  ArrayMinSize,
   ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
 } from 'class-validator';
+import { STICKER_CONSTANTS } from 'src/shared/constants';
+
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -38,11 +41,11 @@ export class ReorderStickerPackItemsDto {
     description: 'Array of sticker IDs in the desired order',
     example: ['1234567890123456789', '9876543210987654321'],
     minItems: 1,
-    maxItems: 100,
+    maxItems: STICKER_CONSTANTS.PAGINATION.MAX_LIMIT,
   })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(100)
+  @ArrayMaxSize(STICKER_CONSTANTS.PAGINATION.MAX_LIMIT)
   @IsString({ each: true })
   stickerIds: string[];
 }

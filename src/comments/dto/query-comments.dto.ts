@@ -40,7 +40,7 @@ export class QueryCommentsDto extends AdvancedPaginationDto {
 
   @IsOptional()
   @IsBoolean()
-  includeAttachments?: boolean = true;
+  includeMedia?: boolean = true;
 
   @IsOptional()
   @IsBoolean()

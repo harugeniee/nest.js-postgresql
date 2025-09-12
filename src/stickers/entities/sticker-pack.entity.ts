@@ -26,7 +26,7 @@ import { STICKER_CONSTANTS, StickerPackStatus } from 'src/shared/constants';
 export class StickerPack extends BaseEntityCustom {
   /**
    * Pack name for display
-   * Maximum length: 100 characters
+   * Maximum length: STICKER_CONSTANTS.PACK_NAME_MAX_LENGTH characters
    */
   @Column({
     type: 'varchar',
@@ -37,7 +37,7 @@ export class StickerPack extends BaseEntityCustom {
 
   /**
    * URL-friendly slug for the pack
-   * Maximum length: 120 characters
+   * Maximum length: STICKER_CONSTANTS.PACK_SLUG_MAX_LENGTH characters
    */
   @Column({
     type: 'varchar',
@@ -48,7 +48,7 @@ export class StickerPack extends BaseEntityCustom {
 
   /**
    * Pack description
-   * Maximum length: 255 characters
+   * Maximum length: STICKER_CONSTANTS.PACK_DESCRIPTION_MAX_LENGTH characters
    */
   @Column({
     type: 'varchar',

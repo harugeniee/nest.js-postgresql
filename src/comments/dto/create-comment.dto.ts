@@ -9,7 +9,6 @@ import {
   IsEnum,
   MaxLength,
   MinLength,
-  ValidateIf,
   Validate,
   ValidatorConstraint,
   ValidatorConstraintInterface,
@@ -26,23 +25,17 @@ import { CreateCommentMediaItemDto } from './create-comment-media.dto';
 
 @ValidatorConstraint({ name: 'contentOrMedia', async: false })
 export class ContentOrMediaConstraint implements ValidatorConstraintInterface {
-  validate(value: any, args: ValidationArguments) {
+  validate(value: any, args: ValidationArguments): boolean {
     const object = args.object as CreateCommentDto;
-    const hasContent = object.content && object.content.trim().length > 0;
-    const hasMedia = object.media && object.media.length > 0;
-    const hasAttachments = object.attachments && object.attachments.length > 0;
+    const hasContent = !!(object.content && object.content.trim().length > 0);
+    const hasMedia = !!(object.media && object.media.length > 0);
 
-    return hasContent || hasMedia || hasAttachments;
+    return hasContent || hasMedia;
   }
 
-  defaultMessage(args: ValidationArguments) {
-    return 'Comment must have either content, media, or attachments';
+  defaultMessage(_args: ValidationArguments): string {
+    return 'Comment must have either content or media';
   }
-}
-
-export class CreateCommentAttachmentDto {
-  @IsString()
-  mediaId: string;
 }
 
 export class CreateCommentMentionDto {
@@ -92,12 +85,6 @@ export class CreateCommentDto {
   @IsOptional()
   @IsBoolean()
   pinned?: boolean = false;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateCommentAttachmentDto)
-  attachments?: CreateCommentAttachmentDto[];
 
   @IsOptional()
   @IsArray()

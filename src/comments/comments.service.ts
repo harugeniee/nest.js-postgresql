@@ -1,29 +1,33 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import {
-  Repository,
-  FindOptionsWhere,
-  In,
-  Not,
-  MoreThan,
-  IsNull,
-} from 'typeorm';
-import { Comment } from './entities/comment.entity';
-import { Media } from 'src/media/entities/media.entity';
-import { CommentMention } from './entities/comment-mention.entity';
-import { CommentMedia } from './entities/comment-media.entity';
-import { CreateCommentDto } from './dto/create-comment.dto';
-import { CreateCommentMediaItemDto } from './dto/create-comment-media.dto';
-import { UpdateCommentDto } from './dto/update-comment.dto';
-import { QueryCommentsDto } from './dto/query-comments.dto';
-import { BatchCommentsDto } from './dto/batch-comments.dto';
-import { CacheService, RabbitMQService } from 'src/shared/services';
-import { BaseService } from 'src/common/services';
-import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
-import { JOB_NAME, CommentType, CommentVisibility } from 'src/shared/constants';
+import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
+import { BaseService } from 'src/common/services';
+import { Media } from 'src/media/entities/media.entity';
+import { CommentType, CommentVisibility, JOB_NAME } from 'src/shared/constants';
 import { COMMENT_CONSTANTS } from 'src/shared/constants/comment.constants';
+import { CacheService, RabbitMQService } from 'src/shared/services';
+import { Sticker } from 'src/stickers/entities/sticker.entity';
+import {
+  FindOptionsWhere,
+  In,
+  IsNull,
+  MoreThan,
+  Not,
+  QueryRunner,
+  Repository,
+} from 'typeorm';
+
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+
+import { BatchCommentsDto } from './dto/batch-comments.dto';
+import { CreateCommentMediaItemDto } from './dto/create-comment-media.dto';
+import { CreateCommentDto } from './dto/create-comment.dto';
+import { QueryCommentsDto } from './dto/query-comments.dto';
+import { UpdateCommentDto } from './dto/update-comment.dto';
+import { CommentMedia } from './entities/comment-media.entity';
+import { CommentMention } from './entities/comment-mention.entity';
+import { Comment } from './entities/comment.entity';
 
 @Injectable()
 export class CommentsService extends BaseService<Comment> {
@@ -50,7 +54,7 @@ export class CommentsService extends BaseService<Comment> {
           user: true,
           parent: true,
           replies: true,
-          media: true,
+          media: { media: true, sticker: { media: true } },
           mentions: { user: true },
         },
         emitEvents: false, // Disable EventEmitter, use RabbitMQ instead
@@ -223,20 +227,6 @@ export class CommentsService extends BaseService<Comment> {
         await this.processCommentMedia(comment.id, dto.media, queryRunner);
       }
 
-      // Legacy attachment support (for backward compatibility)
-      if (
-        dto.attachments &&
-        Array.isArray(dto.attachments) &&
-        dto.attachments.length > 0
-      ) {
-        const legacyMedia = dto.attachments.map((attachment) => ({
-          kind: 'image' as const,
-          mediaId: attachment.mediaId,
-          sortValue: 0,
-        }));
-        await this.processCommentMedia(comment.id, legacyMedia, queryRunner);
-      }
-
       // Process mentions and create mention records
       if (
         dto.mentions &&
@@ -292,9 +282,12 @@ export class CommentsService extends BaseService<Comment> {
   ): Promise<Comment> {
     try {
       return await this.runInTransaction(async (queryRunner) => {
-        // Update comment fields (exclude attachments and mentions as they are handled separately)
+        // Update comment fields (exclude media and mentions as they are handled separately)
+        const { media: _media, mentions: _mentions, ...commentData } = dto;
+
+        // Suppress unused variable warnings for destructured fields
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { attachments: _, mentions: __, ...commentData } = dto;
+        const _ = { _media, _mentions };
         const updateData: Partial<Comment> = {
           ...commentData,
           userId, // Add userId for permission check in beforeUpdate
@@ -305,46 +298,14 @@ export class CommentsService extends BaseService<Comment> {
         // Use BaseService.update which will trigger lifecycle hooks
         await this.update(commentId, updateData, { queryRunner });
 
-        // Update attachments if provided
-        if (dto.attachments !== undefined) {
-          // Get the comment with current attachments
-          const commentWithAttachments = await queryRunner.manager.findOne(
-            Comment,
-            {
-              where: { id: commentId },
-              relations: ['attachments'],
-            },
-          );
+        // Update media attachments if provided
+        if (dto.media !== undefined) {
+          // Remove existing media attachments
+          await queryRunner.manager.delete(CommentMedia, { commentId });
 
-          if (commentWithAttachments) {
-            // Clear existing attachments
-            commentWithAttachments.attachments = [];
-
-            // Add new attachments if provided
-            if (
-              Array.isArray(dto.attachments) &&
-              (dto.attachments as any[]).length > 0
-            ) {
-              const mediaIds = (
-                dto.attachments as Array<{ mediaId: string }>
-              ).map((attachmentDto) => attachmentDto.mediaId);
-              const mediaFiles = await queryRunner.manager.find(Media, {
-                where: { id: In(mediaIds) },
-              });
-
-              if (mediaFiles.length !== mediaIds.length) {
-                throw new HttpException(
-                  {
-                    messageKey: 'comment.MEDIA_NOT_FOUND',
-                  },
-                  HttpStatus.BAD_REQUEST,
-                );
-              }
-
-              commentWithAttachments.attachments = mediaFiles;
-            }
-
-            await queryRunner.manager.save(Comment, commentWithAttachments);
+          // Add new media attachments if provided
+          if (Array.isArray(dto.media) && dto.media.length > 0) {
+            await this.processCommentMedia(commentId, dto.media, queryRunner);
           }
         }
 
@@ -375,7 +336,10 @@ export class CommentsService extends BaseService<Comment> {
             relations: [
               'user',
               'parent',
-              'attachments',
+              'media',
+              'media.media',
+              'media.sticker',
+              'media.sticker.media',
               'mentions',
               'mentions.user',
             ],
@@ -438,7 +402,7 @@ export class CommentsService extends BaseService<Comment> {
       pinned,
       edited,
       visibility,
-      includeAttachments = true,
+      includeMedia = true,
       includeMentions = true,
       ...paginationDto
     } = dto;
@@ -462,7 +426,13 @@ export class CommentsService extends BaseService<Comment> {
 
     // Build relations
     const relations = ['user'];
-    if (includeAttachments) relations.push('attachments');
+    if (includeMedia)
+      relations.push(
+        'media',
+        'media.media',
+        'media.sticker',
+        'media.sticker.media',
+      );
     if (includeMentions) relations.push('mentions', 'mentions.user');
 
     // Use BaseService.listOffset for pagination
@@ -486,7 +456,7 @@ export class CommentsService extends BaseService<Comment> {
       pinned,
       edited,
       visibility,
-      includeAttachments = true,
+      includeMedia = true,
       includeMentions = true,
       ...paginationDto
     } = dto;
@@ -510,7 +480,13 @@ export class CommentsService extends BaseService<Comment> {
 
     // Build relations
     const relations = ['user'];
-    if (includeAttachments) relations.push('attachments');
+    if (includeMedia)
+      relations.push(
+        'media',
+        'media.media',
+        'media.sticker',
+        'media.sticker.media',
+      );
     if (includeMentions) relations.push('mentions', 'mentions.user');
 
     // Use BaseService.listCursor for pagination
@@ -533,13 +509,19 @@ export class CommentsService extends BaseService<Comment> {
     commentId: string,
     options?: {
       includeReplies?: boolean;
-      includeAttachments?: boolean;
+      includeMedia?: boolean;
       includeMentions?: boolean;
     },
   ): Promise<Comment> {
     const relations = ['user'];
     if (options?.includeReplies) relations.push('replies');
-    if (options?.includeAttachments) relations.push('attachments');
+    if (options?.includeMedia)
+      relations.push(
+        'media',
+        'media.media',
+        'media.sticker',
+        'media.sticker.media',
+      );
     if (options?.includeMentions) {
       relations.push('mentions', 'mentions.user');
     }
@@ -579,7 +561,7 @@ export class CommentsService extends BaseService<Comment> {
       subjectType,
       subjectIds,
       parentId,
-      includeAttachments,
+      includeMedia,
       includeMentions,
       visibility,
     } = dto;
@@ -595,7 +577,13 @@ export class CommentsService extends BaseService<Comment> {
     }
 
     const relations = ['user'];
-    if (includeAttachments) relations.push('attachments');
+    if (includeMedia)
+      relations.push(
+        'media',
+        'media.media',
+        'media.sticker',
+        'media.sticker.media',
+      );
     if (includeMentions) relations.push('mentions', 'mentions.user');
 
     const comments = await this.commentRepository.find({
@@ -836,7 +824,7 @@ export class CommentsService extends BaseService<Comment> {
   private async processCommentMedia(
     commentId: string,
     mediaItems: CreateCommentMediaItemDto[],
-    queryRunner: any,
+    queryRunner: QueryRunner,
   ): Promise<void> {
     // Limit media items to prevent abuse
     if (mediaItems.length > 10) {
@@ -866,10 +854,9 @@ export class CommentsService extends BaseService<Comment> {
   private async processStickerMedia(
     commentId: string,
     mediaItem: CreateCommentMediaItemDto & { kind: 'sticker' },
-    queryRunner: any,
+    queryRunner: QueryRunner,
   ): Promise<void> {
     // Import Sticker entity dynamically to avoid circular dependency
-    const { Sticker } = await import('src/stickers/entities/sticker.entity');
 
     // Find the sticker
     const sticker = await queryRunner.manager.findOne(Sticker, {
@@ -901,18 +888,18 @@ export class CommentsService extends BaseService<Comment> {
       commentId,
       mediaId: sticker.mediaId,
       kind: 'sticker',
-      url: sticker.media.url,
+      url: sticker.media?.url || '',
       meta: {
-        width: sticker.width,
-        height: sticker.height,
-        durationMs: sticker.durationMs,
+        width: sticker.width || 0,
+        height: sticker.height || 0,
+        durationMs: sticker.durationMs || 0,
         format: sticker.format,
-        isAnimated: sticker.isAnimated(),
+        isAnimated: sticker.isAnimated ? sticker.isAnimated() : false,
       },
       sortValue: mediaItem.sortValue || 0,
       stickerId: sticker.id,
-      stickerName: sticker.name,
-      stickerTags: sticker.tags,
+      stickerName: sticker.name || '',
+      stickerTags: sticker.tags || '',
       stickerFormat: sticker.format,
     });
   }
@@ -928,7 +915,7 @@ export class CommentsService extends BaseService<Comment> {
     mediaItem: CreateCommentMediaItemDto & {
       kind: 'image' | 'video' | 'audio' | 'document' | 'other';
     },
-    queryRunner: any,
+    queryRunner: QueryRunner,
   ): Promise<void> {
     // Find the media file
     const media = await queryRunner.manager.findOne(Media, {
@@ -949,13 +936,13 @@ export class CommentsService extends BaseService<Comment> {
       commentId,
       mediaId: media.id,
       kind: mediaItem.kind,
-      url: media.url,
+      url: media.url || '',
       meta: {
-        width: media.width,
-        height: media.height,
-        duration: media.duration,
-        mimeType: media.mimeType,
-        size: media.size,
+        width: media.width || 0,
+        height: media.height || 0,
+        duration: media.duration || 0,
+        mimeType: media.mimeType || '',
+        size: media.size || 0,
       },
       sortValue: mediaItem.sortValue || 0,
     });

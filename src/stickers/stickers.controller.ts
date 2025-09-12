@@ -172,16 +172,7 @@ export class StickerPacksController {
   })
   @ApiResponse({ status: 404, description: 'Sticker pack not found' })
   async getStickerPack(@Param('id') id: string) {
-    return this.stickersService.stickerPackRepository.findOne({
-      where: { id },
-      relations: [
-        'creator',
-        'updater',
-        'items',
-        'items.sticker',
-        'items.sticker.media',
-      ],
-    });
+    return await this.stickersService.getStickerPackById(id);
   }
 
   @Patch(':id')

@@ -8,6 +8,7 @@ import {
   Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { STICKER_CONSTANTS } from 'src/shared/constants';
 import { AdvancedPaginationDto } from 'src/common/dto';
 
 /**
@@ -17,20 +18,20 @@ export class CreateStickerPackDto {
   @ApiProperty({
     description: 'Pack name for display',
     example: 'Cute Animals',
-    maxLength: 100,
+    maxLength: STICKER_CONSTANTS.PACK_NAME_MAX_LENGTH,
   })
   @IsString()
-  @Length(1, 100)
+  @Length(1, STICKER_CONSTANTS.PACK_NAME_MAX_LENGTH)
   name: string;
 
   @ApiProperty({
     description: 'URL-friendly slug for the pack',
     example: 'cute-animals',
-    maxLength: 120,
+    maxLength: STICKER_CONSTANTS.PACK_SLUG_MAX_LENGTH,
     pattern: '^[a-z0-9-]+$',
   })
   @IsString()
-  @Length(1, 120)
+  @Length(1, STICKER_CONSTANTS.PACK_SLUG_MAX_LENGTH)
   @Matches(/^[a-z0-9-]+$/, {
     message: 'Slug must contain only lowercase letters, numbers, and hyphens',
   })
@@ -39,11 +40,11 @@ export class CreateStickerPackDto {
   @ApiPropertyOptional({
     description: 'Pack description',
     example: 'A collection of cute animal stickers',
-    maxLength: 255,
+    maxLength: STICKER_CONSTANTS.PACK_DESCRIPTION_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
-  @Length(0, 255)
+  @Length(0, STICKER_CONSTANTS.PACK_DESCRIPTION_MAX_LENGTH)
   description?: string;
 
   @ApiPropertyOptional({
@@ -72,22 +73,22 @@ export class UpdateStickerPackDto {
   @ApiPropertyOptional({
     description: 'Pack name for display',
     example: 'Cute Animals Updated',
-    maxLength: 100,
+    maxLength: STICKER_CONSTANTS.PACK_NAME_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
-  @Length(1, 100)
+  @Length(1, STICKER_CONSTANTS.PACK_NAME_MAX_LENGTH)
   name?: string;
 
   @ApiPropertyOptional({
     description: 'URL-friendly slug for the pack',
     example: 'cute-animals-updated',
-    maxLength: 120,
+    maxLength: STICKER_CONSTANTS.PACK_SLUG_MAX_LENGTH,
     pattern: '^[a-z0-9-]+$',
   })
   @IsOptional()
   @IsString()
-  @Length(1, 120)
+  @Length(1, STICKER_CONSTANTS.PACK_SLUG_MAX_LENGTH)
   @Matches(/^[a-z0-9-]+$/, {
     message: 'Slug must contain only lowercase letters, numbers, and hyphens',
   })
@@ -96,11 +97,11 @@ export class UpdateStickerPackDto {
   @ApiPropertyOptional({
     description: 'Pack description',
     example: 'An updated collection of cute animal stickers',
-    maxLength: 255,
+    maxLength: STICKER_CONSTANTS.PACK_DESCRIPTION_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
-  @Length(0, 255)
+  @Length(0, STICKER_CONSTANTS.PACK_DESCRIPTION_MAX_LENGTH)
   description?: string;
 
   @ApiPropertyOptional({

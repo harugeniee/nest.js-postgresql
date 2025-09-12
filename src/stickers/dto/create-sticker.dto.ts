@@ -1,14 +1,19 @@
 import {
-  IsString,
-  IsOptional,
-  IsInt,
-  Min,
-  Length,
   IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StickerFormat } from 'src/shared/constants';
 import { AdvancedPaginationDto } from 'src/common/dto';
+import {
+  STICKER_CONSTANTS,
+  StickerFormat,
+  StickerStatus,
+} from 'src/shared/constants';
+
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * DTO for creating a new sticker
@@ -24,30 +29,30 @@ export class CreateStickerDto {
   @ApiProperty({
     description: 'Sticker name for identification',
     example: 'cat_wave',
-    maxLength: 100,
+    maxLength: STICKER_CONSTANTS.NAME_MAX_LENGTH,
   })
   @IsString()
-  @Length(1, 100)
+  @Length(1, STICKER_CONSTANTS.NAME_MAX_LENGTH)
   name: string;
 
   @ApiPropertyOptional({
     description: 'Comma-separated tags for categorization',
     example: 'cat,cute,hello',
-    maxLength: 255,
+    maxLength: STICKER_CONSTANTS.TAGS_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
-  @Length(0, 255)
+  @Length(0, STICKER_CONSTANTS.TAGS_MAX_LENGTH)
   tags?: string;
 
   @ApiPropertyOptional({
     description: 'Short description of the sticker',
     example: 'Waving cat sticker',
-    maxLength: 100,
+    maxLength: STICKER_CONSTANTS.DESCRIPTION_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
-  @Length(0, 100)
+  @Length(0, STICKER_CONSTANTS.DESCRIPTION_MAX_LENGTH)
   description?: string;
 
   @ApiPropertyOptional({
@@ -68,31 +73,31 @@ export class UpdateStickerDto {
   @ApiPropertyOptional({
     description: 'Sticker name for identification',
     example: 'cat_wave_updated',
-    maxLength: 100,
+    maxLength: STICKER_CONSTANTS.NAME_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
-  @Length(1, 100)
+  @Length(1, STICKER_CONSTANTS.NAME_MAX_LENGTH)
   name?: string;
 
   @ApiPropertyOptional({
     description: 'Comma-separated tags for categorization',
     example: 'cat,cute,hello,updated',
-    maxLength: 255,
+    maxLength: STICKER_CONSTANTS.TAGS_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
-  @Length(0, 255)
+  @Length(0, STICKER_CONSTANTS.TAGS_MAX_LENGTH)
   tags?: string;
 
   @ApiPropertyOptional({
     description: 'Short description of the sticker',
     example: 'Updated waving cat sticker',
-    maxLength: 100,
+    maxLength: STICKER_CONSTANTS.DESCRIPTION_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
-  @Length(0, 100)
+  @Length(0, STICKER_CONSTANTS.DESCRIPTION_MAX_LENGTH)
   description?: string;
 
   @ApiPropertyOptional({
@@ -104,12 +109,12 @@ export class UpdateStickerDto {
 
   @ApiPropertyOptional({
     description: 'Sticker status for moderation',
-    enum: ['draft', 'approved', 'rejected'],
-    example: 'approved',
+    enum: Object.values(STICKER_CONSTANTS.STATUS),
+    example: STICKER_CONSTANTS.STATUS.APPROVED,
   })
   @IsOptional()
-  @IsEnum(['draft', 'approved', 'rejected'])
-  status?: 'draft' | 'approved' | 'rejected';
+  @IsEnum(Object.values(STICKER_CONSTANTS.STATUS))
+  status?: StickerStatus;
 
   @ApiPropertyOptional({
     description: 'Sort order for display',
@@ -129,21 +134,21 @@ export class UpdateStickerDto {
 export class QueryStickersDto extends AdvancedPaginationDto {
   @ApiPropertyOptional({
     description: 'Filter by sticker format',
-    enum: ['png', 'apng', 'gif', 'lottie'],
-    example: 'png',
+    enum: Object.values(STICKER_CONSTANTS.FORMATS),
+    example: STICKER_CONSTANTS.FORMATS.PNG,
   })
   @IsOptional()
-  @IsEnum(['png', 'apng', 'gif', 'lottie'])
+  @IsEnum(Object.values(STICKER_CONSTANTS.FORMATS))
   format?: StickerFormat;
 
   @ApiPropertyOptional({
     description: 'Filter by sticker status',
-    enum: ['draft', 'approved', 'rejected'],
-    example: 'approved',
+    enum: Object.values(STICKER_CONSTANTS.STATUS),
+    example: STICKER_CONSTANTS.STATUS.APPROVED,
   })
   @IsOptional()
-  @IsEnum(['draft', 'approved', 'rejected'])
-  declare status?: 'draft' | 'approved' | 'rejected';
+  @IsEnum(Object.values(STICKER_CONSTANTS.STATUS))
+  declare status?: StickerStatus;
 
   @ApiPropertyOptional({
     description: 'Filter by availability',

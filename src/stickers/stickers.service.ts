@@ -55,7 +55,12 @@ export class StickersService extends BaseService<Sticker> {
       new TypeOrmBaseRepository<Sticker>(stickerRepository),
       {
         entityName: 'Sticker',
-        cache: { enabled: true, ttlSec: 300, prefix: 'sticker', swrSec: 60 },
+        cache: {
+          enabled: true,
+          ttlSec: STICKER_CONSTANTS.CACHE.TTL,
+          prefix: STICKER_CONSTANTS.CACHE.PREFIX,
+          swrSec: 60, // Keep as 60 seconds for SWR
+        },
         defaultSearchField: 'name',
         relationsWhitelist: {
           media: true,
@@ -113,9 +118,7 @@ export class StickersService extends BaseService<Sticker> {
   async createSticker(dto: CreateStickerDto, userId: string): Promise<Sticker> {
     try {
       // Find the media by ID
-      const media = (await this.mediaService.findById(
-        dto.mediaId,
-      )) as MediaEntity;
+      const media = await this.mediaService.findById(dto.mediaId);
       if (!media) {
         throw new HttpException(
           {
@@ -200,17 +203,13 @@ export class StickersService extends BaseService<Sticker> {
    * @returns Paginated stickers
    */
   async getStickers(query: QueryStickersDto): Promise<IPagination<Sticker>> {
-    const { format, status, available, ...paginationDto } = query;
+    const { format, available, ...paginationDto } = query;
 
     // Build filters
     const filters: Record<string, any> = {};
 
     if (format) {
       filters.format = format;
-    }
-
-    if (status) {
-      filters.status = status;
     }
 
     if (available !== undefined) {
@@ -420,22 +419,23 @@ export class StickersService extends BaseService<Sticker> {
     }
 
     // Apply pagination
-    const offset =
-      ((paginationDto.page || 1) - 1) * (paginationDto.limit || 20);
-    queryBuilder.skip(offset).take(paginationDto.limit || 20);
+    const limit =
+      paginationDto.limit || STICKER_CONSTANTS.PAGINATION.DEFAULT_LIMIT;
+    const page =
+      paginationDto.page || STICKER_CONSTANTS.PAGINATION.DEFAULT_PAGE;
+    const offset = (page - 1) * limit;
+    queryBuilder.skip(offset).take(limit);
 
     const [items, total] = await queryBuilder.getManyAndCount();
 
     return {
       result: items,
       metaData: {
-        pageSize: paginationDto.limit || 20,
+        pageSize: limit,
         totalRecords: total,
-        totalPages: Math.ceil(total / (paginationDto.limit || 20)),
-        currentPage: paginationDto.page || 1,
-        hasNextPage:
-          (paginationDto.page || 1) <
-          Math.ceil(total / (paginationDto.limit || 20)),
+        totalPages: Math.ceil(total / limit),
+        currentPage: page,
+        hasNextPage: page < Math.ceil(total / limit),
       },
     };
   }
@@ -452,6 +452,35 @@ export class StickersService extends BaseService<Sticker> {
       ...query,
       isPublished: true,
     });
+  }
+
+  /**
+   * Get sticker pack by ID with relations
+   * @param id Pack ID
+   * @returns Sticker pack with relations
+   */
+  async getStickerPackById(id: string): Promise<StickerPack> {
+    const pack = await this.stickerPackRepository.findOne({
+      where: { id },
+      relations: [
+        'creator',
+        'updater',
+        'items',
+        'items.sticker',
+        'items.sticker.media',
+      ],
+    });
+
+    if (!pack) {
+      throw new HttpException(
+        {
+          messageKey: STICKER_CONSTANTS.MESSAGE_CODE.STICKER_PACK_NOT_FOUND,
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return pack;
   }
 
   /**
@@ -605,7 +634,7 @@ export class StickersService extends BaseService<Sticker> {
    * @param media Media entity
    */
   private async validateStickerMedia(media: MediaEntity): Promise<void> {
-    // Check file size (512KB limit)
+    // Check file size (STICKER_CONSTANTS.SIZE_LIMITS.MAX limit)
     if (media.size > STICKER_CONSTANTS.SIZE_LIMITS.MAX) {
       throw new HttpException(
         {
@@ -677,7 +706,9 @@ export class StickersService extends BaseService<Sticker> {
     return {
       width: media.width || undefined,
       height: media.height || undefined,
-      durationMs: media.duration ? media.duration * 1000 : undefined, // Convert seconds to milliseconds
+      durationMs: media.duration
+        ? Math.round(media.duration * 1000)
+        : undefined, // Convert seconds to milliseconds
     };
   }
 }

@@ -18,7 +18,7 @@ export class BatchCommentsDto {
 
   @IsOptional()
   @IsBoolean()
-  includeAttachments?: boolean = true;
+  includeMedia?: boolean = true;
 
   @IsOptional()
   @IsBoolean()
