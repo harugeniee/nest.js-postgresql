@@ -25,21 +25,29 @@ src/rate-limit/
 │   ├── api-key.entity.ts           # API key management
 │   ├── ip-whitelist.entity.ts      # IP whitelist
 │   ├── rate-limit-policy.entity.ts # Advanced policy configuration
-│   └── rate-limit-log.entity.ts    # Rate limit logging
+│   ├── rate-limit-log.entity.ts    # Rate limit logging
+│   └── index.ts                    # Entity exports
 ├── dto/
-│   ├── plan.dto.ts                 # Plan DTOs
-│   ├── api-key.dto.ts              # API key DTOs
-│   ├── ip-whitelist.dto.ts         # IP whitelist DTOs
-│   └── rate-limit-policy.dto.ts    # Policy DTOs
+│   ├── plan.dto.ts                 # Plan DTOs (Swagger)
+│   ├── api-key.dto.ts              # API key DTOs (Swagger)
+│   ├── ip-whitelist.dto.ts         # IP whitelist DTOs (Swagger)
+│   ├── rate-limit-policy.dto.ts    # Policy DTOs (Swagger)
+│   ├── create-plan.dto.ts          # Plan creation DTOs
+│   ├── create-api-key.dto.ts       # API key creation DTOs
+│   ├── create-ip-whitelist.dto.ts  # IP whitelist creation DTOs
+│   ├── create-policy.dto.ts        # Policy creation DTOs
+│   ├── update-*.dto.ts             # Update DTOs (using PartialType)
+│   ├── rate-limit-response.dto.ts  # Response DTOs
+│   └── index.ts                    # DTO exports
 ├── rate-limit-admin.controller.ts  # Admin API
-├── rate-limit.service.ts           # Core service (simplified)
+├── rate-limit.service.ts           # Core service (unified)
 ├── rate-limit.guard.ts             # Rate limiting guard
 ├── rate-limit.decorator.ts         # Route decorators
 ├── rate-limit.module.ts            # Main module
 └── README.md                       # Documentation
 
-src/db/migrations/
-└── 1757217875336-add-rate-limit-tables.ts  # Database migration
+src/db/seed/
+└── rate-limit.ts                   # Seed data for rate limiting
 
 scripts/
 ├── test-rate-limit.js              # Legacy system test
@@ -61,7 +69,8 @@ env.example                         # Added environment variables
 ### 1. Install Dependencies
 
 ```bash
-yarn add @nestjs/throttler @nest-lab/throttler-storage-redis
+# Dependencies are already included in the project
+# No additional installation required
 ```
 
 ### 2. Environment Setup
@@ -69,8 +78,13 @@ yarn add @nestjs/throttler @nest-lab/throttler-storage-redis
 Add to `.env`:
 
 ```env
-# Dynamic Rate Limiting
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
 RATE_LIMIT_REDIS_URL=redis://localhost:6379/1
+
+# Rate Limiting
+RATE_LIMIT_TTL=60
+RATE_LIMIT_LIMIT=100
 RATE_LIMIT_CACHE_TTL=300
 RATE_LIMIT_ENABLED=true
 RATE_LIMIT_DEFAULT_PLAN=anonymous
@@ -82,7 +96,16 @@ RATE_LIMIT_DEFAULT_PLAN=anonymous
 yarn migration:run
 ```
 
-### 4. Start Application
+### 4. Seed Data (Optional)
+
+The system will automatically seed default data on first startup, but you can also run:
+
+```bash
+# Data is seeded automatically when the service starts
+# No manual seeding required
+```
+
+### 5. Start Application
 
 ```bash
 yarn start:dev
@@ -100,10 +123,12 @@ node scripts/test-rate-limit.js
 
 | Plan | Limit/Min | TTL | Description |
 |------|-----------|-----|-------------|
-| anonymous | 90 | 60s | Default for users without API key |
-| free | 300 | 60s | Free tier with basic limits |
-| pro | 1200 | 60s | Professional plan |
-| enterprise | 6000 | 60s | Enterprise plan with max limits |
+| anonymous | 30 | 60s | Default for users without API key |
+| free | 100 | 60s | Free tier with basic limits |
+| pro | 500 | 60s | Professional plan |
+| enterprise | 2000 | 60s | Enterprise plan with max limits |
+
+**Note**: Anonymous plan has a fallback limit of 5 requests/minute if not found in database.
 
 ## 🔧 Admin API Endpoints
 
@@ -121,17 +146,30 @@ node scripts/test-rate-limit.js
 ### IP Whitelist Management
 - `GET /admin/rate-limit/ip-whitelist` - Get IP whitelist
 - `POST /admin/rate-limit/ip-whitelist` - Add IP to whitelist
+- `PUT /admin/rate-limit/ip-whitelist/:id` - Update IP whitelist entry
 - `DELETE /admin/rate-limit/ip-whitelist/:id` - Remove IP from whitelist
+
+### Policy Management
+- `GET /admin/rate-limit/policies` - Get all policies
+- `POST /admin/rate-limit/policies` - Create new policy
+- `PUT /admin/rate-limit/policies/:id` - Update policy
+- `DELETE /admin/rate-limit/policies/:id` - Delete policy
+- `GET /admin/rate-limit/policies/name/:name` - Get policy by name
+- `POST /admin/rate-limit/policies/:id/test` - Test policy matching
 
 ### Cache Management
 - `POST /admin/rate-limit/cache/invalidate` - Invalidate cache
 - `GET /admin/rate-limit/cache/stats` - Get cache statistics
+- `POST /admin/rate-limit/reset/:key` - Reset rate limit for specific key
+- `GET /admin/rate-limit/info/:key` - Get rate limit info for specific key
 
 ## 🎨 Usage Examples
 
 ### Basic Usage
 
 ```typescript
+import { BypassRateLimit, UsePlan, CustomRateLimit, RateLimit } from './rate-limit/rate-limit.decorator';
+
 @Controller('api')
 export class ApiController {
   @Get('public')
@@ -150,6 +188,12 @@ export class ApiController {
   @BypassRateLimit() // Skip rate limiting
   healthCheck() {
     return { status: 'ok' };
+  }
+
+  @Post('messages')
+  @RateLimit({ policy: 'createMessage', keyBy: ['userId', 'route'] })
+  createMessage() {
+    return { success: true };
   }
 }
 ```
@@ -197,9 +241,18 @@ Response:
 ```
 Client Request
      ↓
-CustomThrottlerGuard
+RateLimitGuard
      ↓
-RateLimitPolicyService
+RateLimitService
+     ↓
+┌─────────────────┐
+│  Rate Limiting  │
+│  Flow:          │
+│  1. IP Check    │
+│  2. API Key     │
+│  3. Policies    │
+│  4. Plan Limits │
+└─────────────────┘
      ↓
 Redis Storage
      ↓
@@ -208,18 +261,22 @@ Response with Headers
 
 ## 🔒 Security Features
 
-- **API Key Validation**: Keys are validated against database
-- **IP Whitelisting**: Trusted IPs bypass all rate limits
+- **API Key Validation**: Keys are validated against database with expiration checks
+- **IP Whitelisting**: Trusted IPs bypass all rate limits (supports CIDR ranges)
 - **Plan Isolation**: Different plans have separate rate limit buckets
-- **Cache Invalidation**: Sensitive data is invalidated on changes
+- **Policy-based Limiting**: Advanced rules with multiple strategies (Fixed Window, Sliding Window, Token Bucket)
+- **Cache Invalidation**: Sensitive data is invalidated on changes via Redis Pub/Sub
 - **Graceful Degradation**: On Redis errors, requests are allowed through
+- **Rate Limit Logging**: All rate limit events are logged for monitoring
 
 ## 📈 Performance
 
-- **Redis Caching**: Plans and API keys cached for 5 minutes
-- **Batch Operations**: Multiple rate limit checks are batched
+- **Redis Caching**: Plans, API keys, and policies cached for 5 minutes
+- **Lua Scripts**: Atomic rate limiting operations using Redis Lua scripts
 - **Connection Pooling**: Redis connections are pooled
 - **Minimal Overhead**: ~1-2ms per request for rate limiting
+- **Distributed**: Multi-instance support with Redis Pub/Sub cache invalidation
+- **Memory Efficient**: Uses Redis data structures optimized for rate limiting
 
 ## 🐛 Troubleshooting
 
@@ -256,13 +313,18 @@ LOG_LEVEL=debug
 
 The rate limiting system has been fully implemented and is ready for production use with:
 
-- ✅ Database migration with seed data
-- ✅ Redis configuration and caching
-- ✅ Complete admin API
-- ✅ Decorator support
-- ✅ Error handling and logging
-- ✅ Documentation and test scripts
-- ✅ Environment configuration
-- ✅ Multi-instance support
+- ✅ **Unified Service**: Single `RateLimitService` handling all rate limiting logic
+- ✅ **Database Entities**: Complete entity system with relationships
+- ✅ **Seed Data**: Automatic seeding with sample plans, API keys, and policies
+- ✅ **Redis Integration**: Distributed rate limiting with Lua scripts
+- ✅ **Admin API**: Full CRUD operations for all rate limiting components
+- ✅ **Decorator Support**: Flexible route configuration with multiple decorators
+- ✅ **Policy System**: Advanced policy-based rate limiting with multiple strategies
+- ✅ **IP Whitelisting**: Support for individual IPs and CIDR ranges
+- ✅ **Error Handling**: Graceful degradation and comprehensive logging
+- ✅ **Documentation**: Complete documentation and examples
+- ✅ **Environment Configuration**: Flexible configuration via environment variables
+- ✅ **Multi-instance Support**: Distributed cache invalidation via Redis Pub/Sub
+- ✅ **Type Safety**: Full TypeScript support with comprehensive interfaces
 
 The system can be easily extended and integrated with other modules in the project.

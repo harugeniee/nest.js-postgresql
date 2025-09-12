@@ -6,7 +6,7 @@ import {
 import { COMMON_CONSTANTS } from 'src/shared/constants';
 import { Repository } from 'typeorm';
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import {
@@ -23,8 +23,6 @@ import {
   UpdateApiKeyDto,
   CreateIpWhitelistDto,
   UpdateIpWhitelistDto,
-  CreatePolicyDto,
-  UpdatePolicyDto,
   PolicyMatchResponseDto,
 } from './dto';
 import {
@@ -43,7 +41,7 @@ import { RateLimitPolicy } from './entities/rate-limit-policy.entity';
  * Handles all rate limiting logic in one place
  */
 @Injectable()
-export class RateLimitService {
+export class RateLimitService implements OnModuleInit {
   private readonly logger = new Logger(RateLimitService.name);
   private readonly CACHE_TTL = 300; // 5 minutes
   private readonly ANONYMOUS_PLAN = 'anonymous';
@@ -72,7 +70,10 @@ export class RateLimitService {
     private readonly cacheService: CacheService,
   ) {
     this.setupCacheInvalidation();
-    void this.initializeData();
+  }
+
+  async onModuleInit(): Promise<void> {
+    await this.initializeData();
   }
 
   /**
@@ -366,7 +367,7 @@ export class RateLimitService {
 
       const apiKey = await this.apiKeyRepo.findOne({
         where: { key, active: true },
-        select: ['plan', 'isWhitelist', 'expiresAt', 'deletedAt'],
+        select: ['id', 'plan', 'isWhitelist', 'expiresAt', 'deletedAt'],
         relations: ['plan'],
       });
 
