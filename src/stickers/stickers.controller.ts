@@ -40,7 +40,9 @@ export class StickersController {
   @Post()
   @Auth()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new sticker from existing media (Admin only)' })
+  @ApiOperation({
+    summary: 'Create a new sticker from existing media (Admin only)',
+  })
   @ApiResponse({ status: 201, description: 'Sticker created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

@@ -61,7 +61,6 @@ export class CreateStickerDto {
   sortValue?: number = 0;
 }
 
-
 /**
  * DTO for updating sticker metadata
  */
