@@ -1,0 +1,22 @@
+# docker-compose.tunnel.yml
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel
+    restart: unless-stopped
+
+    # network_mode: "host"
+
+    command: tunnel run
+    volumes:
+      - ./infra/cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ./infra/cloudflared/8cde39db-b2fd-4144-a946-8df505af02f9.json:/etc/cloudflared/8cde39db-b2fd-4144-a946-8df505af02f9.json:ro
+
+    environment:
+      - TUNNEL_LOGLEVEL=debug
+
+    healthcheck:
+      test: ["CMD", "cloudflared", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

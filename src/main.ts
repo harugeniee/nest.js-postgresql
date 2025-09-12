@@ -3,6 +3,7 @@ import * as morgan from 'morgan';
 import { I18nService } from 'nestjs-i18n';
 import { I18nHttpExceptionFilter } from 'src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from 'src/shared/interceptors/response.interceptor';
+import { CacheService } from 'src/shared/services/cache/cache.service';
 
 import {
   ConsoleLogger,
@@ -14,7 +15,6 @@ import { ConfigService } from '@nestjs/config';
 import { NestApplication, NestFactory } from '@nestjs/core';
 import { RmqOptions, Transport } from '@nestjs/microservices';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-
 import { AppModule } from './app.module';
 import { RedisIoAdapter } from './common/gateways/socket.adapter';
 import { RateLimitGuard } from './rate-limit/rate-limit.guard';
@@ -89,7 +89,11 @@ async function bootstrap(): Promise<void> {
     // Setup WebSocket adapter with Redis support
     try {
       logger.log('🔧 Setting up WebSocket adapter...');
-      const redisIoAdapter = new RedisIoAdapter(app);
+
+      // Get Redis instance from CacheService
+      const cacheService = app.get(CacheService);
+      const redis = cacheService.getRedisClient();
+      const redisIoAdapter = new RedisIoAdapter(app, redis);
 
       // Initialize Redis connection for the adapter
       await redisIoAdapter.connectToRedis();

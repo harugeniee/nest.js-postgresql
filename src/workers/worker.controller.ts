@@ -115,4 +115,126 @@ export class WorkerController {
       channel.nack(originalMsg, false, true);
     }
   }
+
+  @MessagePattern(JOB_NAME.REACTION_SET)
+  async handleReactionSet(@Payload() data: any, @Ctx() context: RmqContext) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Reaction set event received:', data);
+      // Process reaction set event here
+      // You can add logic to update other systems, send notifications, etc.
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error) {
+      console.log('Error processing reaction set event:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern(JOB_NAME.REACTION_UNSET)
+  async handleReactionUnset(@Payload() data: any, @Ctx() context: RmqContext) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Reaction unset event received:', data);
+      // Process reaction unset event here
+      // You can add logic to update other systems, send notifications, etc.
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error) {
+      console.log('Error processing reaction unset event:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern(JOB_NAME.COMMENT_CREATED)
+  async handleCommentCreated(@Payload() data: any, @Ctx() context: RmqContext) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Comment created event received:', data);
+      // Process comment created event here
+      // You can add logic to send notifications, update analytics, etc.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await this.workerService.processCommentCreated(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing comment created event:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern(JOB_NAME.COMMENT_UPDATED)
+  async handleCommentUpdated(@Payload() data: any, @Ctx() context: RmqContext) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Comment updated event received:', data);
+      // Process comment updated event here
+      // You can add logic to send notifications, update analytics, etc.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await this.workerService.processCommentUpdated(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing comment updated event:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern(JOB_NAME.COMMENT_DELETED)
+  async handleCommentDeleted(@Payload() data: any, @Ctx() context: RmqContext) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Comment deleted event received:', data);
+      // Process comment deleted event here
+      // You can add logic to clean up related data, send notifications, etc.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await this.workerService.processCommentDeleted(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing comment deleted event:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern(JOB_NAME.COMMENT_PINNED)
+  async handleCommentPinned(@Payload() data: any, @Ctx() context: RmqContext) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Comment pinned event received:', data);
+      // Process comment pinned event here
+      // You can add logic to send notifications, update analytics, etc.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await this.workerService.processCommentPinned(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing comment pinned event:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
 }

@@ -4,6 +4,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Redis } from 'ioredis';
 import { Logger } from '@nestjs/common';
+import { NestApplication } from '@nestjs/core';
 
 export class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
@@ -12,28 +13,35 @@ export class RedisIoAdapter extends IoAdapter {
   private isConnected = false;
   private readonly logger = new Logger(RedisIoAdapter.name);
 
+  constructor(
+    private readonly app: NestApplication,
+    private readonly redis: Redis,
+  ) {
+    super(app);
+  }
+
   async connectToRedis(): Promise<void> {
     try {
-      this.logger.log('🔌 Connecting to Redis...');
+      this.logger.log(
+        '🔌 Using existing Redis connection for WebSocket adapter...',
+      );
 
-      // Create Redis clients with proper error handling
-      this.pubClient = new Redis(process.env.REDIS_URL as string, {
-        maxRetriesPerRequest: 3,
-        lazyConnect: true,
-      });
+      // Use the existing Redis connection from CacheModule
+      this.pubClient = this.redis;
+      this.subClient = this.redis.duplicate();
 
-      this.subClient = this.pubClient.duplicate();
-
-      // Wait for both clients to connect
-      await Promise.all([this.pubClient.connect(), this.subClient.connect()]);
+      // Wait for subscriber client to connect
+      await this.subClient.connect();
 
       // Create the Redis adapter
       this.adapterConstructor = createAdapter(this.pubClient, this.subClient);
 
       this.isConnected = true;
-      this.logger.log('✅ Redis adapter created successfully');
+      this.logger.log(
+        '✅ Redis adapter created successfully using shared connection',
+      );
     } catch (error) {
-      this.logger.error('❌ Failed to connect to Redis:', error);
+      this.logger.error('❌ Failed to create Redis adapter:', error);
       this.isConnected = false;
       throw error;
     }

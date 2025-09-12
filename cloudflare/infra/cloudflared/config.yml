@@ -1,0 +1,10 @@
+# infra/cloudflared/config.yml
+tunnel: 8cde39db-b2fd-4144-a946-8df505af02f9
+credentials-file: /etc/cloudflared/8cde39db-b2fd-4144-a946-8df505af02f9.json
+protocol: http2
+edge-ip-version: "4"
+
+ingress:
+  - hostname: api-zero-trust.calumma.cc
+    service: http://192.168.2.71:3000   
+  - service: http_status:404

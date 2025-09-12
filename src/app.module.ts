@@ -7,7 +7,6 @@ import {
 } from 'nestjs-i18n';
 import { join } from 'path';
 
-import { RedisModule } from '@nestjs-modules/ioredis';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -26,15 +25,22 @@ import {
   oauthConfig,
   redisConfig,
   r2Config,
+  stickerConfig,
 } from './shared/config';
 import { configValidationSchema } from './shared/config/schema';
 import { CacheModule, RabbitmqModule, MailModule } from './shared/services';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { ReactionsModule } from './reactions/reactions.module';
+import { ArticlesModule } from './articles/articles.module';
+import { CommentsModule } from './comments/comments.module';
+import { StickersModule } from './stickers/stickers.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       validationSchema: configValidationSchema,
       isGlobal: true,
@@ -51,17 +57,13 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
         () => ({
           r2: r2Config(),
         }),
+        () => ({
+          sticker: stickerConfig(),
+        }),
       ],
     }),
     TypeOrmModule.forRootAsync({
       useClass: DatabaseConfigFactory,
-    }),
-    RedisModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'single',
-        url: configService.get<string>('redis.url', { infer: true }),
-      }),
     }),
     I18nModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
@@ -90,6 +92,10 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
     AuthModule,
     QrModule,
     RateLimitModule,
+    ArticlesModule,
+    ReactionsModule,
+    CommentsModule,
+    StickersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
