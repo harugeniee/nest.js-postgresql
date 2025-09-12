@@ -5,7 +5,7 @@ import { CommentsService } from './comments.service';
 import { Comment } from './entities/comment.entity';
 import { Media } from 'src/media/entities/media.entity';
 import { CommentMention } from './entities/comment-mention.entity';
-import { CacheService, RabbitmqModule } from 'src/shared/services';
+import { RabbitmqModule } from 'src/shared/services';
 
 @Module({
   imports: [
@@ -13,7 +13,7 @@ import { CacheService, RabbitmqModule } from 'src/shared/services';
     RabbitmqModule,
   ],
   controllers: [CommentsController],
-  providers: [CommentsService, CacheService],
+  providers: [CommentsService],
   exports: [CommentsService],
 })
 export class CommentsModule {}

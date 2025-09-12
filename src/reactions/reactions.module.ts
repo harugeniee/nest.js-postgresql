@@ -4,7 +4,7 @@ import { ReactionsController } from './reactions.controller';
 import { ReactionsService } from './reactions.service';
 import { Reaction } from './entities/reaction.entity';
 import { ReactionCount } from './entities/reaction-count.entity';
-import { CacheService, RabbitmqModule } from 'src/shared/services';
+import { RabbitmqModule } from 'src/shared/services';
 
 @Module({
   imports: [
@@ -12,7 +12,7 @@ import { CacheService, RabbitmqModule } from 'src/shared/services';
     RabbitmqModule,
   ],
   controllers: [ReactionsController],
-  providers: [ReactionsService, CacheService],
+  providers: [ReactionsService],
   exports: [ReactionsService],
 })
 export class ReactionsModule {}

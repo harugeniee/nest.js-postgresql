@@ -7,7 +7,6 @@ import {
 } from 'nestjs-i18n';
 import { join } from 'path';
 
-import { RedisModule } from '@nestjs-modules/ioredis';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -60,13 +59,6 @@ import { ScheduleModule } from '@nestjs/schedule';
     }),
     TypeOrmModule.forRootAsync({
       useClass: DatabaseConfigFactory,
-    }),
-    RedisModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'single',
-        url: configService.get<string>('redis.url', { infer: true }),
-      }),
     }),
     I18nModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
