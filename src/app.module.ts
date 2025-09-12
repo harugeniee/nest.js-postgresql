@@ -34,6 +34,7 @@ import { WorkerModule } from './workers/worker.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { ArticlesModule } from './articles/articles.module';
+import { CommentsModule } from './comments/comments.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -96,6 +97,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     RateLimitModule,
     ArticlesModule,
     ReactionsModule,
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

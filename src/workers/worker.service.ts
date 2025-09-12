@@ -8,12 +8,16 @@ import {
   OtpEmailQueueJob,
   MailQueueJobResult,
 } from 'src/shared/services/mail/mail-queue.interface';
+import { CommentsService } from 'src/comments/comments.service';
 
 @Injectable()
 export class WorkerService {
   private readonly logger = new Logger(WorkerService.name);
 
-  constructor(private readonly mailService: MailService) {}
+  constructor(
+    private readonly mailService: MailService,
+    private readonly commentsService: CommentsService,
+  ) {}
 
   testRABBIT(id: number) {
     return `This action removes a #${id} worker`;
@@ -200,6 +204,146 @@ export class WorkerService {
         error: error instanceof Error ? error.message : 'Unknown error',
         processingTime,
       };
+    }
+  }
+
+  /**
+   * Process comment created event
+   * Handles notifications, analytics, and other post-creation tasks
+   */
+  async processCommentCreated(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing comment created event: ${data}`);
+
+    try {
+      // Update reply count for parent comment if this is a reply
+      if (data.parentId) {
+        await this.commentsService.updateReplyCount(data.parentId, true);
+        this.logger.log(
+          `Updated reply count for parent comment: ${data.parentId}`,
+        );
+      }
+
+      // TODO: Add other comment created processing logic here
+      // Examples:
+      // - Send notifications to mentioned users
+      // - Update comment statistics
+      // - Trigger moderation checks
+      // - Send WebSocket notifications
+      // - Update search indexes
+      // - Log analytics events
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Comment created event processed: ${data}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing comment created event: ${data}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process comment updated event
+   * Handles notifications, analytics, and other post-update tasks
+   */
+  async processCommentUpdated(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing comment updated event: ${data}`);
+
+    try {
+      // TODO: Add comment updated processing logic here
+      // Examples:
+      // - Send notifications to subscribers
+      // - Update comment statistics
+      // - Trigger moderation checks for edited content
+      // - Send WebSocket notifications
+      // - Update search indexes
+      // - Log analytics events
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Comment updated event processed: ${data}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing comment updated event: ${data}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process comment deleted event
+   * Handles cleanup, notifications, and other post-deletion tasks
+   */
+  async processCommentDeleted(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing comment deleted event: ${data}`);
+
+    try {
+      // Update reply count for parent comment if this was a reply
+      if (data.parentId) {
+        await this.commentsService.updateReplyCount(data.parentId, false);
+        this.logger.log(
+          `Decremented reply count for parent comment: ${data.parentId}`,
+        );
+      }
+
+      // TODO: Add other comment deleted processing logic here
+      // Examples:
+      // - Clean up related data (reactions, attachments, etc.)
+      // - Send notifications to subscribers
+      // - Update comment statistics
+      // - Send WebSocket notifications
+      // - Update search indexes
+      // - Log analytics events
+      // - Handle soft delete vs hard delete logic
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Comment deleted event processed: ${data}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing comment deleted event: ${data}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process comment pinned event
+   * Handles notifications and other post-pin tasks
+   */
+  async processCommentPinned(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing comment pinned event: ${data}`);
+
+    try {
+      // TODO: Add comment pinned processing logic here
+      // Examples:
+      // - Send notifications to relevant users
+      // - Update comment statistics
+      // - Send WebSocket notifications
+      // - Log analytics events
+      // - Update pinned comment lists
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Comment pinned event processed: ${data}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing comment pinned event: ${data}`,
+        error,
+      );
+      throw error;
     }
   }
 }
