@@ -6,12 +6,10 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
-  ManyToMany,
-  JoinTable,
 } from 'typeorm';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
-import { Media } from 'src/media/entities/media.entity';
 import { CommentMention } from 'src/comments/entities/comment-mention.entity';
+import { CommentMedia } from 'src/comments/entities/comment-media.entity';
 import {
   COMMENT_CONSTANTS,
   CommentFlag,
@@ -123,23 +121,14 @@ export class Comment extends BaseEntityCustom {
   editedAt: Date;
 
   /**
-   * Comment attachments (files, images, etc.)
-   * Many-to-Many relationship with Media entity
-   * Uses a junction table to link comments with media files
+   * Comment media attachments (files, images, stickers, etc.)
+   * One-to-Many relationship with CommentMedia entity
+   * Supports different media types including stickers
    */
-  @ManyToMany(() => Media, { cascade: false })
-  @JoinTable({
-    name: 'comment_media',
-    joinColumn: {
-      name: 'commentId',
-      referencedColumnName: 'id',
-    },
-    inverseJoinColumn: {
-      name: 'mediaId',
-      referencedColumnName: 'id',
-    },
+  @OneToMany(() => CommentMedia, (media) => media.comment, {
+    cascade: true,
   })
-  attachments: Media[];
+  media: CommentMedia[];
 
   /**
    * User mentions in the comment

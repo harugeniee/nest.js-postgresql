@@ -11,7 +11,9 @@ import {
 import { Comment } from './entities/comment.entity';
 import { Media } from 'src/media/entities/media.entity';
 import { CommentMention } from './entities/comment-mention.entity';
+import { CommentMedia } from './entities/comment-media.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { CreateCommentMediaItemDto } from './dto/create-comment-media.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { QueryCommentsDto } from './dto/query-comments.dto';
 import { BatchCommentsDto } from './dto/batch-comments.dto';
@@ -30,6 +32,10 @@ export class CommentsService extends BaseService<Comment> {
   constructor(
     @InjectRepository(Comment)
     private readonly commentRepository: Repository<Comment>,
+    @InjectRepository(CommentMedia)
+    private readonly commentMediaRepository: Repository<CommentMedia>,
+    @InjectRepository(CommentMention)
+    private readonly commentMentionRepository: Repository<CommentMention>,
 
     private readonly rabbitMQService: RabbitMQService,
     cacheService: CacheService,
@@ -44,7 +50,7 @@ export class CommentsService extends BaseService<Comment> {
           user: true,
           parent: true,
           replies: true,
-          attachments: true,
+          media: true,
           mentions: { user: true },
         },
         emitEvents: false, // Disable EventEmitter, use RabbitMQ instead
@@ -212,31 +218,23 @@ export class CommentsService extends BaseService<Comment> {
         { queryRunner },
       );
 
-      // Link media attachments if provided
+      // Process media attachments (including stickers) if provided
+      if (dto.media && Array.isArray(dto.media) && dto.media.length > 0) {
+        await this.processCommentMedia(comment.id, dto.media, queryRunner);
+      }
+
+      // Legacy attachment support (for backward compatibility)
       if (
         dto.attachments &&
         Array.isArray(dto.attachments) &&
         dto.attachments.length > 0
       ) {
-        const mediaIds = dto.attachments.map(
-          (attachmentDto) => attachmentDto.mediaId,
-        );
-        const mediaFiles = await queryRunner.manager.find(Media, {
-          where: { id: In(mediaIds) },
-        });
-
-        if (mediaFiles.length !== mediaIds.length) {
-          throw new HttpException(
-            {
-              messageKey: 'comment.MEDIA_NOT_FOUND',
-            },
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-
-        // Link media files to the comment
-        comment.attachments = mediaFiles;
-        await queryRunner.manager.save(Comment, comment);
+        const legacyMedia = dto.attachments.map((attachment) => ({
+          kind: 'image' as const,
+          mediaId: attachment.mediaId,
+          sortValue: 0,
+        }));
+        await this.processCommentMedia(comment.id, legacyMedia, queryRunner);
       }
 
       // Process mentions and create mention records
@@ -259,7 +257,10 @@ export class CommentsService extends BaseService<Comment> {
           relations: [
             'user',
             'parent',
-            'attachments',
+            'media',
+            'media.media',
+            'media.sticker',
+            'media.sticker.media',
             'mentions',
             'mentions.user',
           ],
@@ -823,6 +824,140 @@ export class CommentsService extends BaseService<Comment> {
     return this.commentRepository.findOne({
       where: { id: commentId },
       select: ['id', 'replyCount', 'parentId', 'subjectType', 'subjectId'],
+    });
+  }
+
+  /**
+   * Process comment media attachments (including stickers)
+   * @param commentId - ID of the comment
+   * @param mediaItems - Array of media items to attach
+   * @param queryRunner - Database query runner
+   */
+  private async processCommentMedia(
+    commentId: string,
+    mediaItems: CreateCommentMediaItemDto[],
+    queryRunner: any,
+  ): Promise<void> {
+    // Limit media items to prevent abuse
+    if (mediaItems.length > 10) {
+      throw new HttpException(
+        {
+          messageKey: 'comment.TOO_MANY_MEDIA_ITEMS',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    for (const mediaItem of mediaItems) {
+      if (mediaItem.kind === 'sticker') {
+        await this.processStickerMedia(commentId, mediaItem, queryRunner);
+      } else {
+        await this.processRegularMedia(commentId, mediaItem, queryRunner);
+      }
+    }
+  }
+
+  /**
+   * Process sticker media attachment
+   * @param commentId - ID of the comment
+   * @param mediaItem - Sticker media item
+   * @param queryRunner - Database query runner
+   */
+  private async processStickerMedia(
+    commentId: string,
+    mediaItem: CreateCommentMediaItemDto & { kind: 'sticker' },
+    queryRunner: any,
+  ): Promise<void> {
+    // Import Sticker entity dynamically to avoid circular dependency
+    const { Sticker } = await import('src/stickers/entities/sticker.entity');
+
+    // Find the sticker
+    const sticker = await queryRunner.manager.findOne(Sticker, {
+      where: { id: mediaItem.stickerId },
+      relations: ['media'],
+    });
+
+    if (!sticker) {
+      throw new HttpException(
+        {
+          messageKey: 'sticker.STICKER_NOT_FOUND',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Check if sticker is available for use
+    if (!sticker.isUsable()) {
+      throw new HttpException(
+        {
+          messageKey: 'sticker.STICKER_NOT_AVAILABLE',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Create comment media record with sticker snapshot
+    await queryRunner.manager.save(CommentMedia, {
+      commentId,
+      mediaId: sticker.mediaId,
+      kind: 'sticker',
+      url: sticker.media.url,
+      meta: {
+        width: sticker.width,
+        height: sticker.height,
+        durationMs: sticker.durationMs,
+        format: sticker.format,
+        isAnimated: sticker.isAnimated(),
+      },
+      sortValue: mediaItem.sortValue || 0,
+      stickerId: sticker.id,
+      stickerName: sticker.name,
+      stickerTags: sticker.tags,
+      stickerFormat: sticker.format,
+    });
+  }
+
+  /**
+   * Process regular media attachment
+   * @param commentId - ID of the comment
+   * @param mediaItem - Regular media item
+   * @param queryRunner - Database query runner
+   */
+  private async processRegularMedia(
+    commentId: string,
+    mediaItem: CreateCommentMediaItemDto & {
+      kind: 'image' | 'video' | 'audio' | 'document' | 'other';
+    },
+    queryRunner: any,
+  ): Promise<void> {
+    // Find the media file
+    const media = await queryRunner.manager.findOne(Media, {
+      where: { id: mediaItem.mediaId },
+    });
+
+    if (!media) {
+      throw new HttpException(
+        {
+          messageKey: 'comment.MEDIA_NOT_FOUND',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Create comment media record
+    await queryRunner.manager.save(CommentMedia, {
+      commentId,
+      mediaId: media.id,
+      kind: mediaItem.kind,
+      url: media.url,
+      meta: {
+        width: media.width,
+        height: media.height,
+        duration: media.duration,
+        mimeType: media.mimeType,
+        size: media.size,
+      },
+      sortValue: mediaItem.sortValue || 0,
     });
   }
 }

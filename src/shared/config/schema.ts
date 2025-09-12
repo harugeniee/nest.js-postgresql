@@ -104,4 +104,11 @@ export const configValidationSchema = Joi.object({
 
   // WebSocket configuration
   WS_ADAPTER_ENABLED: Joi.boolean().default(false),
+
+  // Sticker configuration
+  STICKER_MAX_SIZE: Joi.number().default(524288), // 512KB
+  STICKER_RECOMMENDED_SIDE: Joi.number().default(320),
+  STICKER_MAX_SIDE: Joi.number().default(1024),
+  STICKER_MAX_DURATION_MS: Joi.number().default(5000),
+  MEDIA_STICKER_FOLDER: Joi.string().default('stickers'),
 });

@@ -25,6 +25,7 @@ import {
   oauthConfig,
   redisConfig,
   r2Config,
+  stickerConfig,
 } from './shared/config';
 import { configValidationSchema } from './shared/config/schema';
 import { CacheModule, RabbitmqModule, MailModule } from './shared/services';
@@ -34,6 +35,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { ArticlesModule } from './articles/articles.module';
 import { CommentsModule } from './comments/comments.module';
+import { StickersModule } from './stickers/stickers.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -54,6 +56,9 @@ import { ScheduleModule } from '@nestjs/schedule';
         () => ({ oauth: oauthConfig() }),
         () => ({
           r2: r2Config(),
+        }),
+        () => ({
+          sticker: stickerConfig(),
         }),
       ],
     }),
@@ -90,6 +95,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ArticlesModule,
     ReactionsModule,
     CommentsModule,
+    StickersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

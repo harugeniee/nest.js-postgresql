@@ -9,6 +9,11 @@ import {
   IsEnum,
   MaxLength,
   MinLength,
+  ValidateIf,
+  Validate,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -17,6 +22,23 @@ import {
   CommentType,
   CommentVisibility,
 } from 'src/shared/constants/comment.constants';
+import { CreateCommentMediaItemDto } from './create-comment-media.dto';
+
+@ValidatorConstraint({ name: 'contentOrMedia', async: false })
+export class ContentOrMediaConstraint implements ValidatorConstraintInterface {
+  validate(value: any, args: ValidationArguments) {
+    const object = args.object as CreateCommentDto;
+    const hasContent = object.content && object.content.trim().length > 0;
+    const hasMedia = object.media && object.media.length > 0;
+    const hasAttachments = object.attachments && object.attachments.length > 0;
+
+    return hasContent || hasMedia || hasAttachments;
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    return 'Comment must have either content, media, or attachments';
+  }
+}
 
 export class CreateCommentAttachmentDto {
   @IsString()
@@ -57,10 +79,11 @@ export class CreateCommentDto {
   @IsString()
   parentId?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(COMMENT_CONSTANTS.VALIDATION.CONTENT_MIN_LENGTH)
   @MaxLength(COMMENT_CONSTANTS.VALIDATION.CONTENT_MAX_LENGTH)
-  content: string;
+  content?: string;
 
   @IsOptional()
   @IsEnum(Object.values(COMMENT_CONSTANTS.TYPES))
@@ -75,6 +98,12 @@ export class CreateCommentDto {
   @ValidateNested({ each: true })
   @Type(() => CreateCommentAttachmentDto)
   attachments?: CreateCommentAttachmentDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => Object)
+  media?: CreateCommentMediaItemDto[];
 
   @IsOptional()
   @IsArray()
@@ -94,4 +123,7 @@ export class CreateCommentDto {
   @IsOptional()
   @IsEnum(Object.values(COMMENT_CONSTANTS.VISIBILITY))
   visibility?: CommentVisibility = COMMENT_CONSTANTS.VISIBILITY.PUBLIC;
+
+  @Validate(ContentOrMediaConstraint)
+  _contentOrMedia?: any; // This field is only used for validation
 }
