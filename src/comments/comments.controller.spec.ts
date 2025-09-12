@@ -6,7 +6,6 @@ import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { QueryCommentsDto } from './dto/query-comments.dto';
 import { BatchCommentsDto } from './dto/batch-comments.dto';
-import { CommentResponseDto } from './dto/comment-response.dto';
 import { JwtAccessTokenGuard } from 'src/auth/guard';
 import { JwtService } from '@nestjs/jwt';
 import { CacheService } from 'src/shared/services';
@@ -33,7 +32,7 @@ describe('CommentsController', () => {
     pinned: false,
     edited: false,
     editedAt: null,
-    attachments: [],
+    media: [],
     mentions: [],
     metadata: {},
     flags: [],
@@ -42,11 +41,7 @@ describe('CommentsController', () => {
     updatedAt: new Date(),
   } as unknown as Comment;
 
-  const mockCommentResponse = new CommentResponseDto(mockComment, {
-    includeReplies: false,
-    includeAttachments: true,
-    includeMentions: true,
-  });
+  const mockCommentResponse = mockComment;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -55,9 +50,9 @@ describe('CommentsController', () => {
         {
           provide: CommentsService,
           useValue: {
-            create: jest.fn(),
-            update: jest.fn(),
-            delete: jest.fn(),
+            createComment: jest.fn(),
+            updateComment: jest.fn(),
+            deleteComment: jest.fn(),
             list: jest.fn(),
             getById: jest.fn(),
             getBatch: jest.fn(),
@@ -113,12 +108,14 @@ describe('CommentsController', () => {
         type: 'text',
       };
 
-      jest.spyOn(service, 'create').mockResolvedValue(mockCommentResponse);
+      jest
+        .spyOn(service, 'createComment')
+        .mockResolvedValue(mockCommentResponse);
 
       const result = await controller.createComment(req, dto);
 
       expect(result).toEqual(mockCommentResponse);
-      expect(service.create).toHaveBeenCalledWith('1', dto);
+      expect(service.createComment).toHaveBeenCalledWith('1', dto);
     });
   });
 
@@ -134,9 +131,14 @@ describe('CommentsController', () => {
       };
 
       const mockResult = {
-        comments: [mockCommentResponse],
-        total: 1,
-        hasMore: false,
+        result: [mockCommentResponse],
+        metaData: {
+          currentPage: 1,
+          pageSize: 10,
+          totalRecords: 1,
+          totalPages: 1,
+          hasNextPage: false,
+        },
       };
 
       jest.spyOn(service, 'list').mockResolvedValue(mockResult);
@@ -152,7 +154,7 @@ describe('CommentsController', () => {
     it('should return a single comment by ID', async () => {
       const commentId = '1';
       const includeReplies = 'true';
-      const includeAttachments = 'true';
+      const includeMedia = 'true';
       const includeMentions = 'true';
 
       jest.spyOn(service, 'getById').mockResolvedValue(mockCommentResponse);
@@ -160,7 +162,7 @@ describe('CommentsController', () => {
       const result = await controller.getComment(
         commentId,
         includeReplies,
-        includeAttachments,
+        includeMedia,
         includeMentions,
       );
 
@@ -182,12 +184,14 @@ describe('CommentsController', () => {
         edited: true,
       };
 
-      jest.spyOn(service, 'update').mockResolvedValue(mockCommentResponse);
+      jest
+        .spyOn(service, 'updateComment')
+        .mockResolvedValue(mockCommentResponse);
 
       const result = await controller.updateComment(commentId, req, dto);
 
       expect(result).toEqual(mockCommentResponse);
-      expect(service.update).toHaveBeenCalledWith(commentId, '1', dto);
+      expect(service.updateComment).toHaveBeenCalledWith(commentId, '1', dto);
     });
   });
 
@@ -196,12 +200,12 @@ describe('CommentsController', () => {
       const req = { user: { uid: '1' } } as any;
       const commentId = '1';
 
-      jest.spyOn(service, 'delete').mockResolvedValue({ success: true });
+      jest.spyOn(service, 'deleteComment').mockResolvedValue(undefined);
 
       const result = await controller.deleteComment(commentId, req);
 
-      expect(result).toEqual({ success: true });
-      expect(service.delete).toHaveBeenCalledWith(commentId, '1');
+      expect(result).toBeUndefined();
+      expect(service.deleteComment).toHaveBeenCalledWith(commentId, '1');
     });
   });
 
@@ -226,7 +230,7 @@ describe('CommentsController', () => {
         subjectType: 'article',
         subjectIds: ['1', '2', '3'],
         includeReplies: false,
-        includeAttachments: true,
+        includeMedia: true,
         includeMentions: true,
       };
 
@@ -277,9 +281,14 @@ describe('CommentsController', () => {
       };
 
       const mockResult = {
-        comments: [mockCommentResponse],
-        total: 1,
-        hasMore: false,
+        result: [mockCommentResponse],
+        metaData: {
+          currentPage: 1,
+          pageSize: 10,
+          totalRecords: 1,
+          totalPages: 1,
+          hasNextPage: false,
+        },
       };
 
       jest.spyOn(service, 'list').mockResolvedValue(mockResult);
@@ -290,62 +299,6 @@ describe('CommentsController', () => {
       expect(service.list).toHaveBeenCalledWith({
         ...dto,
         parentId: commentId,
-      });
-    });
-  });
-
-  describe('getCommentsByUser', () => {
-    it('should return comments by user', async () => {
-      const userId = '1';
-      const dto: Omit<QueryCommentsDto, 'userId'> = {
-        page: 1,
-        limit: 10,
-        sortBy: 'recent',
-        order: 'DESC',
-      };
-
-      const mockResult = {
-        comments: [mockCommentResponse],
-        total: 1,
-        hasMore: false,
-      };
-
-      jest.spyOn(service, 'list').mockResolvedValue(mockResult);
-
-      const result = await controller.getCommentsByUser(userId, dto);
-
-      expect(result).toEqual(mockResult);
-      expect(service.list).toHaveBeenCalledWith({
-        ...dto,
-        userId,
-      });
-    });
-  });
-
-  describe('searchComments', () => {
-    it('should search comments', async () => {
-      const query = 'test search';
-      const dto: Omit<QueryCommentsDto, 'search'> = {
-        page: 1,
-        limit: 10,
-        sortBy: 'recent',
-        order: 'DESC',
-      };
-
-      const mockResult = {
-        comments: [mockCommentResponse],
-        total: 1,
-        hasMore: false,
-      };
-
-      jest.spyOn(service, 'list').mockResolvedValue(mockResult);
-
-      const result = await controller.searchComments(query, dto);
-
-      expect(result).toEqual(mockResult);
-      expect(service.list).toHaveBeenCalledWith({
-        ...dto,
-        search: query.trim(),
       });
     });
   });
