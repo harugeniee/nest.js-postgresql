@@ -3,8 +3,12 @@ import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
 import { Media } from 'src/media/entities/media.entity';
-import { CommentType, CommentVisibility, JOB_NAME } from 'src/shared/constants';
-import { COMMENT_CONSTANTS } from 'src/shared/constants/comment.constants';
+import {
+  COMMENT_CONSTANTS,
+  CommentType,
+  CommentVisibility,
+  JOB_NAME,
+} from 'src/shared/constants';
 import { CacheService, RabbitMQService } from 'src/shared/services';
 import { Sticker } from 'src/stickers/entities/sticker.entity';
 import {
@@ -20,14 +24,14 @@ import {
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { BatchCommentsDto } from './dto/batch-comments.dto';
-import { CreateCommentMediaItemDto } from './dto/create-comment-media.dto';
-import { CreateCommentDto } from './dto/create-comment.dto';
-import { QueryCommentsDto } from './dto/query-comments.dto';
-import { UpdateCommentDto } from './dto/update-comment.dto';
-import { CommentMedia } from './entities/comment-media.entity';
-import { CommentMention } from './entities/comment-mention.entity';
-import { Comment } from './entities/comment.entity';
+import {
+  BatchCommentsDto,
+  CreateCommentDto,
+  CreateCommentMediaItemDto,
+  QueryCommentsDto,
+  UpdateCommentDto,
+} from './dto';
+import { Comment, CommentMedia, CommentMention } from './entities';
 
 @Injectable()
 export class CommentsService extends BaseService<Comment> {
