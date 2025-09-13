@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsOptional,
   IsString,
   IsStrongPassword,
@@ -6,7 +7,6 @@ import {
   MinLength,
 } from 'class-validator';
 
-// export class UpdateUserDto extends PartialType(RegisterDto) {}
 export class UpdateUserDto {
   @IsOptional()
   @IsString()
@@ -21,4 +21,12 @@ export class UpdateUserDto {
     minNumbers: 1,
   })
   password?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isEmailVerified?: boolean;
+
+  @IsOptional()
+  @IsString()
+  photoUrl?: string;
 }

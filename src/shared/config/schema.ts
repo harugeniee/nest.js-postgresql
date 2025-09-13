@@ -111,4 +111,12 @@ export const configValidationSchema = Joi.object({
   STICKER_MAX_SIDE: Joi.number().default(1024),
   STICKER_MAX_DURATION_MS: Joi.number().default(5000),
   MEDIA_STICKER_FOLDER: Joi.string().default('stickers'),
+
+  // Firebase configuration
+  FIREBASE_PROJECT_ID: Joi.string().required(),
+  FIREBASE_PRIVATE_KEY_ID: Joi.string().required(),
+  FIREBASE_PRIVATE_KEY: Joi.string().required(),
+  FIREBASE_CLIENT_EMAIL: Joi.string().required(),
+  FIREBASE_CLIENT_ID: Joi.string().required(),
+  FIREBASE_CLIENT_X509_CERT_URL: Joi.string().required(),
 });

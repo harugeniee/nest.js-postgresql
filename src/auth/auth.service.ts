@@ -12,7 +12,7 @@ import {
 } from 'src/users/dto';
 import { User } from 'src/users/entities';
 import { UsersService } from 'src/users/users.service';
-import { OtpRequestDto, OtpVerifyDto } from './dto';
+import { OtpRequestDto, OtpVerifyDto, FirebaseLoginDto } from './dto';
 import { OtpData } from './interfaces';
 import {
   generateOtpCode,
@@ -24,6 +24,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { RedisOtpStore, MailerEmailOtpSender } from './providers';
+import { FirebaseService } from 'src/shared/services/firebase/firebase.service';
 
 @Injectable()
 export class AuthService {
@@ -42,6 +43,7 @@ export class AuthService {
     private readonly cacheService: CacheService,
     private readonly otpStore: RedisOtpStore,
     private readonly emailOtpSender: MailerEmailOtpSender,
+    private readonly firebaseService: FirebaseService,
   ) {}
 
   async register(registerDto: RegisterDto, clientInfo: ClientInfo) {
@@ -489,5 +491,96 @@ export class AuthService {
    */
   private getOtpStoreKey(email: string): string {
     return `${this.OTP_PREFIX}${email.toLowerCase()}`;
+  }
+
+  /**
+   * Firebase authentication login
+   * @param firebaseLoginDto - Firebase login data containing ID token
+   * @param clientInfo - Client information
+   * @returns Login result with JWT tokens
+   */
+  async firebaseLogin(
+    firebaseLoginDto: FirebaseLoginDto,
+    clientInfo: ClientInfo,
+  ) {
+    try {
+      this.logger.log('Firebase authentication initiated');
+
+      // Step 1: Verify Firebase ID token with Firebase
+      const firebaseResult = await this.firebaseService.authenticate(
+        firebaseLoginDto.idToken,
+      );
+
+      if (!firebaseResult.success || !firebaseResult.user) {
+        this.logger.warn('Firebase authentication failed');
+        throw new HttpException(
+          {
+            messageKey: 'auth.FIREBASE_AUTH_FAILED',
+            details: firebaseResult.error || 'Firebase authentication failed',
+          },
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      const firebaseUser = firebaseResult.user;
+      this.logger.log(
+        `Firebase user authenticated: ${firebaseUser.uid}, email: ${firebaseUser.email}`,
+      );
+
+      // Step 2: Check if user exists in database by Firebase UID
+      let user = await this.usersService.findByFirebaseUid(firebaseUser.uid);
+
+      if (!user) {
+        // Step 3: If user doesn't exist, create new user
+        this.logger.log(
+          `Creating new user for Firebase UID: ${firebaseUser.uid}`,
+        );
+
+        user = await this.usersService.createFromFirebase({
+          firebaseUid: firebaseUser.uid,
+          email: firebaseUser?.email || '',
+          name:
+            firebaseUser?.name ||
+            firebaseUser?.email?.split('@')[0] ||
+            firebaseUser?.uid,
+          emailVerified: firebaseUser.email_verified || false,
+          photoUrl: firebaseUser.picture,
+        });
+      } else {
+        // Step 4: Update existing user with latest Firebase data
+        this.logger.log(
+          `Updating existing user with Firebase data: ${firebaseUser.uid}`,
+        );
+        await this.usersService.updateUser(user.id, {
+          isEmailVerified: firebaseUser.email_verified || false,
+          photoUrl: firebaseUser.picture,
+        });
+      }
+
+      // Step 5: Generate JWT tokens (same as email/password login)
+      const token = await this.generateToken(user, clientInfo);
+
+      this.logger.log(`Firebase login successful for user: ${user.id}`);
+
+      return buildResponse({
+        messageKey: 'auth.FIREBASE_LOGIN_SUCCESS',
+        data: {
+          user,
+          token,
+        },
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error('Firebase login failed:', error);
+      throw new HttpException(
+        {
+          messageKey: 'auth.FIREBASE_LOGIN_ERROR',
+          details: 'Firebase authentication failed. Please try again later.',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

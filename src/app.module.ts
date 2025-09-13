@@ -9,34 +9,35 @@ import { join } from 'path';
 
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ArticlesModule } from './articles/articles.module';
 import { AuthModule } from './auth/auth.module';
+import { CommentsModule } from './comments/comments.module';
 import { MediaModule } from './media/media.module';
 import { QrModule } from './qr/qr.module';
+import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { ReactionsModule } from './reactions/reactions.module';
 import {
   appConfig,
   awsConfig,
   databaseConfig,
   DatabaseConfigFactory,
+  firebaseConfig,
   mailConfig,
   oauthConfig,
-  redisConfig,
   r2Config,
+  redisConfig,
   stickerConfig,
 } from './shared/config';
 import { configValidationSchema } from './shared/config/schema';
-import { CacheModule, RabbitmqModule, MailModule } from './shared/services';
+import { CacheModule, MailModule, RabbitmqModule } from './shared/services';
+import { StickersModule } from './stickers/stickers.module';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
-import { RateLimitModule } from './rate-limit/rate-limit.module';
-import { ReactionsModule } from './reactions/reactions.module';
-import { ArticlesModule } from './articles/articles.module';
-import { CommentsModule } from './comments/comments.module';
-import { StickersModule } from './stickers/stickers.module';
-import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { ScheduleModule } from '@nestjs/schedule';
         () => ({
           sticker: stickerConfig(),
         }),
+        () => ({ firebase: firebaseConfig() }),
       ],
     }),
     TypeOrmModule.forRootAsync({

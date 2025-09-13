@@ -16,7 +16,7 @@ import {
   UpdateUserDto,
 } from 'src/users/dto';
 import { User, UserDeviceToken, UserSession } from 'src/users/entities';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 import {
@@ -97,6 +97,36 @@ export class UsersService extends BaseService<User> {
 
   async findByEmail(email: string) {
     return await this.userRepository.findOne({ where: { email } });
+  }
+
+  async findByFirebaseUid(firebaseUid: string) {
+    return await this.userRepository.findOne({ where: { firebaseUid } });
+  }
+
+  async createFromFirebase(firebaseData: {
+    firebaseUid: string;
+    email: string;
+    name: string;
+    emailVerified: boolean;
+    photoUrl?: string;
+  }) {
+    // Generate a unique username from email
+    const username = firebaseData.email.split('@')[0] + '_' + Date.now();
+
+    const userData = {
+      name: firebaseData.name,
+      username,
+      email: firebaseData.email,
+      firebaseUid: firebaseData.firebaseUid,
+      photoUrl: firebaseData.photoUrl,
+      isEmailVerified: firebaseData.emailVerified,
+      authMethod: USER_CONSTANTS.AUTH_METHODS.FIREBASE,
+      status: USER_CONSTANTS.STATUS.ACTIVE,
+      role: USER_CONSTANTS.ROLES.USER,
+    };
+
+    // Use the inherited create method from BaseService
+    return await this.create(userData);
   }
 
   // Inherit BaseService.findOne

@@ -2,7 +2,7 @@ import { Auth, ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { CreateDeviceTokenDto, LoginDto, RegisterDto } from 'src/users/dto';
 import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
-import { OtpRequestDto, OtpVerifyDto } from './dto';
+import { OtpRequestDto, OtpVerifyDto, FirebaseLoginDto } from './dto';
 
 import {
   Body,
@@ -22,10 +22,7 @@ import { AuthService } from './auth.service';
 import { JwtAccessTokenGuard } from './guard/jwt-access-token.guard';
 import { JwtRefreshTokenGuard } from './guard/jwt-refresh-token.guard';
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
-import {
-  CustomRateLimit,
-  RateLimit,
-} from 'src/rate-limit/rate-limit.decorator';
+import { CustomRateLimit } from 'src/rate-limit/rate-limit.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -140,5 +137,14 @@ export class AuthController {
     @ClientInfo() clientInfo: ClientInfo,
   ) {
     return this.authService.verifyOtp(otpVerifyDto, clientInfo);
+  }
+
+  @Post('firebase/login')
+  @HttpCode(HttpStatus.OK)
+  async firebaseLogin(
+    @Body() firebaseLoginDto: FirebaseLoginDto,
+    @ClientInfo() clientInfo: ClientInfo,
+  ) {
+    return this.authService.firebaseLogin(firebaseLoginDto, clientInfo);
   }
 }

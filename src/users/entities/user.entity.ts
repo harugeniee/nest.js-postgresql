@@ -85,6 +85,20 @@ export class User extends BaseEntityCustom {
   })
   oauthId: string; // Unique ID from OAuth provider
 
+  // Firebase specific fields
+  @Index({ unique: true }) // Unique index for Firebase UID
+  @Column('varchar', {
+    length: USER_CONSTANTS.OAUTH_ID_MAX_LENGTH,
+    nullable: true,
+  })
+  firebaseUid: string; // Firebase UID
+
+  @Column('varchar', {
+    length: 500,
+    nullable: true,
+  })
+  photoUrl: string; // Profile photo URL from Firebase
+
   @Index() // Index for auth method filtering
   @Column('varchar', {
     length: USER_CONSTANTS.AUTH_METHOD_MAX_LENGTH,
