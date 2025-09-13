@@ -29,4 +29,12 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   photoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  oauthId?: string;
+
+  @IsOptional()
+  @IsString()
+  oauthProvider?: string;
 }

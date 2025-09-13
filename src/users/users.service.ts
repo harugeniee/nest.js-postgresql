@@ -109,6 +109,8 @@ export class UsersService extends BaseService<User> {
     name: string;
     emailVerified: boolean;
     photoUrl?: string;
+    oauthId?: string;
+    oauthProvider?: string;
   }) {
     // Generate a unique username from email
     const username = firebaseData.email.split('@')[0] + '_' + Date.now();
@@ -123,6 +125,8 @@ export class UsersService extends BaseService<User> {
       authMethod: USER_CONSTANTS.AUTH_METHODS.FIREBASE,
       status: USER_CONSTANTS.STATUS.ACTIVE,
       role: USER_CONSTANTS.ROLES.USER,
+      oauthId: firebaseData.oauthId,
+      oauthProvider: firebaseData.oauthProvider,
     };
 
     // Use the inherited create method from BaseService

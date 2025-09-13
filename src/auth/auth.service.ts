@@ -523,6 +523,7 @@ export class AuthService {
       }
 
       const firebaseUser = firebaseResult.user;
+      console.log(JSON.stringify(firebaseUser, null, 2));
       this.logger.log(
         `Firebase user authenticated: ${firebaseUser.uid}, email: ${firebaseUser.email}`,
       );
@@ -545,6 +546,8 @@ export class AuthService {
             firebaseUser?.uid,
           emailVerified: firebaseUser.email_verified || false,
           photoUrl: firebaseUser.picture,
+          oauthId: firebaseUser.uid,
+          oauthProvider: firebaseUser.firebase.sign_in_provider,
         });
       } else {
         // Step 4: Update existing user with latest Firebase data
@@ -554,6 +557,8 @@ export class AuthService {
         await this.usersService.updateUser(user.id, {
           isEmailVerified: firebaseUser.email_verified || false,
           photoUrl: firebaseUser.picture,
+          // oauthId: firebaseUser.uid,
+          // oauthProvider: firebaseUser.firebase.sign_in_provider,
         });
       }
 
