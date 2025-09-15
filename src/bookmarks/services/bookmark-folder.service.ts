@@ -184,15 +184,19 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
   ): Promise<{ data: BookmarkFolder[]; total: number }> {
     const { page = 1, limit = 20, ...filters } = query;
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       userId,
       ...filters,
     };
 
     // Use BaseService listOffset method with custom ordering
-    const result = await this.listOffset({ page, limit, ...filters }, where, {
-      relations: ['bookmarks'],
-    });
+    const result = await this.listOffset(
+      { page, limit, ...filters, sortBy: 'createdAt', order: 'DESC' },
+      where,
+      {
+        relations: ['bookmarks'],
+      },
+    );
 
     // Apply custom ordering after getting results
     result.result.sort((a, b) => {
@@ -202,7 +206,7 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
-    return { data: result.result, total: result.total };
+    return { data: result.result, total: result.metaData.totalRecords || 0 };
   }
 
   /**
@@ -234,15 +238,29 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
    * @param query - Query parameters
    * @returns All folders with pagination
    */
-  async getAllFolders(query: any): Promise<[BookmarkFolder[], number]> {
-    const { page = 1, limit = 20, ...filters } = query;
+  async getAllFolders(
+    query: Record<string, unknown>,
+  ): Promise<[BookmarkFolder[], number]> {
+    const {
+      page = 1,
+      limit = 20,
+      ...filters
+    } = query as {
+      page?: number;
+      limit?: number;
+      [key: string]: unknown;
+    };
 
     // Use BaseService listOffset method
-    const result = await this.listOffset({ page, limit }, filters, {
-      relations: ['user', 'bookmarks'],
-    });
+    const result = await this.listOffset(
+      { page, limit, sortBy: 'createdAt', order: 'DESC' },
+      filters,
+      {
+        relations: ['user', 'bookmarks'],
+      },
+    );
 
-    return [result.result, result.total];
+    return [result.result, result.metaData.totalRecords || 0];
   }
 
   /**
@@ -316,7 +334,7 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
     name: string,
     excludeId?: string,
   ): Promise<boolean> {
-    const where: any = { userId, name };
+    const where: Record<string, unknown> = { userId, name };
     if (excludeId) {
       where.id = Not(excludeId);
     }

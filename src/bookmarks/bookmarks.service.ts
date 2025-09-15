@@ -216,7 +216,7 @@ export class BookmarksService extends BaseService<Bookmark> {
       });
     }
 
-    return { data: result.data, total: result.total };
+    return { data: result.result, total: result.metaData.totalRecords || 0 };
   }
 
   /**
@@ -631,10 +631,14 @@ export class BookmarksService extends BaseService<Bookmark> {
     const { page = 1, limit = 20, ...filters } = query;
 
     // Use BaseService listOffset method
-    const result = await this.listOffset({ page, limit }, filters, {
-      relations: ['user', 'folder'],
-    });
+    const result = await this.listOffset(
+      { page, limit, sortBy: 'createdAt', order: 'DESC' },
+      filters,
+      {
+        relations: ['user', 'folder'],
+      },
+    );
 
-    return { data: result.data, total: result.total };
+    return { data: result.result, total: result.metaData.totalRecords || 0 };
   }
 }
