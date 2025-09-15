@@ -49,12 +49,12 @@ export class ReportStatsDto {
   reason?: ReportReason;
 
   @ApiPropertyOptional({
-    description: 'Filter by reporter ID',
+    description: 'Filter by user ID',
     example: '1234567890123456789',
   })
   @IsOptional()
   @IsString()
-  reporterId?: string;
+  userId?: string;
 
   @ApiPropertyOptional({
     description: 'Filter by moderator ID',

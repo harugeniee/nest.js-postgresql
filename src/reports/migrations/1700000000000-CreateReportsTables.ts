@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, Index, ForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  Index,
+  ForeignKey,
+} from 'typeorm';
 
 export class CreateReportsTables1700000000000 implements MigrationInterface {
   name = 'CreateReportsTables1700000000000';
@@ -23,7 +29,7 @@ export class CreateReportsTables1700000000000 implements MigrationInterface {
             default: 'uuid_generate_v4()',
           },
           {
-            name: 'reporterId',
+            name: 'userId',
             type: 'bigint',
             isNullable: false,
           },
@@ -238,7 +244,7 @@ export class CreateReportsTables1700000000000 implements MigrationInterface {
 
     await queryRunner.createIndex(
       'reports',
-      new Index('IDX_reports_reporter', ['reporterId']),
+      new Index('IDX_reports_user', ['userId']),
     );
 
     await queryRunner.createIndex(
@@ -296,7 +302,7 @@ export class CreateReportsTables1700000000000 implements MigrationInterface {
     await queryRunner.createForeignKey(
       'reports',
       new ForeignKey({
-        columnNames: ['reporterId'],
+        columnNames: ['userId'],
         referencedColumnNames: ['id'],
         referencedTableName: 'users',
         onDelete: 'CASCADE',
@@ -336,15 +342,27 @@ export class CreateReportsTables1700000000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop foreign keys
-    await queryRunner.dropForeignKey('report_actions', 'FK_report_actions_moderator');
-    await queryRunner.dropForeignKey('report_actions', 'FK_report_actions_report');
+    await queryRunner.dropForeignKey(
+      'report_actions',
+      'FK_report_actions_moderator',
+    );
+    await queryRunner.dropForeignKey(
+      'report_actions',
+      'FK_report_actions_report',
+    );
     await queryRunner.dropForeignKey('reports', 'FK_reports_moderator');
-    await queryRunner.dropForeignKey('reports', 'FK_reports_reporter');
+    await queryRunner.dropForeignKey('reports', 'FK_reports_user');
 
     // Drop indexes
-    await queryRunner.dropIndex('report_actions', 'IDX_report_actions_created_at');
+    await queryRunner.dropIndex(
+      'report_actions',
+      'IDX_report_actions_created_at',
+    );
     await queryRunner.dropIndex('report_actions', 'IDX_report_actions_action');
-    await queryRunner.dropIndex('report_actions', 'IDX_report_actions_moderator');
+    await queryRunner.dropIndex(
+      'report_actions',
+      'IDX_report_actions_moderator',
+    );
     await queryRunner.dropIndex('report_actions', 'IDX_report_actions_report');
     await queryRunner.dropIndex('reports', 'IDX_reports_resolved_at');
     await queryRunner.dropIndex('reports', 'IDX_reports_assigned_at');
@@ -352,7 +370,7 @@ export class CreateReportsTables1700000000000 implements MigrationInterface {
     await queryRunner.dropIndex('reports', 'IDX_reports_reason');
     await queryRunner.dropIndex('reports', 'IDX_reports_priority');
     await queryRunner.dropIndex('reports', 'IDX_reports_status');
-    await queryRunner.dropIndex('reports', 'IDX_reports_reporter');
+    await queryRunner.dropIndex('reports', 'IDX_reports_user');
     await queryRunner.dropIndex('reports', 'IDX_reports_reportable');
 
     // Drop tables

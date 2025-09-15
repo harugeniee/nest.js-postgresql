@@ -1,4 +1,10 @@
-import { IsOptional, IsString, IsEnum, IsBoolean, IsDateString } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsBoolean,
+  IsDateString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { AdvancedPaginationDto } from 'src/common/dto/advanced-pagination.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -51,12 +57,12 @@ export class QueryReportsDto extends AdvancedPaginationDto {
   reason?: ReportReason;
 
   @ApiPropertyOptional({
-    description: 'Filter by reporter ID',
+    description: 'Filter by user ID',
     example: '1234567890123456789',
   })
   @IsOptional()
   @IsString()
-  reporterId?: string;
+  userId?: string;
 
   @ApiPropertyOptional({
     description: 'Filter by moderator ID',

@@ -20,8 +20,8 @@ describe('ReportsService', () => {
 
   const mockReport = {
     id: '1',
-    reporterId: '1',
-    reporter: {
+    userId: '1',
+    user: {
       id: '1',
       username: 'testuser',
       displayName: 'Test User',
@@ -159,7 +159,7 @@ describe('ReportsService', () => {
 
   describe('createReport', () => {
     it('should create a new report', async () => {
-      const reporterId = '1';
+      const userId = '1';
       const dto: CreateReportDto = {
         reportableType: 'article',
         reportableId: '1',
@@ -196,7 +196,7 @@ describe('ReportsService', () => {
           return result;
         });
 
-      const result = await service.createReport(reporterId, dto);
+      const result = await service.createReport(userId, dto);
 
       expect(result).toBeDefined();
       expect(
@@ -205,7 +205,7 @@ describe('ReportsService', () => {
         'report_created',
         expect.objectContaining({
           reportId: mockReport.id,
-          reporterId,
+          userId,
           reportableType: dto.reportableType,
           reportableId: dto.reportableId,
           reason: dto.reason,
@@ -215,7 +215,7 @@ describe('ReportsService', () => {
     });
 
     it('should throw error if duplicate report exists', async () => {
-      const reporterId = '1';
+      const userId = '1';
       const dto: CreateReportDto = {
         reportableType: 'article',
         reportableId: '1',
@@ -225,7 +225,7 @@ describe('ReportsService', () => {
 
       jest.spyOn(service as any, 'findOne').mockResolvedValue(mockReport);
 
-      await expect(service.createReport(reporterId, dto)).rejects.toThrow(
+      await expect(service.createReport(userId, dto)).rejects.toThrow(
         HttpException,
       );
     });
@@ -485,7 +485,7 @@ describe('ReportsService', () => {
         reportsByType: { article: 8, comment: 2 },
         reportsByReason: { spam: 6, harassment: 4 },
         averageResolutionTime: 2.5,
-        topReporters: [{ reporterId: '1', count: 3 }],
+        topUsers: [{ userId: '1', count: 3 }],
         topModerators: [{ moderatorId: '2', count: 5 }],
         recentTrends: [{ date: '2024-01-15', count: 2 }],
       };
@@ -536,7 +536,11 @@ describe('ReportsService', () => {
 
       jest.spyOn(service, 'updateReport').mockResolvedValue(mockReport);
 
-      const result = await service.resolveReport(reportId, moderatorId, resolution);
+      const result = await service.resolveReport(
+        reportId,
+        moderatorId,
+        resolution,
+      );
 
       expect(result).toBeDefined();
       expect(service.updateReport).toHaveBeenCalledWith(reportId, moderatorId, {
@@ -576,7 +580,11 @@ describe('ReportsService', () => {
 
       jest.spyOn(service, 'updateReport').mockResolvedValue(mockReport);
 
-      const result = await service.escalateReport(reportId, moderatorId, reason);
+      const result = await service.escalateReport(
+        reportId,
+        moderatorId,
+        reason,
+      );
 
       expect(result).toBeDefined();
       expect(service.updateReport).toHaveBeenCalledWith(reportId, moderatorId, {
@@ -600,7 +608,10 @@ describe('ReportsService', () => {
         writable: true,
       });
 
-      const result = await service.getReportsForContent(reportableType, reportableId);
+      const result = await service.getReportsForContent(
+        reportableType,
+        reportableId,
+      );
 
       expect(result).toEqual([mockReport]);
     });
@@ -618,7 +629,10 @@ describe('ReportsService', () => {
         writable: true,
       });
 
-      const result = await service.getDuplicateReports(reportableType, reportableId);
+      const result = await service.getDuplicateReports(
+        reportableType,
+        reportableId,
+      );
 
       expect(result).toEqual([mockReport]);
     });
@@ -651,7 +665,10 @@ describe('ReportsService', () => {
           return result;
         });
 
-      const result = await service.mergeDuplicateReports(reportIds, moderatorId);
+      const result = await service.mergeDuplicateReports(
+        reportIds,
+        moderatorId,
+      );
 
       expect(result).toBeDefined();
     });

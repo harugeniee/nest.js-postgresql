@@ -18,8 +18,8 @@ describe('ReportsController', () => {
 
   const mockReport = {
     id: '1',
-    reporterId: '1',
-    reporter: {
+    userId: '1',
+    user: {
       id: '1',
       username: 'testuser',
       displayName: 'Test User',
@@ -142,9 +142,7 @@ describe('ReportsController', () => {
         priority: 'medium',
       };
 
-      jest
-        .spyOn(service, 'createReport')
-        .mockResolvedValue(mockReport as any);
+      jest.spyOn(service, 'createReport').mockResolvedValue(mockReport as any);
 
       const result = await controller.createReport(req, dto);
 
@@ -206,9 +204,7 @@ describe('ReportsController', () => {
         moderatorId: '2',
       };
 
-      jest
-        .spyOn(service, 'updateReport')
-        .mockResolvedValue(mockReport as any);
+      jest.spyOn(service, 'updateReport').mockResolvedValue(mockReport as any);
 
       const result = await controller.updateReport(reportId, req, dto);
 
@@ -263,7 +259,11 @@ describe('ReportsController', () => {
       const result = await controller.dismissReport(reportId, req, body);
 
       expect(result).toEqual(mockReport);
-      expect(service.dismissReport).toHaveBeenCalledWith(reportId, '2', 'No violation found');
+      expect(service.dismissReport).toHaveBeenCalledWith(
+        reportId,
+        '2',
+        'No violation found',
+      );
     });
   });
 
@@ -273,12 +273,18 @@ describe('ReportsController', () => {
       const reportId = '1';
       const body = { reason: 'Requires admin review' };
 
-      jest.spyOn(service, 'escalateReport').mockResolvedValue(mockReport as any);
+      jest
+        .spyOn(service, 'escalateReport')
+        .mockResolvedValue(mockReport as any);
 
       const result = await controller.escalateReport(reportId, req, body);
 
       expect(result).toEqual(mockReport);
-      expect(service.escalateReport).toHaveBeenCalledWith(reportId, '2', 'Requires admin review');
+      expect(service.escalateReport).toHaveBeenCalledWith(
+        reportId,
+        '2',
+        'Requires admin review',
+      );
     });
   });
 
@@ -315,10 +321,16 @@ describe('ReportsController', () => {
         .spyOn(service, 'getReportsForContent')
         .mockResolvedValue([mockReport] as any);
 
-      const result = await controller.getReportsForContent(reportableType, reportableId);
+      const result = await controller.getReportsForContent(
+        reportableType,
+        reportableId,
+      );
 
       expect(result).toEqual([mockReport]);
-      expect(service.getReportsForContent).toHaveBeenCalledWith(reportableType, reportableId);
+      expect(service.getReportsForContent).toHaveBeenCalledWith(
+        reportableType,
+        reportableId,
+      );
     });
   });
 
@@ -331,10 +343,16 @@ describe('ReportsController', () => {
         .spyOn(service, 'getDuplicateReports')
         .mockResolvedValue([mockReport] as any);
 
-      const result = await controller.getDuplicateReports(reportableType, reportableId);
+      const result = await controller.getDuplicateReports(
+        reportableType,
+        reportableId,
+      );
 
       expect(result).toEqual([mockReport]);
-      expect(service.getDuplicateReports).toHaveBeenCalledWith(reportableType, reportableId);
+      expect(service.getDuplicateReports).toHaveBeenCalledWith(
+        reportableType,
+        reportableId,
+      );
     });
   });
 
@@ -350,7 +368,10 @@ describe('ReportsController', () => {
       const result = await controller.mergeDuplicateReports(req, body);
 
       expect(result).toEqual(mockReport);
-      expect(service.mergeDuplicateReports).toHaveBeenCalledWith(['1', '2', '3'], '2');
+      expect(service.mergeDuplicateReports).toHaveBeenCalledWith(
+        ['1', '2', '3'],
+        '2',
+      );
     });
   });
 
@@ -374,7 +395,7 @@ describe('ReportsController', () => {
         reportsByType: { article: 8, comment: 2 },
         reportsByReason: { spam: 6, harassment: 4 },
         averageResolutionTime: 2.5,
-        topReporters: [{ reporterId: '1', count: 3 }],
+        topUsers: [{ userId: '1', count: 3 }],
         topModerators: [{ moderatorId: '2', count: 5 }],
         recentTrends: [{ date: '2024-01-15', count: 2 }],
       };
@@ -414,7 +435,7 @@ describe('ReportsController', () => {
       const result = await controller.getMyReports(req, dto);
 
       expect(result).toEqual(mockResult);
-      expect(service.list).toHaveBeenCalledWith({ ...dto, reporterId: '1' });
+      expect(service.list).toHaveBeenCalledWith({ ...dto, userId: '1' });
     });
   });
 

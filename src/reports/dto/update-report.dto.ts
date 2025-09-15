@@ -76,7 +76,8 @@ export class UpdateReportDto extends PartialType(CreateReportDto) {
   @ApiPropertyOptional({
     description: 'Additional details about the resolution',
     maxLength: REPORT_CONSTANTS.RESOLUTION_MAX_LENGTH,
-    example: 'Content removed and user received warning. No further action needed.',
+    example:
+      'Content removed and user received warning. No further action needed.',
   })
   @IsOptional()
   @IsString()

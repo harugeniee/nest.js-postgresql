@@ -102,7 +102,7 @@ export class ReportAction extends BaseEntityCustom {
       REPORT_CONSTANTS.ACTIONS.CONTENT_REMOVED,
       REPORT_CONSTANTS.ACTIONS.CONTENT_HIDDEN,
       REPORT_CONSTANTS.ACTIONS.CONTENT_EDITED,
-    ].includes(this.action);
+    ].includes(this.action as any);
   }
 
   /**
@@ -115,7 +115,7 @@ export class ReportAction extends BaseEntityCustom {
       REPORT_CONSTANTS.ACTIONS.USER_SUSPENDED,
       REPORT_CONSTANTS.ACTIONS.USER_BANNED,
       REPORT_CONSTANTS.ACTIONS.ACCOUNT_DELETED,
-    ].includes(this.action);
+    ].includes(this.action as any);
   }
 
   /**
@@ -126,7 +126,7 @@ export class ReportAction extends BaseEntityCustom {
     return [
       REPORT_CONSTANTS.ACTIONS.ESCALATED_TO_ADMIN,
       REPORT_CONSTANTS.ACTIONS.ESCALATED_TO_LEGAL,
-    ].includes(this.action);
+    ].includes(this.action as any);
   }
 
   /**
@@ -137,7 +137,7 @@ export class ReportAction extends BaseEntityCustom {
     return [
       REPORT_CONSTANTS.ACTIONS.REPORT_DISMISSED,
       REPORT_CONSTANTS.ACTIONS.NO_ACTION,
-    ].includes(this.action);
+    ].includes(this.action as any);
   }
 
   /**

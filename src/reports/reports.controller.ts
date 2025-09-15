@@ -23,7 +23,12 @@ import { SnowflakeIdPipe } from 'src/common/pipes';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RoleGuard } from 'src/auth/guard/role.guard';
 import { USER_CONSTANTS } from 'src/shared/constants';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
@@ -50,8 +55,8 @@ export class ReportsController {
     @Request() req: Request & { user: AuthPayload },
     @Body() dto: CreateReportDto,
   ) {
-    const reporterId = req.user.uid;
-    return this.reportsService.createReport(reporterId, dto);
+    const userId = req.user.uid;
+    return this.reportsService.createReport(userId, dto);
   }
 
   /**
@@ -163,7 +168,8 @@ export class ReportsController {
   async resolveReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
-    @Body() body: {
+    @Body()
+    body: {
       action: string;
       resolution: string;
       resolutionDetails?: string;
@@ -197,7 +203,11 @@ export class ReportsController {
     @Body() body: { reason: string },
   ) {
     const moderatorId = req.user.uid;
-    return this.reportsService.dismissReport(reportId, moderatorId, body.reason);
+    return this.reportsService.dismissReport(
+      reportId,
+      moderatorId,
+      body.reason,
+    );
   }
 
   /**
@@ -223,7 +233,11 @@ export class ReportsController {
     @Body() body: { reason: string },
   ) {
     const moderatorId = req.user.uid;
-    return this.reportsService.escalateReport(reportId, moderatorId, body.reason);
+    return this.reportsService.escalateReport(
+      reportId,
+      moderatorId,
+      body.reason,
+    );
   }
 
   /**
@@ -323,7 +337,10 @@ export class ReportsController {
     @Body() body: { reportIds: string[] },
   ) {
     const moderatorId = req.user.uid;
-    return this.reportsService.mergeDuplicateReports(body.reportIds, moderatorId);
+    return this.reportsService.mergeDuplicateReports(
+      body.reportIds,
+      moderatorId,
+    );
   }
 
   /**
@@ -356,10 +373,10 @@ export class ReportsController {
   })
   async getMyReports(
     @Request() req: Request & { user: AuthPayload },
-    @Query() dto: Omit<QueryReportsDto, 'reporterId'>,
+    @Query() dto: Omit<QueryReportsDto, 'userId'>,
   ) {
-    const reporterId = req.user.uid;
-    return this.reportsService.list({ ...dto, reporterId });
+    const userId = req.user.uid;
+    return this.reportsService.list({ ...dto, userId });
   }
 
   /**

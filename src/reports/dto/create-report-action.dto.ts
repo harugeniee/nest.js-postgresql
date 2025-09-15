@@ -36,7 +36,8 @@ export class CreateReportActionDto {
   @ApiPropertyOptional({
     description: 'Description of the action taken',
     maxLength: 1000,
-    example: 'Removed inappropriate content that violated community guidelines.',
+    example:
+      'Removed inappropriate content that violated community guidelines.',
   })
   @IsOptional()
   @IsString()
@@ -46,7 +47,8 @@ export class CreateReportActionDto {
   @ApiPropertyOptional({
     description: 'Additional notes about the action',
     maxLength: 2000,
-    example: 'User was warned about future violations. Content was permanently removed.',
+    example:
+      'User was warned about future violations. Content was permanently removed.',
   })
   @IsOptional()
   @IsString()
@@ -55,10 +57,10 @@ export class CreateReportActionDto {
 
   @ApiPropertyOptional({
     description: 'Additional metadata for the action',
-    example: { 
+    example: {
       contentId: '1234567890123456789',
       userId: '9876543210987654321',
-      reason: 'hate_speech'
+      reason: 'hate_speech',
     },
   })
   @IsOptional()

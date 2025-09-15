@@ -52,7 +52,7 @@ Hệ thống báo cáo (Report System) cho blog, tương tự như các hệ th�
 ```typescript
 {
   id: string;
-  reporterId: string;
+  userId: string;
   reportableType: 'article' | 'comment' | 'user' | 'media' | 'sticker' | 'post';
   reportableId: string;
   reason: string; // spam, harassment, hate_speech, etc.

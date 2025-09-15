@@ -8,13 +8,14 @@ import {
   OneToMany,
 } from 'typeorm';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
+import { ReportAction } from './report-action.entity';
 import {
   REPORT_CONSTANTS,
   ReportStatus,
   ReportPriority,
   ReportableType,
   ReportReason,
-  ReportAction,
+  ReportAction as ReportActionType,
   ReportResolution,
 } from 'src/shared/constants';
 
@@ -26,7 +27,7 @@ import {
  */
 @Entity('reports')
 @Index(['reportableType', 'reportableId'])
-@Index(['reporterId'])
+@Index(['userId'])
 @Index(['status'])
 @Index(['priority'])
 @Index(['reason'])
@@ -37,15 +38,15 @@ export class Report extends BaseEntityCustom {
    * Links to users table
    */
   @Column({ type: 'bigint', nullable: false })
-  reporterId: string;
+  userId: string;
 
   /**
    * User who submitted the report
    * Many-to-One relationship with User entity
    */
   @ManyToOne(() => User, { nullable: false })
-  @JoinColumn({ name: 'reporterId', referencedColumnName: 'id' })
-  reporter: User;
+  @JoinColumn({ name: 'userId', referencedColumnName: 'id' })
+  user: User;
 
   /**
    * Type of content being reported
@@ -134,7 +135,7 @@ export class Report extends BaseEntityCustom {
     length: REPORT_CONSTANTS.ACTION_MAX_LENGTH,
     nullable: true,
   })
-  action?: ReportAction;
+  action?: ReportActionType;
 
   /**
    * Notes from the moderator about the report
