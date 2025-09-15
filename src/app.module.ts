@@ -21,6 +21,7 @@ import { MediaModule } from './media/media.module';
 import { QrModule } from './qr/qr.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { ReactionsModule } from './reactions/reactions.module';
+import { ReportsModule } from './reports/reports.module';
 import {
   appConfig,
   awsConfig,
@@ -98,6 +99,7 @@ import { WorkerModule } from './workers/worker.module';
     ReactionsModule,
     CommentsModule,
     StickersModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,925 @@
+import { IPagination } from 'src/common/interface';
+import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
+import { BaseService } from 'src/common/services';
+import { CacheService, RabbitMQService } from 'src/shared/services';
+import {
+  REPORT_CONSTANTS,
+  ReportStatus,
+  ReportPriority,
+  ReportableType,
+  ReportReason,
+  ReportAction as ReportActionType,
+  ReportResolution,
+  JOB_NAME,
+} from 'src/shared/constants';
+import {
+  FindOptionsWhere,
+  In,
+  IsNull,
+  Not,
+  Repository,
+  Between,
+  LessThan,
+  MoreThanOrEqual,
+} from 'typeorm';
+
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+
+import {
+  CreateReportDto,
+  UpdateReportDto,
+  QueryReportsDto,
+  CreateReportActionDto,
+  ReportStatsDto,
+} from './dto';
+import { Report, ReportAction } from './entities';
+
+@Injectable()
+export class ReportsService extends BaseService<Report> {
+  private readonly logger = new Logger(ReportsService.name);
+
+  constructor(
+    @InjectRepository(Report)
+    private readonly reportRepository: Repository<Report>,
+    @InjectRepository(ReportAction)
+    private readonly reportActionRepository: Repository<ReportAction>,
+    private readonly rabbitMQService: RabbitMQService,
+    cacheService: CacheService,
+  ) {
+    super(
+      new TypeOrmBaseRepository<Report>(reportRepository),
+      {
+        entityName: 'Report',
+        cache: { enabled: true, ttlSec: 300, prefix: 'reports', swrSec: 60 },
+        defaultSearchField: 'description',
+        relationsWhitelist: {
+          reporter: true,
+          moderator: true,
+          actions: { moderator: true },
+        },
+        emitEvents: false, // Disable EventEmitter, use RabbitMQ instead
+      },
+      cacheService,
+    );
+  }
+
+  /**
+   * Define searchable columns for Report entity
+   * @returns Array of searchable column names
+   */
+  protected getSearchableColumns(): (keyof Report)[] {
+    return ['description', 'moderatorNotes', 'resolutionDetails'];
+  }
+
+  /**
+   * Lifecycle hook: Before creating a report
+   * @param data - Report data to be created
+   * @returns Processed report data
+   */
+  protected async beforeCreate(
+    data: Partial<Report>,
+  ): Promise<Partial<Report>> {
+    // Check for duplicate reports
+    const existingReport = await this.findOne({
+      reporterId: data.reporterId,
+      reportableType: data.reportableType,
+      reportableId: data.reportableId,
+      reason: data.reason,
+    });
+
+    if (existingReport?.isPending()) {
+      throw new HttpException(
+        { messageKey: 'report.DUPLICATE_REPORT' },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    // Set default priority based on reason
+    if (!data.priority) {
+      data.priority = this.getDefaultPriorityForReason(data.reason);
+    }
+
+    // Set default status
+    if (!data.status) {
+      data.status = REPORT_CONSTANTS.STATUS.PENDING;
+    }
+
+    return data;
+  }
+
+  /**
+   * Lifecycle hook: After creating a report
+   * @param report - Created report entity
+   */
+  protected async afterCreate(report: Report): Promise<void> {
+    // Send event to RabbitMQ
+    await this.rabbitMQService.sendDataToRabbitMQAsync(
+      JOB_NAME.REPORT_CREATED,
+      {
+        reportId: report.id,
+        reporterId: report.reporterId,
+        reportableType: report.reportableType,
+        reportableId: report.reportableId,
+        reason: report.reason,
+        priority: report.priority,
+      },
+    );
+
+    // Check for auto-escalation
+    await this.checkAutoEscalation(report);
+
+    // Clear related cache
+    await this.clearReportCache();
+  }
+
+  /**
+   * Lifecycle hook: After updating a report
+   * @param report - Updated report entity
+   */
+  protected async afterUpdate(report: Report): Promise<void> {
+    // Send event to RabbitMQ
+    await this.rabbitMQService.sendDataToRabbitMQAsync(
+      JOB_NAME.REPORT_UPDATED,
+      {
+        reportId: report.id,
+        status: report.status,
+        action: report.action,
+        moderatorId: report.moderatorId,
+      },
+    );
+
+    // Clear related cache
+    await this.clearReportCache();
+  }
+
+  /**
+   * Create a new report
+   * @param reporterId - ID of the user creating the report
+   * @param dto - Report creation data
+   * @returns Created report with relations
+   */
+  async createReport(reporterId: string, dto: CreateReportDto): Promise<Report> {
+    return await this.runInTransaction(async (queryRunner) => {
+      // Create the report using BaseService.create
+      const report = await this.create(
+        {
+          reporterId,
+          reportableType: dto.reportableType,
+          reportableId: dto.reportableId,
+          reason: dto.reason,
+          description: dto.description,
+          priority: dto.priority || REPORT_CONSTANTS.PRIORITY.MEDIUM,
+          isAutoGenerated: dto.isAutoGenerated || false,
+          metadata: dto.metadata,
+        },
+        { queryRunner },
+      );
+
+      // Fetch the complete report with relations
+      const completeReport = await this.findOne(
+        { id: report.id },
+        {
+          relations: ['reporter', 'moderator', 'actions', 'actions.moderator'],
+        },
+      );
+
+      if (!completeReport) {
+        throw new HttpException(
+          { messageKey: 'report.REPORT_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return completeReport;
+    });
+  }
+
+  /**
+   * Update an existing report
+   * @param reportId - ID of the report to update
+   * @param moderatorId - ID of the moderator updating the report
+   * @param dto - Report update data
+   * @returns Updated report
+   */
+  async updateReport(
+    reportId: string,
+    moderatorId: string,
+    dto: UpdateReportDto,
+  ): Promise<Report> {
+    try {
+      return await this.runInTransaction(async (queryRunner) => {
+        // Update report fields
+        const updateData: Partial<Report> = {
+          ...dto,
+          moderatorId,
+        } as Partial<Report>;
+
+        // Set assignedAt if moderator is being assigned
+        if (dto.moderatorId && !dto.assignedAt) {
+          updateData.assignedAt = new Date();
+        }
+
+        // Set resolvedAt if status is being changed to resolved
+        if (dto.status === REPORT_CONSTANTS.STATUS.RESOLVED && !dto.resolvedAt) {
+          updateData.resolvedAt = new Date();
+        }
+
+        // Use BaseService.update which will trigger lifecycle hooks
+        await this.update(reportId, updateData, { queryRunner });
+
+        // Fetch the complete report with relations
+        const completeReport = await this.findOne(
+          { id: reportId },
+          {
+            relations: ['reporter', 'moderator', 'actions', 'actions.moderator'],
+          },
+        );
+
+        if (!completeReport) {
+          throw new HttpException(
+            { messageKey: 'report.REPORT_NOT_FOUND' },
+            HttpStatus.NOT_FOUND,
+          );
+        }
+
+        return completeReport;
+      });
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'common.INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Get reports with pagination and filtering
+   * @param dto - Query parameters
+   * @returns Paginated reports
+   */
+  async list(dto: QueryReportsDto): Promise<IPagination<Report>> {
+    const {
+      status,
+      priority,
+      reportableType,
+      reason,
+      reporterId,
+      moderatorId,
+      reportableId,
+      isAutoGenerated,
+      createdAfter,
+      createdBefore,
+      assignedAfter,
+      assignedBefore,
+      resolvedAfter,
+      resolvedBefore,
+      minDuplicateCount,
+      maxDuplicateCount,
+      ...paginationDto
+    } = dto;
+
+    // Build where condition
+    const whereCondition: FindOptionsWhere<Report> = {};
+
+    if (status) whereCondition.status = status;
+    if (priority) whereCondition.priority = priority;
+    if (reportableType) whereCondition.reportableType = reportableType;
+    if (reason) whereCondition.reason = reason;
+    if (reporterId) whereCondition.reporterId = reporterId;
+    if (moderatorId) whereCondition.moderatorId = moderatorId;
+    if (reportableId) whereCondition.reportableId = reportableId;
+    if (isAutoGenerated !== undefined) whereCondition.isAutoGenerated = isAutoGenerated;
+
+    // Date filters
+    if (createdAfter || createdBefore) {
+      whereCondition.createdAt = Between(
+        createdAfter ? new Date(createdAfter) : new Date(0),
+        createdBefore ? new Date(createdBefore) : new Date(),
+      );
+    }
+
+    if (assignedAfter || assignedBefore) {
+      whereCondition.assignedAt = Between(
+        assignedAfter ? new Date(assignedAfter) : new Date(0),
+        assignedBefore ? new Date(assignedBefore) : new Date(),
+      );
+    }
+
+    if (resolvedAfter || resolvedBefore) {
+      whereCondition.resolvedAt = Between(
+        resolvedAfter ? new Date(resolvedAfter) : new Date(0),
+        resolvedBefore ? new Date(resolvedBefore) : new Date(),
+      );
+    }
+
+    // Duplicate count filters
+    if (minDuplicateCount !== undefined) {
+      whereCondition.duplicateCount = MoreThanOrEqual(minDuplicateCount);
+    }
+    if (maxDuplicateCount !== undefined) {
+      whereCondition.duplicateCount = LessThan(maxDuplicateCount);
+    }
+
+    // Build relations
+    const relations = ['reporter', 'moderator', 'actions', 'actions.moderator'];
+
+    // Use BaseService.listOffset for pagination
+    return await this.listOffset(paginationDto, whereCondition, { relations });
+  }
+
+  /**
+   * Get a single report by ID
+   * @param reportId - ID of the report
+   * @returns Report with relations
+   */
+  async getById(reportId: string): Promise<Report> {
+    return await this.findById(reportId, {
+      relations: ['reporter', 'moderator', 'actions', 'actions.moderator'],
+    });
+  }
+
+  /**
+   * Create a report action
+   * @param moderatorId - ID of the moderator performing the action
+   * @param dto - Action creation data
+   * @returns Created report action
+   */
+  async createReportAction(
+    moderatorId: string,
+    dto: CreateReportActionDto,
+  ): Promise<ReportAction> {
+    return await this.runInTransaction(async (queryRunner) => {
+      // Verify report exists
+      const report = await this.findById(dto.reportId);
+      if (!report) {
+        throw new HttpException(
+          { messageKey: 'report.REPORT_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Create the action
+      const action = this.reportActionRepository.create({
+        reportId: dto.reportId,
+        moderatorId,
+        action: dto.action,
+        description: dto.description,
+        notes: dto.notes,
+        metadata: dto.metadata,
+      });
+
+      const savedAction = await queryRunner.manager.save(ReportAction, action);
+
+      // Update report with action details
+      await queryRunner.manager.update(Report, dto.reportId, {
+        action: dto.action,
+        moderatorId,
+        status: this.getStatusFromAction(dto.action),
+        updatedAt: new Date(),
+      });
+
+      // Send event to RabbitMQ
+      await this.rabbitMQService.sendDataToRabbitMQAsync(
+        JOB_NAME.REPORT_ACTION_CREATED,
+        {
+          reportId: dto.reportId,
+          actionId: savedAction.id,
+          action: dto.action,
+          moderatorId,
+        },
+      );
+
+      return savedAction;
+    });
+  }
+
+  /**
+   * Get report statistics
+   * @param dto - Statistics query parameters
+   * @returns Report statistics
+   */
+  async getStats(dto: ReportStatsDto): Promise<{
+    totalReports: number;
+    pendingReports: number;
+    underReviewReports: number;
+    resolvedReports: number;
+    dismissedReports: number;
+    escalatedReports: number;
+    reportsByStatus: Record<ReportStatus, number>;
+    reportsByPriority: Record<ReportPriority, number>;
+    reportsByType: Record<ReportableType, number>;
+    reportsByReason: Record<ReportReason, number>;
+    averageResolutionTime: number;
+    topReporters: Array<{ reporterId: string; count: number }>;
+    topModerators: Array<{ moderatorId: string; count: number }>;
+    recentTrends: Array<{ date: string; count: number }>;
+  }> {
+    const cacheKey = `reports:stats:${JSON.stringify(dto)}`;
+    const cached = await this.cacheService?.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Build where condition
+    const whereCondition: FindOptionsWhere<Report> = {};
+    if (dto.status) whereCondition.status = dto.status;
+    if (dto.priority) whereCondition.priority = dto.priority;
+    if (dto.reportableType) whereCondition.reportableType = dto.reportableType;
+    if (dto.reason) whereCondition.reason = dto.reason;
+    if (dto.reporterId) whereCondition.reporterId = dto.reporterId;
+    if (dto.moderatorId) whereCondition.moderatorId = dto.moderatorId;
+
+    // Date filters
+    if (dto.startDate || dto.endDate) {
+      whereCondition.createdAt = Between(
+        dto.startDate ? new Date(dto.startDate) : new Date(0),
+        dto.endDate ? new Date(dto.endDate) : new Date(),
+      );
+    }
+
+    // Get basic counts
+    const [
+      totalReports,
+      pendingReports,
+      underReviewReports,
+      resolvedReports,
+      dismissedReports,
+      escalatedReports,
+    ] = await Promise.all([
+      this.reportRepository.count({ where: whereCondition }),
+      this.reportRepository.count({
+        where: { ...whereCondition, status: REPORT_CONSTANTS.STATUS.PENDING },
+      }),
+      this.reportRepository.count({
+        where: { ...whereCondition, status: REPORT_CONSTANTS.STATUS.UNDER_REVIEW },
+      }),
+      this.reportRepository.count({
+        where: { ...whereCondition, status: REPORT_CONSTANTS.STATUS.RESOLVED },
+      }),
+      this.reportRepository.count({
+        where: { ...whereCondition, status: REPORT_CONSTANTS.STATUS.DISMISSED },
+      }),
+      this.reportRepository.count({
+        where: { ...whereCondition, status: REPORT_CONSTANTS.STATUS.ESCALATED },
+      }),
+    ]);
+
+    // Get reports by status
+    const reportsByStatus = await this.getReportsByField('status', whereCondition);
+    const reportsByPriority = await this.getReportsByField('priority', whereCondition);
+    const reportsByType = await this.getReportsByField('reportableType', whereCondition);
+    const reportsByReason = await this.getReportsByField('reason', whereCondition);
+
+    // Get average resolution time
+    const resolvedReportsWithTimes = await this.reportRepository.find({
+      where: {
+        ...whereCondition,
+        status: REPORT_CONSTANTS.STATUS.RESOLVED,
+        resolvedAt: Not(IsNull()),
+      },
+      select: ['createdAt', 'resolvedAt'],
+    });
+
+    const averageResolutionTime = resolvedReportsWithTimes.length > 0
+      ? resolvedReportsWithTimes.reduce((sum, report) => {
+          const resolutionTime = report.resolvedAt!.getTime() - report.createdAt.getTime();
+          return sum + resolutionTime;
+        }, 0) / resolvedReportsWithTimes.length / (1000 * 60 * 60 * 24) // Convert to days
+      : 0;
+
+    // Get top reporters
+    const topReporters = await this.getTopReporters(whereCondition);
+    const topModerators = await this.getTopModerators(whereCondition);
+    const recentTrends = await this.getRecentTrends(whereCondition, dto.groupBy);
+
+    const stats = {
+      totalReports,
+      pendingReports,
+      underReviewReports,
+      resolvedReports,
+      dismissedReports,
+      escalatedReports,
+      reportsByStatus,
+      reportsByPriority,
+      reportsByType,
+      reportsByReason,
+      averageResolutionTime: Math.round(averageResolutionTime * 100) / 100,
+      topReporters,
+      topModerators,
+      recentTrends,
+    };
+
+    // Cache the results
+    await this.cacheService?.set(
+      cacheKey,
+      stats,
+      REPORT_CONSTANTS.CACHE.STATS_TTL_SEC,
+    );
+
+    return stats;
+  }
+
+  /**
+   * Assign a report to a moderator
+   * @param reportId - ID of the report
+   * @param moderatorId - ID of the moderator
+   * @returns Updated report
+   */
+  async assignReport(reportId: string, moderatorId: string): Promise<Report> {
+    return await this.updateReport(reportId, moderatorId, {
+      moderatorId,
+      status: REPORT_CONSTANTS.STATUS.UNDER_REVIEW,
+      assignedAt: new Date(),
+    });
+  }
+
+  /**
+   * Resolve a report
+   * @param reportId - ID of the report
+   * @param moderatorId - ID of the moderator
+   * @param resolution - Resolution details
+   * @returns Updated report
+   */
+  async resolveReport(
+    reportId: string,
+    moderatorId: string,
+    resolution: {
+      action: ReportActionType;
+      resolution: ReportResolution;
+      resolutionDetails?: string;
+      moderatorNotes?: string;
+    },
+  ): Promise<Report> {
+    return await this.updateReport(reportId, moderatorId, {
+      ...resolution,
+      status: REPORT_CONSTANTS.STATUS.RESOLVED,
+      resolvedAt: new Date(),
+    });
+  }
+
+  /**
+   * Dismiss a report
+   * @param reportId - ID of the report
+   * @param moderatorId - ID of the moderator
+   * @param reason - Reason for dismissal
+   * @returns Updated report
+   */
+  async dismissReport(
+    reportId: string,
+    moderatorId: string,
+    reason: string,
+  ): Promise<Report> {
+    return await this.updateReport(reportId, moderatorId, {
+      status: REPORT_CONSTANTS.STATUS.DISMISSED,
+      action: REPORT_CONSTANTS.ACTIONS.REPORT_DISMISSED,
+      resolution: REPORT_CONSTANTS.RESOLUTION.DISMISSED,
+      resolutionDetails: reason,
+      resolvedAt: new Date(),
+    });
+  }
+
+  /**
+   * Escalate a report
+   * @param reportId - ID of the report
+   * @param moderatorId - ID of the moderator
+   * @param reason - Reason for escalation
+   * @returns Updated report
+   */
+  async escalateReport(
+    reportId: string,
+    moderatorId: string,
+    reason: string,
+  ): Promise<Report> {
+    return await this.updateReport(reportId, moderatorId, {
+      status: REPORT_CONSTANTS.STATUS.ESCALATED,
+      action: REPORT_CONSTANTS.ACTIONS.ESCALATED_TO_ADMIN,
+      resolution: REPORT_CONSTANTS.RESOLUTION.ESCALATED,
+      resolutionDetails: reason,
+    });
+  }
+
+  /**
+   * Get reports for a specific content item
+   * @param reportableType - Type of content
+   * @param reportableId - ID of content
+   * @returns Array of reports
+   */
+  async getReportsForContent(
+    reportableType: ReportableType,
+    reportableId: string,
+  ): Promise<Report[]> {
+    return await this.reportRepository.find({
+      where: { reportableType, reportableId },
+      relations: ['reporter', 'moderator', 'actions', 'actions.moderator'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Get duplicate reports for the same content
+   * @param reportableType - Type of content
+   * @param reportableId - ID of content
+   * @returns Array of duplicate reports
+   */
+  async getDuplicateReports(
+    reportableType: ReportableType,
+    reportableId: string,
+  ): Promise<Report[]> {
+    return await this.reportRepository.find({
+      where: { reportableType, reportableId },
+      relations: ['reporter', 'moderator'],
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /**
+   * Merge duplicate reports
+   * @param reportIds - Array of report IDs to merge
+   * @param moderatorId - ID of the moderator performing the merge
+   * @returns Primary report with updated duplicate count
+   */
+  async mergeDuplicateReports(
+    reportIds: string[],
+    moderatorId: string,
+  ): Promise<Report> {
+    if (reportIds.length < 2) {
+      throw new HttpException(
+        { messageKey: 'report.INSUFFICIENT_REPORTS_TO_MERGE' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return await this.runInTransaction(async (queryRunner) => {
+      // Get all reports
+      const reports = await queryRunner.manager.find(Report, {
+        where: { id: In(reportIds) },
+        order: { createdAt: 'ASC' },
+      });
+
+      if (reports.length !== reportIds.length) {
+        throw new HttpException(
+          { messageKey: 'report.REPORTS_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Use the oldest report as primary
+      const primaryReport = reports[0];
+      const duplicateReports = reports.slice(1);
+
+      // Update duplicate count
+      primaryReport.duplicateCount = reports.length;
+
+      // Mark duplicate reports as merged
+      for (const duplicateReport of duplicateReports) {
+        duplicateReport.status = REPORT_CONSTANTS.STATUS.RESOLVED;
+        duplicateReport.action = REPORT_CONSTANTS.ACTIONS.REPORT_MERGED;
+        duplicateReport.resolution = REPORT_CONSTANTS.RESOLUTION.MERGED;
+        duplicateReport.moderatorId = moderatorId;
+        duplicateReport.resolvedAt = new Date();
+        duplicateReport.resolutionDetails = `Merged with report ${primaryReport.id}`;
+
+        await queryRunner.manager.save(Report, duplicateReport);
+      }
+
+      // Save primary report
+      await queryRunner.manager.save(Report, primaryReport);
+
+      return primaryReport;
+    });
+  }
+
+  /**
+   * Get default priority for a report reason
+   * @param reason - Report reason
+   * @returns Priority level
+   */
+  private getDefaultPriorityForReason(reason: ReportReason): ReportPriority {
+    const highPriorityReasons = [
+      REPORT_CONSTANTS.REASONS.CHILD_ABUSE,
+      REPORT_CONSTANTS.REASONS.TERRORISM,
+      REPORT_CONSTANTS.REASONS.EXTREMISM,
+      REPORT_CONSTANTS.REASONS.SELF_HARM,
+      REPORT_CONSTANTS.REASONS.SUICIDE,
+      REPORT_CONSTANTS.REASONS.THREATS,
+      REPORT_CONSTANTS.REASONS.VIOLENCE,
+      REPORT_CONSTANTS.REASONS.GRAPHIC_VIOLENCE,
+    ];
+
+    const urgentReasons = [
+      REPORT_CONSTANTS.REASONS.CHILD_ABUSE,
+      REPORT_CONSTANTS.REASONS.TERRORISM,
+      REPORT_CONSTANTS.REASONS.SUICIDE,
+    ];
+
+    if (urgentReasons.includes(reason)) {
+      return REPORT_CONSTANTS.PRIORITY.URGENT;
+    }
+
+    if (highPriorityReasons.includes(reason)) {
+      return REPORT_CONSTANTS.PRIORITY.HIGH;
+    }
+
+    return REPORT_CONSTANTS.PRIORITY.MEDIUM;
+  }
+
+  /**
+   * Get status from action
+   * @param action - Report action
+   * @returns Status
+   */
+  private getStatusFromAction(action: ReportActionType): ReportStatus {
+    const resolvedActions = [
+      REPORT_CONSTANTS.ACTIONS.CONTENT_REMOVED,
+      REPORT_CONSTANTS.ACTIONS.CONTENT_HIDDEN,
+      REPORT_CONSTANTS.ACTIONS.CONTENT_EDITED,
+      REPORT_CONSTANTS.ACTIONS.USER_WARNED,
+      REPORT_CONSTANTS.ACTIONS.USER_SUSPENDED,
+      REPORT_CONSTANTS.ACTIONS.USER_BANNED,
+      REPORT_CONSTANTS.ACTIONS.ACCOUNT_DELETED,
+    ];
+
+    const dismissedActions = [
+      REPORT_CONSTANTS.ACTIONS.REPORT_DISMISSED,
+      REPORT_CONSTANTS.ACTIONS.NO_ACTION,
+    ];
+
+    const escalatedActions = [
+      REPORT_CONSTANTS.ACTIONS.ESCALATED_TO_ADMIN,
+      REPORT_CONSTANTS.ACTIONS.ESCALATED_TO_LEGAL,
+    ];
+
+    if (resolvedActions.includes(action)) {
+      return REPORT_CONSTANTS.STATUS.RESOLVED;
+    }
+
+    if (dismissedActions.includes(action)) {
+      return REPORT_CONSTANTS.STATUS.DISMISSED;
+    }
+
+    if (escalatedActions.includes(action)) {
+      return REPORT_CONSTANTS.STATUS.ESCALATED;
+    }
+
+    return REPORT_CONSTANTS.STATUS.UNDER_REVIEW;
+  }
+
+  /**
+   * Check for auto-escalation
+   * @param report - Report to check
+   */
+  private async checkAutoEscalation(report: Report): Promise<void> {
+    // Check if this is a high-priority reason that should be auto-escalated
+    const autoEscalateReasons = [
+      REPORT_CONSTANTS.REASONS.CHILD_ABUSE,
+      REPORT_CONSTANTS.REASONS.TERRORISM,
+      REPORT_CONSTANTS.REASONS.SUICIDE,
+    ];
+
+    if (autoEscalateReasons.includes(report.reason)) {
+      await this.escalateReport(
+        report.id,
+        'system',
+        'Auto-escalated due to high-priority reason',
+      );
+    }
+
+    // Check for duplicate reports that might need escalation
+    const duplicateReports = await this.getDuplicateReports(
+      report.reportableType,
+      report.reportableId,
+    );
+
+    if (duplicateReports.length >= REPORT_CONSTANTS.AUTO_RESOLUTION.ESCALATION_THRESHOLD) {
+      await this.escalateReport(
+        report.id,
+        'system',
+        `Auto-escalated due to ${duplicateReports.length} duplicate reports`,
+      );
+    }
+  }
+
+  /**
+   * Get reports by field for statistics
+   * @param field - Field to group by
+   * @param whereCondition - Where condition
+   * @returns Statistics by field
+   */
+  private async getReportsByField(
+    field: keyof Report,
+    whereCondition: FindOptionsWhere<Report>,
+  ): Promise<Record<string, number>> {
+    const results = await this.reportRepository
+      .createQueryBuilder('report')
+      .select(`report.${field}`, 'field')
+      .addSelect('COUNT(*)', 'count')
+      .where(whereCondition)
+      .groupBy(`report.${field}`)
+      .getRawMany();
+
+    return results.reduce((acc, result) => {
+      acc[result.field] = parseInt(result.count);
+      return acc;
+    }, {} as Record<string, number>);
+  }
+
+  /**
+   * Get top reporters
+   * @param whereCondition - Where condition
+   * @returns Top reporters
+   */
+  private async getTopReporters(
+    whereCondition: FindOptionsWhere<Report>,
+  ): Promise<Array<{ reporterId: string; count: number }>> {
+    const results = await this.reportRepository
+      .createQueryBuilder('report')
+      .select('report.reporterId', 'reporterId')
+      .addSelect('COUNT(*)', 'count')
+      .where(whereCondition)
+      .groupBy('report.reporterId')
+      .orderBy('COUNT(*)', 'DESC')
+      .limit(10)
+      .getRawMany();
+
+    return results.map((result) => ({
+      reporterId: result.reporterId,
+      count: parseInt(result.count),
+    }));
+  }
+
+  /**
+   * Get top moderators
+   * @param whereCondition - Where condition
+   * @returns Top moderators
+   */
+  private async getTopModerators(
+    whereCondition: FindOptionsWhere<Report>,
+  ): Promise<Array<{ moderatorId: string; count: number }>> {
+    const results = await this.reportRepository
+      .createQueryBuilder('report')
+      .select('report.moderatorId', 'moderatorId')
+      .addSelect('COUNT(*)', 'count')
+      .where({ ...whereCondition, moderatorId: Not(IsNull()) })
+      .groupBy('report.moderatorId')
+      .orderBy('COUNT(*)', 'DESC')
+      .limit(10)
+      .getRawMany();
+
+    return results.map((result) => ({
+      moderatorId: result.moderatorId,
+      count: parseInt(result.count),
+    }));
+  }
+
+  /**
+   * Get recent trends
+   * @param whereCondition - Where condition
+   * @param groupBy - Group by period
+   * @returns Recent trends
+   */
+  private async getRecentTrends(
+    whereCondition: FindOptionsWhere<Report>,
+    groupBy?: 'hour' | 'day' | 'week' | 'month' | 'year',
+  ): Promise<Array<{ date: string; count: number }>> {
+    const period = groupBy || 'day';
+    const dateFormat = {
+      hour: 'YYYY-MM-DD HH24:00:00',
+      day: 'YYYY-MM-DD',
+      week: 'YYYY-"W"WW',
+      month: 'YYYY-MM',
+      year: 'YYYY',
+    }[period];
+
+    const results = await this.reportRepository
+      .createQueryBuilder('report')
+      .select(`TO_CHAR(report.createdAt, '${dateFormat}')`, 'date')
+      .addSelect('COUNT(*)', 'count')
+      .where(whereCondition)
+      .groupBy(`TO_CHAR(report.createdAt, '${dateFormat}')`)
+      .orderBy(`TO_CHAR(report.createdAt, '${dateFormat}')`, 'DESC')
+      .limit(30)
+      .getRawMany();
+
+    return results.map((result) => ({
+      date: result.date,
+      count: parseInt(result.count),
+    }));
+  }
+
+  /**
+   * Clear report-related cache
+   */
+  private async clearReportCache(): Promise<void> {
+    if (!this.cacheService) return;
+
+    await Promise.all([
+      this.cacheService.deleteKeysByPattern('reports:*'),
+      this.cacheService.deleteKeysByPattern('reports:stats:*'),
+    ]);
+  }
+}

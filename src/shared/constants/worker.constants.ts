@@ -11,4 +11,13 @@ export const JOB_NAME = {
   COMMENT_UPDATED: 'comment_updated',
   COMMENT_DELETED: 'comment_deleted',
   COMMENT_PINNED: 'comment_pinned',
+  // Report events
+  REPORT_CREATED: 'report_created',
+  REPORT_UPDATED: 'report_updated',
+  REPORT_ACTION_CREATED: 'report_action_created',
+  REPORT_ASSIGNED: 'report_assigned',
+  REPORT_RESOLVED: 'report_resolved',
+  REPORT_DISMISSED: 'report_dismissed',
+  REPORT_ESCALATED: 'report_escalated',
+  REPORT_MERGED: 'report_merged',
 } as const;
