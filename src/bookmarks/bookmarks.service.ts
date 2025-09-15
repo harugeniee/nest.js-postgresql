@@ -168,6 +168,64 @@ export class BookmarksService extends BaseService<Bookmark> {
     userId: string,
     query: QueryBookmarksDto,
   ): Promise<{ data: Bookmark[]; total: number }> {
+    const { page = 1, limit = 20, ...filters } = query;
+    const actualLimit = Math.min(
+      limit,
+      BOOKMARK_CONSTANTS.MAX_BOOKMARKS_PER_PAGE,
+    );
+
+    // Build where condition for BaseService
+    const where: any = {
+      userId,
+      status: Not(BOOKMARK_CONSTANTS.BOOKMARK_STATUS.DELETED),
+      ...filters,
+    };
+
+    // Handle special filters that need custom logic
+    if (query.tags) {
+      // For tags, we'll need to use a custom query builder
+      return await this.getUserBookmarksWithTags(userId, query);
+    }
+
+    if (query.search) {
+      // For search, we'll need to use a custom query builder
+      return await this.getUserBookmarksWithSearch(userId, query);
+    }
+
+    // Use BaseService listOffset for standard filtering
+    const result = await this.listOffset(
+      { page, limit: actualLimit, ...filters },
+      where,
+      {
+        relations: ['folder'],
+      },
+    );
+
+    // Apply custom sorting if needed
+    if (query.sortBy) {
+      const [field, direction] = query.sortBy.split('_');
+      result.data.sort((a, b) => {
+        const aValue = a[field as keyof Bookmark];
+        const bValue = b[field as keyof Bookmark];
+
+        if (direction.toUpperCase() === 'ASC') {
+          return aValue > bValue ? 1 : -1;
+        } else {
+          return aValue < bValue ? 1 : -1;
+        }
+      });
+    }
+
+    return { data: result.data, total: result.total };
+  }
+
+  /**
+   * Get user bookmarks with tags filtering (custom implementation)
+   */
+  private async getUserBookmarksWithTags(
+    userId: string,
+    query: QueryBookmarksDto,
+  ): Promise<{ data: Bookmark[]; total: number }> {
     const queryBuilder = this.bookmarkRepository
       .createQueryBuilder('bookmark')
       .leftJoinAndSelect('bookmark.folder', 'folder')
@@ -176,7 +234,7 @@ export class BookmarksService extends BaseService<Bookmark> {
         deletedStatus: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.DELETED,
       });
 
-    // Apply filters
+    // Apply other filters
     if (query.bookmarkableType) {
       queryBuilder.andWhere('bookmark.bookmarkableType = :type', {
         type: query.bookmarkableType,
@@ -195,6 +253,19 @@ export class BookmarksService extends BaseService<Bookmark> {
       });
     }
 
+    if (query.isFavorite !== undefined) {
+      queryBuilder.andWhere('bookmark.isFavorite = :isFavorite', {
+        isFavorite: query.isFavorite,
+      });
+    }
+
+    if (query.isReadLater !== undefined) {
+      queryBuilder.andWhere('bookmark.isReadLater = :isReadLater', {
+        isReadLater: query.isReadLater,
+      });
+    }
+
+    // Apply tags filter
     if (query.tags) {
       const tags = query.tags.split(',').map((tag) => tag.trim());
       queryBuilder.andWhere(
@@ -204,6 +275,66 @@ export class BookmarksService extends BaseService<Bookmark> {
           return params;
         }, {}),
       );
+    }
+
+    // Apply sorting
+    if (query.sortBy) {
+      const [field, direction] = query.sortBy.split('_');
+      queryBuilder.orderBy(
+        `bookmark.${field}`,
+        direction.toUpperCase() as 'ASC' | 'DESC',
+      );
+    } else {
+      queryBuilder.orderBy('bookmark.createdAt', 'DESC');
+    }
+
+    // Apply pagination
+    const page = query.page || 1;
+    const limit = Math.min(
+      query.limit || 20,
+      BOOKMARK_CONSTANTS.MAX_BOOKMARKS_PER_PAGE,
+    );
+    const offset = (page - 1) * limit;
+
+    queryBuilder.skip(offset).take(limit);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    return { data, total };
+  }
+
+  /**
+   * Get user bookmarks with search filtering (custom implementation)
+   */
+  private async getUserBookmarksWithSearch(
+    userId: string,
+    query: QueryBookmarksDto,
+  ): Promise<{ data: Bookmark[]; total: number }> {
+    const queryBuilder = this.bookmarkRepository
+      .createQueryBuilder('bookmark')
+      .leftJoinAndSelect('bookmark.folder', 'folder')
+      .where('bookmark.userId = :userId', { userId })
+      .andWhere('bookmark.status != :deletedStatus', {
+        deletedStatus: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.DELETED,
+      });
+
+    // Apply other filters
+    if (query.bookmarkableType) {
+      queryBuilder.andWhere('bookmark.bookmarkableType = :type', {
+        type: query.bookmarkableType,
+      });
+    }
+
+    if (query.folderId) {
+      queryBuilder.andWhere('bookmark.folderId = :folderId', {
+        folderId: query.folderId,
+      });
+    }
+
+    if (query.status) {
+      queryBuilder.andWhere('bookmark.status = :status', {
+        status: query.status,
+      });
     }
 
     if (query.isFavorite !== undefined) {
@@ -218,6 +349,7 @@ export class BookmarksService extends BaseService<Bookmark> {
       });
     }
 
+    // Apply search filter
     if (query.search) {
       queryBuilder.andWhere(
         '(bookmark.note ILIKE :search OR bookmark.tags ILIKE :search)',
@@ -496,11 +628,13 @@ export class BookmarksService extends BaseService<Bookmark> {
    * @returns {Promise<{data: Bookmark[], total: number}>} Paginated bookmarks
    */
   async list(query: any): Promise<{ data: Bookmark[]; total: number }> {
-    const [data, total] = await this.bookmarkRepository.findAndCount({
-      ...query,
+    const { page = 1, limit = 20, ...filters } = query;
+
+    // Use BaseService listOffset method
+    const result = await this.listOffset({ page, limit }, filters, {
       relations: ['user', 'folder'],
     });
 
-    return { data, total };
+    return { data: result.data, total: result.total };
   }
 }

@@ -189,15 +189,20 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
       ...filters,
     };
 
-    const [data, total] = await this.folderRepository.findAndCount({
-      where,
+    // Use BaseService listOffset method with custom ordering
+    const result = await this.listOffset({ page, limit, ...filters }, where, {
       relations: ['bookmarks'],
-      order: { sortOrder: 'ASC', createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
     });
 
-    return { data, total };
+    // Apply custom ordering after getting results
+    result.result.sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    return { data: result.result, total: result.total };
   }
 
   /**
@@ -232,13 +237,12 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
   async getAllFolders(query: any): Promise<[BookmarkFolder[], number]> {
     const { page = 1, limit = 20, ...filters } = query;
 
-    return await this.folderRepository.findAndCount({
-      where: filters,
+    // Use BaseService listOffset method
+    const result = await this.listOffset({ page, limit }, filters, {
       relations: ['user', 'bookmarks'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
     });
+
+    return [result.result, result.total];
   }
 
   /**
@@ -327,6 +331,7 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
    * @returns Array of default folders
    */
   async getDefaultFolders(userId: string): Promise<BookmarkFolder[]> {
+    // Use repository directly for multiple results with custom ordering
     return await this.folderRepository.find({
       where: {
         userId,

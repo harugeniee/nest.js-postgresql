@@ -639,6 +639,7 @@ export class ReportsService extends BaseService<Report> {
     reportableType: ReportableType,
     reportableId: string,
   ): Promise<Report[]> {
+    // Use repository directly for custom ordering and relations
     return await this.reportRepository.find({
       where: { reportableType, reportableId },
       relations: ['user', 'moderator', 'actions', 'actions.moderator'],
@@ -656,6 +657,7 @@ export class ReportsService extends BaseService<Report> {
     reportableType: ReportableType,
     reportableId: string,
   ): Promise<Report[]> {
+    // Use repository directly for custom ordering and relations
     return await this.reportRepository.find({
       where: { reportableType, reportableId },
       relations: ['user', 'moderator'],
