@@ -1,5 +1,10 @@
 import { IsOptional, IsString, IsEnum, IsDateString } from 'class-validator';
-import { ReportStatus, ReportPriority, ReportableType, ReportReason } from 'src/shared/constants';
+import {
+  ReportStatus,
+  ReportPriority,
+  ReportableType,
+  ReportReason,
+} from 'src/shared/constants';
 
 /**
  * DTO for report statistics query parameters

@@ -7,7 +7,6 @@ import {
   Param,
   Query,
   Request,
-  UseGuards,
 } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import {
@@ -16,258 +15,149 @@ import {
   QueryReportsDto,
   CreateReportActionDto,
   ReportStatsDto,
+  ResolveReportDto,
+  AssignReportDto,
+  DismissReportDto,
+  EscalateReportDto,
+  MergeReportsDto,
 } from './dto';
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RolesGuard } from 'src/auth/guard/role.guard';
 import {
   USER_CONSTANTS,
-  ReportAction as ReportActionType,
-  ReportResolution,
+  ReportableType,
+  ReportStatus,
+  ReportPriority,
 } from 'src/shared/constants';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
 
-@ApiTags('Reports')
-@ApiBearerAuth()
+/**
+ * Reports Controller
+ *
+ * Handles all report-related API endpoints
+ * Provides CRUD operations for reports and report actions
+ */
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   /**
    * Create a new report
-   * POST /reports
    */
   @Post()
   @Auth()
-  @ApiOperation({ summary: 'Create a new report' })
-  @ApiResponse({
-    status: 201,
-    description: 'Report created successfully',
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'Duplicate report already exists',
-  })
-  async createReport(
+  createReport(
     @Request() req: Request & { user: AuthPayload },
     @Body() dto: CreateReportDto,
   ) {
-    const userId = req.user.uid;
-    return this.reportsService.createReport(userId, dto);
+    return this.reportsService.createReport(req.user.uid, dto);
   }
 
   /**
    * Get reports with pagination and filtering
-   * GET /reports
    */
   @Get()
   @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Get reports with pagination and filtering' })
-  @ApiResponse({
-    status: 200,
-    description: 'Reports retrieved successfully',
-  })
-  async getReports(@Query() dto: QueryReportsDto) {
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  getReports(@Query() dto: QueryReportsDto) {
     return this.reportsService.list(dto);
   }
 
   /**
    * Get a single report by ID
-   * GET /reports/:id
    */
   @Get(':id')
   @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Get a single report by ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Report retrieved successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Report not found',
-  })
-  async getReport(@Param('id', new SnowflakeIdPipe()) reportId: string) {
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  getReport(@Param('id', new SnowflakeIdPipe()) reportId: string) {
     return this.reportsService.getById(reportId);
   }
 
   /**
    * Update a report
-   * PUT /reports/:id
    */
   @Put(':id')
   @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Update a report' })
-  @ApiResponse({
-    status: 200,
-    description: 'Report updated successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Report not found',
-  })
-  async updateReport(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  updateReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
     @Body() dto: UpdateReportDto,
   ) {
-    const moderatorId = req.user.uid;
-    return this.reportsService.updateReport(reportId, moderatorId, dto);
+    return this.reportsService.updateReport(reportId, req.user.uid, dto);
   }
 
   /**
    * Assign a report to a moderator
-   * POST /reports/:id/assign
    */
   @Post(':id/assign')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Assign a report to a moderator' })
-  @ApiResponse({
-    status: 200,
-    description: 'Report assigned successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Report not found',
-  })
-  async assignReport(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  assignReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
-    @Body() body: { moderatorId: string },
+    @Body() dto: AssignReportDto,
   ) {
-    return this.reportsService.assignReport(reportId, body.moderatorId);
+    return this.reportsService.assignReport(reportId, dto.moderatorId);
   }
 
   /**
    * Resolve a report
-   * POST /reports/:id/resolve
    */
   @Post(':id/resolve')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Resolve a report' })
-  @ApiResponse({
-    status: 200,
-    description: 'Report resolved successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Report not found',
-  })
-  async resolveReport(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  resolveReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
-    @Body()
-    body: {
-      action: ReportActionType;
-      resolution: ReportResolution;
-      resolutionDetails?: string;
-      moderatorNotes?: string;
-    },
+    @Body() dto: ResolveReportDto,
   ) {
-    const moderatorId = req.user.uid;
-    return this.reportsService.resolveReport(reportId, moderatorId, body);
+    return this.reportsService.resolveReport(reportId, req.user.uid, dto);
   }
 
   /**
    * Dismiss a report
-   * POST /reports/:id/dismiss
    */
   @Post(':id/dismiss')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Dismiss a report' })
-  @ApiResponse({
-    status: 200,
-    description: 'Report dismissed successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Report not found',
-  })
-  async dismissReport(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  dismissReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
-    @Body() body: { reason: string },
+    @Body() dto: DismissReportDto,
   ) {
-    const moderatorId = req.user.uid;
     return this.reportsService.dismissReport(
       reportId,
-      moderatorId,
-      body.reason,
+      req.user.uid,
+      dto.reason,
     );
   }
 
   /**
    * Escalate a report
-   * POST /reports/:id/escalate
    */
   @Post(':id/escalate')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Escalate a report' })
-  @ApiResponse({
-    status: 200,
-    description: 'Report escalated successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Report not found',
-  })
-  async escalateReport(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  escalateReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
-    @Body() body: { reason: string },
+    @Body() dto: EscalateReportDto,
   ) {
-    const moderatorId = req.user.uid;
     return this.reportsService.escalateReport(
       reportId,
-      moderatorId,
-      body.reason,
+      req.user.uid,
+      dto.reason,
     );
   }
 
   /**
    * Create a report action
-   * POST /reports/:id/actions
    */
   @Post(':id/actions')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Create a report action' })
-  @ApiResponse({
-    status: 201,
-    description: 'Report action created successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Report not found',
-  })
-  async createReportAction(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  createReportAction(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
     @Body() dto: Omit<CreateReportActionDto, 'reportId'>,
   ) {
-    const moderatorId = req.user.uid;
-    return this.reportsService.createReportAction(moderatorId, {
+    return this.reportsService.createReportAction(req.user.uid, {
       ...dto,
       reportId,
     });
@@ -275,172 +165,103 @@ export class ReportsController {
 
   /**
    * Get reports for specific content
-   * GET /reports/content/:type/:id
    */
   @Get('content/:type/:id')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Get reports for specific content' })
-  @ApiResponse({
-    status: 200,
-    description: 'Reports for content retrieved successfully',
-  })
-  async getReportsForContent(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  getReportsForContent(
     @Param('type') reportableType: string,
     @Param('id', new SnowflakeIdPipe()) reportableId: string,
   ) {
     return this.reportsService.getReportsForContent(
-      reportableType as any,
+      reportableType as ReportableType,
       reportableId,
     );
   }
 
   /**
    * Get duplicate reports
-   * GET /reports/duplicates/:type/:id
    */
   @Get('duplicates/:type/:id')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Get duplicate reports for content' })
-  @ApiResponse({
-    status: 200,
-    description: 'Duplicate reports retrieved successfully',
-  })
-  async getDuplicateReports(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  getDuplicateReports(
     @Param('type') reportableType: string,
     @Param('id', new SnowflakeIdPipe()) reportableId: string,
   ) {
     return this.reportsService.getDuplicateReports(
-      reportableType as any,
+      reportableType as ReportableType,
       reportableId,
     );
   }
 
   /**
    * Merge duplicate reports
-   * POST /reports/merge
    */
   @Post('merge')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Merge duplicate reports' })
-  @ApiResponse({
-    status: 200,
-    description: 'Reports merged successfully',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Insufficient reports to merge',
-  })
-  async mergeDuplicateReports(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  mergeDuplicateReports(
     @Request() req: Request & { user: AuthPayload },
-    @Body() body: { reportIds: string[] },
+    @Body() dto: MergeReportsDto,
   ) {
-    const moderatorId = req.user.uid;
     return this.reportsService.mergeDuplicateReports(
-      body.reportIds,
-      moderatorId,
+      dto.reportIds,
+      req.user.uid,
     );
   }
 
   /**
    * Get report statistics
-   * GET /reports/stats
    */
   @Get('stats')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Get report statistics' })
-  @ApiResponse({
-    status: 200,
-    description: 'Report statistics retrieved successfully',
-  })
-  async getReportStats(@Query() dto: ReportStatsDto) {
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  getReportStats(@Query() dto: ReportStatsDto) {
     return this.reportsService.getStats(dto);
   }
 
   /**
    * Get my reports (for regular users)
-   * GET /reports/my
    */
   @Get('my')
   @Auth()
-  @ApiOperation({ summary: 'Get my reports' })
-  @ApiResponse({
-    status: 200,
-    description: 'User reports retrieved successfully',
-  })
-  async getMyReports(
+  getMyReports(
     @Request() req: Request & { user: AuthPayload },
     @Query() dto: Omit<QueryReportsDto, 'userId'>,
   ) {
-    const userId = req.user.uid;
-    return this.reportsService.list({ ...dto, userId });
+    return this.reportsService.list({ ...dto, userId: req.user.uid });
   }
 
   /**
    * Get reports assigned to me (for moderators)
-   * GET /reports/assigned
    */
   @Get('assigned')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Get reports assigned to me' })
-  @ApiResponse({
-    status: 200,
-    description: 'Assigned reports retrieved successfully',
-  })
-  async getAssignedReports(
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  getAssignedReports(
     @Request() req: Request & { user: AuthPayload },
     @Query() dto: Omit<QueryReportsDto, 'moderatorId'>,
   ) {
-    const moderatorId = req.user.uid;
-    return this.reportsService.list({ ...dto, moderatorId });
+    return this.reportsService.list({ ...dto, moderatorId: req.user.uid });
   }
 
   /**
    * Get pending reports (for moderators)
-   * GET /reports/pending
    */
   @Get('pending')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Get pending reports' })
-  @ApiResponse({
-    status: 200,
-    description: 'Pending reports retrieved successfully',
-  })
-  async getPendingReports(@Query() dto: Omit<QueryReportsDto, 'status'>) {
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  getPendingReports(@Query() dto: Omit<QueryReportsDto, 'status'>) {
     return this.reportsService.list({
       ...dto,
-      status: 'pending' as any,
+      status: 'pending' as ReportStatus,
     });
   }
 
   /**
    * Get urgent reports (for moderators)
-   * GET /reports/urgent
    */
   @Get('urgent')
-  @Auth()
-  @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Get urgent reports' })
-  @ApiResponse({
-    status: 200,
-    description: 'Urgent reports retrieved successfully',
-  })
-  async getUrgentReports(@Query() dto: Omit<QueryReportsDto, 'priority'>) {
+  @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  getUrgentReports(@Query() dto: Omit<QueryReportsDto, 'priority'>) {
     return this.reportsService.list({
       ...dto,
-      priority: 'urgent' as any,
+      priority: 'urgent' as ReportPriority,
     });
   }
 }

@@ -3,3 +3,8 @@ export * from './update-report.dto';
 export * from './query-reports.dto';
 export * from './create-report-action.dto';
 export * from './report-stats.dto';
+export * from './resolve-report.dto';
+export * from './assign-report.dto';
+export * from './dismiss-report.dto';
+export * from './escalate-report.dto';
+export * from './merge-reports.dto';
