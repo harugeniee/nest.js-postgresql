@@ -1,6 +1,6 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, Not, IsNull } from 'typeorm';
 import { BaseService } from 'src/common/services/base.service';
 import { Bookmark } from './entities/bookmark.entity';
 import { BookmarkFolder } from './entities/bookmark-folder.entity';
@@ -435,53 +435,67 @@ export class BookmarksService extends BaseService<Bookmark> {
       this.folderRepository.count({ where: { userId } }),
     ]);
 
-    // Get bookmarks by type
-    const bookmarksByType = await this.bookmarkRepository
-      .createQueryBuilder('bookmark')
-      .select('bookmark.bookmarkableType', 'type')
-      .addSelect('COUNT(*)', 'count')
-      .where('bookmark.userId = :userId', { userId })
-      .andWhere('bookmark.status = :status', {
+    // Get bookmarks by type using TypeORM methods
+    const activeBookmarksData = await this.bookmarkRepository.find({
+      where: {
+        userId,
         status: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.ACTIVE,
-      })
-      .groupBy('bookmark.bookmarkableType')
-      .getRawMany();
+      },
+      select: ['bookmarkableType'],
+    });
 
-    const bookmarksByTypeMap = bookmarksByType.reduce(
-      (acc, item: any) => {
-        acc[item.type as BookmarkableType] = parseInt(item.count);
+    const bookmarksByTypeMap = activeBookmarksData.reduce(
+      (acc, bookmark) => {
+        acc[bookmark.bookmarkableType] =
+          (acc[bookmark.bookmarkableType] || 0) + 1;
         return acc;
       },
       {} as Record<BookmarkableType, number>,
     );
 
-    // Get top tags
-    const topTags = await this.bookmarkRepository
-      .createQueryBuilder('bookmark')
-      .select("UNNEST(STRING_TO_ARRAY(bookmark.tags, ','))", 'tag')
-      .addSelect('COUNT(*)', 'count')
-      .where('bookmark.userId = :userId', { userId })
-      .andWhere('bookmark.status = :status', {
+    // Get top tags using TypeORM methods
+    const bookmarksWithTags = await this.bookmarkRepository.find({
+      where: {
+        userId,
         status: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.ACTIVE,
-      })
-      .andWhere('bookmark.tags IS NOT NULL')
-      .andWhere("bookmark.tags != ''")
-      .groupBy('tag')
-      .orderBy('count', 'DESC')
-      .limit(10)
-      .getRawMany();
+        tags: Not(IsNull()),
+      },
+      select: ['tags'],
+    });
 
-    // Get folders with counts
-    const foldersWithCounts = await this.folderRepository
-      .createQueryBuilder('folder')
-      .leftJoin('folder.bookmarks', 'bookmark')
-      .select('folder.id', 'folderId')
-      .addSelect('folder.name', 'folderName')
-      .addSelect('COUNT(bookmark.id)', 'bookmarkCount')
-      .where('folder.userId = :userId', { userId })
-      .groupBy('folder.id, folder.name')
-      .orderBy('folder.sortOrder', 'ASC')
-      .getRawMany();
+    const tagCounts: Record<string, number> = {};
+    bookmarksWithTags.forEach((bookmark) => {
+      if (bookmark.tags && bookmark.tags.trim() !== '') {
+        const tags = bookmark.tags.split(',').map((tag) => tag.trim());
+        tags.forEach((tag) => {
+          if (tag) {
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    const topTags = Object.entries(tagCounts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Get folders with counts using TypeORM methods
+    const folders = await this.folderRepository.find({
+      where: { userId },
+      relations: ['bookmarks'],
+      order: { sortOrder: 'ASC' },
+    });
+
+    const foldersWithCounts = folders.map((folder) => ({
+      folderId: folder.id,
+      folderName: folder.name,
+      bookmarkCount:
+        folder.bookmarks?.filter(
+          (bookmark) =>
+            bookmark.status === BOOKMARK_CONSTANTS.BOOKMARK_STATUS.ACTIVE,
+        ).length || 0,
+    }));
 
     return {
       totalBookmarks,
@@ -491,15 +505,8 @@ export class BookmarksService extends BaseService<Bookmark> {
       readLaterBookmarks,
       totalFolders,
       bookmarksByType: bookmarksByTypeMap,
-      topTags: topTags.map((item: any) => ({
-        tag: item.tag.trim(),
-        count: parseInt(item.count),
-      })),
-      foldersWithCounts: foldersWithCounts.map((item: any) => ({
-        folderId: item.folderId,
-        folderName: item.folderName,
-        bookmarkCount: parseInt(item.bookmarkCount),
-      })),
+      topTags,
+      foldersWithCounts,
     };
   }
 

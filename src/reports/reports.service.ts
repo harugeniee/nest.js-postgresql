@@ -843,17 +843,15 @@ export class ReportsService extends BaseService<Report> {
     field: keyof Report,
     whereCondition: FindOptionsWhere<Report>,
   ): Promise<Record<string, number>> {
-    const results = await this.reportRepository
-      .createQueryBuilder('report')
-      .select(`report.${field}`, 'field')
-      .addSelect('COUNT(*)', 'count')
-      .where(whereCondition)
-      .groupBy(`report.${field}`)
-      .getRawMany();
+    const reports = await this.reportRepository.find({
+      where: whereCondition,
+      select: [field],
+    });
 
-    return results.reduce(
-      (acc, result) => {
-        acc[result.field] = parseInt(result.count);
+    return reports.reduce(
+      (acc, report) => {
+        const value = report[field] as string;
+        acc[value] = (acc[value] || 0) + 1;
         return acc;
       },
       {} as Record<string, number>,
@@ -868,20 +866,20 @@ export class ReportsService extends BaseService<Report> {
   private async getTopUsers(
     whereCondition: FindOptionsWhere<Report>,
   ): Promise<Array<{ userId: string; count: number }>> {
-    const results = await this.reportRepository
-      .createQueryBuilder('report')
-      .select('report.userId', 'userId')
-      .addSelect('COUNT(*)', 'count')
-      .where(whereCondition)
-      .groupBy('report.userId')
-      .orderBy('COUNT(*)', 'DESC')
-      .limit(10)
-      .getRawMany();
+    const reports = await this.reportRepository.find({
+      where: whereCondition,
+      select: ['userId'],
+    });
 
-    return results.map((result) => ({
-      userId: result.userId,
-      count: parseInt(result.count),
-    }));
+    const userCounts: Record<string, number> = {};
+    reports.forEach((report) => {
+      userCounts[report.userId] = (userCounts[report.userId] || 0) + 1;
+    });
+
+    return Object.entries(userCounts)
+      .map(([userId, count]) => ({ userId, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
   }
 
   /**
@@ -892,20 +890,23 @@ export class ReportsService extends BaseService<Report> {
   private async getTopModerators(
     whereCondition: FindOptionsWhere<Report>,
   ): Promise<Array<{ moderatorId: string; count: number }>> {
-    const results = await this.reportRepository
-      .createQueryBuilder('report')
-      .select('report.moderatorId', 'moderatorId')
-      .addSelect('COUNT(*)', 'count')
-      .where({ ...whereCondition, moderatorId: Not(IsNull()) })
-      .groupBy('report.moderatorId')
-      .orderBy('COUNT(*)', 'DESC')
-      .limit(10)
-      .getRawMany();
+    const reports = await this.reportRepository.find({
+      where: { ...whereCondition, moderatorId: Not(IsNull()) },
+      select: ['moderatorId'],
+    });
 
-    return results.map((result) => ({
-      moderatorId: result.moderatorId,
-      count: parseInt(result.count),
-    }));
+    const moderatorCounts: Record<string, number> = {};
+    reports.forEach((report) => {
+      if (report.moderatorId) {
+        moderatorCounts[report.moderatorId] =
+          (moderatorCounts[report.moderatorId] || 0) + 1;
+      }
+    });
+
+    return Object.entries(moderatorCounts)
+      .map(([moderatorId, count]) => ({ moderatorId, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
   }
 
   /**
@@ -919,28 +920,50 @@ export class ReportsService extends BaseService<Report> {
     groupBy?: 'hour' | 'day' | 'week' | 'month' | 'year',
   ): Promise<Array<{ date: string; count: number }>> {
     const period = groupBy || 'day';
-    const dateFormat = {
-      hour: 'YYYY-MM-DD HH24:00:00',
-      day: 'YYYY-MM-DD',
-      week: 'YYYY-"W"WW',
-      month: 'YYYY-MM',
-      year: 'YYYY',
-    }[period];
 
-    const results = await this.reportRepository
-      .createQueryBuilder('report')
-      .select(`TO_CHAR(report.createdAt, '${dateFormat}')`, 'date')
-      .addSelect('COUNT(*)', 'count')
-      .where(whereCondition)
-      .groupBy(`TO_CHAR(report.createdAt, '${dateFormat}')`)
-      .orderBy(`TO_CHAR(report.createdAt, '${dateFormat}')`, 'DESC')
-      .limit(30)
-      .getRawMany();
+    // Get reports with createdAt field
+    const reports = await this.reportRepository.find({
+      where: whereCondition,
+      select: ['createdAt'],
+      order: { createdAt: 'DESC' },
+    });
 
-    return results.map((result) => ({
-      date: result.date,
-      count: parseInt(result.count),
-    }));
+    // Group by date based on period
+    const dateCounts: Record<string, number> = {};
+    reports.forEach((report) => {
+      let dateKey: string;
+      const date = new Date(report.createdAt);
+
+      switch (period) {
+        case 'hour':
+          dateKey = date.toISOString().slice(0, 13) + ':00:00';
+          break;
+        case 'day':
+          dateKey = date.toISOString().slice(0, 10);
+          break;
+        case 'week': {
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          dateKey = weekStart.toISOString().slice(0, 10);
+          break;
+        }
+        case 'month':
+          dateKey = date.toISOString().slice(0, 7);
+          break;
+        case 'year':
+          dateKey = date.toISOString().slice(0, 4);
+          break;
+        default:
+          dateKey = date.toISOString().slice(0, 10);
+      }
+
+      dateCounts[dateKey] = (dateCounts[dateKey] || 0) + 1;
+    });
+
+    return Object.entries(dateCounts)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 30);
   }
 
   /**
