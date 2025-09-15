@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { BaseService } from 'src/common/services/base.service';
@@ -64,7 +59,10 @@ export class BookmarksService extends BaseService<Bookmark> {
     });
 
     if (existingBookmark) {
-      throw new BadRequestException('Bookmark already exists');
+      throw new HttpException(
+        { messageKey: 'bookmark.BOOKMARK_ALREADY_EXISTS' },
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // Validate folder if provided
@@ -73,7 +71,10 @@ export class BookmarksService extends BaseService<Bookmark> {
         where: { id: data.folderId, userId },
       });
       if (!folder) {
-        throw new NotFoundException('Folder not found');
+        throw new HttpException(
+          { messageKey: 'bookmark.FOLDER_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
       }
     }
 
@@ -104,7 +105,10 @@ export class BookmarksService extends BaseService<Bookmark> {
     });
 
     if (!bookmark) {
-      throw new NotFoundException('Bookmark not found');
+      throw new HttpException(
+        { messageKey: 'bookmark.BOOKMARK_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     // Validate folder if provided
@@ -113,7 +117,10 @@ export class BookmarksService extends BaseService<Bookmark> {
         where: { id: data.folderId, userId },
       });
       if (!folder) {
-        throw new NotFoundException('Folder not found');
+        throw new HttpException(
+          { messageKey: 'bookmark.FOLDER_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
       }
     }
 
@@ -138,7 +145,10 @@ export class BookmarksService extends BaseService<Bookmark> {
     });
 
     if (!bookmark) {
-      throw new NotFoundException('Bookmark not found');
+      throw new HttpException(
+        { messageKey: 'bookmark.BOOKMARK_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     await this.bookmarkRepository.update(id, {
@@ -274,11 +284,17 @@ export class BookmarksService extends BaseService<Bookmark> {
     });
 
     if (!folder) {
-      throw new NotFoundException('Folder not found');
+      throw new HttpException(
+        { messageKey: 'bookmark.FOLDER_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     if (folder.isSystemFolder()) {
-      throw new ForbiddenException('Cannot modify system folders');
+      throw new HttpException(
+        { messageKey: 'bookmark.FOLDER_CANNOT_BE_MODIFIED' },
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     Object.assign(folder, data);
@@ -298,11 +314,17 @@ export class BookmarksService extends BaseService<Bookmark> {
     });
 
     if (!folder) {
-      throw new NotFoundException('Folder not found');
+      throw new HttpException(
+        { messageKey: 'bookmark.FOLDER_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     if (!folder.canBeDeleted()) {
-      throw new ForbiddenException('Cannot delete this folder');
+      throw new HttpException(
+        { messageKey: 'bookmark.FOLDER_CANNOT_BE_DELETED' },
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     await this.folderRepository.remove(folder);
@@ -426,8 +448,8 @@ export class BookmarksService extends BaseService<Bookmark> {
       .getRawMany();
 
     const bookmarksByTypeMap = bookmarksByType.reduce(
-      (acc, item) => {
-        acc[item.type] = parseInt(item.count);
+      (acc, item: any) => {
+        acc[item.type as BookmarkableType] = parseInt(item.count);
         return acc;
       },
       {} as Record<BookmarkableType, number>,
@@ -469,11 +491,11 @@ export class BookmarksService extends BaseService<Bookmark> {
       readLaterBookmarks,
       totalFolders,
       bookmarksByType: bookmarksByTypeMap,
-      topTags: topTags.map((item) => ({
+      topTags: topTags.map((item: any) => ({
         tag: item.tag.trim(),
         count: parseInt(item.count),
       })),
-      foldersWithCounts: foldersWithCounts.map((item) => ({
+      foldersWithCounts: foldersWithCounts.map((item: any) => ({
         folderId: item.folderId,
         folderName: item.folderName,
         bookmarkCount: parseInt(item.bookmarkCount),
@@ -541,7 +563,10 @@ export class BookmarksService extends BaseService<Bookmark> {
     });
 
     if (!folder) {
-      throw new Error('Folder not found');
+      throw new HttpException(
+        { messageKey: 'bookmark.FOLDER_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     return folder;
