@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AdvancedPaginationDto } from 'src/common/dto/advanced-pagination.dto';
 import {
@@ -32,12 +32,4 @@ export class QueryBookmarkFoldersDto extends AdvancedPaginationDto {
   })
   @IsOptional()
   declare isDefault?: boolean;
-
-  @ApiPropertyOptional({
-    description: 'Search in folder name and description',
-    example: 'favorites',
-  })
-  @IsString()
-  @IsOptional()
-  declare search?: string;
 }

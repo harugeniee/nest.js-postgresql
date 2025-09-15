@@ -12,13 +12,6 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
-import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { USER_CONSTANTS } from 'src/shared/constants';
@@ -30,10 +23,10 @@ import {
   UpdateBookmarkFolderDto,
   QueryBookmarksDto,
   QueryBookmarkFoldersDto,
-  BookmarkStatsDto,
 } from './dto';
-import { Bookmark } from './entities/bookmark.entity';
-import { BookmarkFolder } from './entities/bookmark-folder.entity';
+import { Auth } from 'src/common/decorators';
+import { AuthPayload } from 'src/common/interface/auth.interface';
+import { SnowflakeIdPipe } from 'src/common/pipes/snowflake-id.pipe';
 
 /**
  * Bookmarks Controller
@@ -41,10 +34,8 @@ import { BookmarkFolder } from './entities/bookmark-folder.entity';
  * Handles all bookmark-related API endpoints
  * Provides CRUD operations for bookmarks and folders
  */
-@ApiTags('Bookmarks')
 @Controller('bookmarks')
-@UseGuards(JwtAccessTokenGuard)
-@ApiBearerAuth()
+@Auth()
 export class BookmarksController {
   constructor(private readonly bookmarksService: BookmarksService) {}
 
@@ -52,19 +43,11 @@ export class BookmarksController {
    * Create a new bookmark
    */
   @Post()
-  @ApiOperation({ summary: 'Create a new bookmark' })
-  @ApiResponse({
-    status: 201,
-    description: 'Bookmark created successfully',
-    type: Bookmark,
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async createBookmark(
-    @Request() req: any,
+  createBookmark(
+    @Request() req: Request & { user: AuthPayload },
     @Body() createBookmarkDto: CreateBookmarkDto,
-  ): Promise<Bookmark> {
-    return await this.bookmarksService.createBookmark(
+  ) {
+    return this.bookmarksService.createBookmark(
       req.user.uid,
       createBookmarkDto,
     );
@@ -74,99 +57,41 @@ export class BookmarksController {
    * Get user's bookmarks with filtering and pagination
    */
   @Get()
-  @ApiOperation({ summary: 'Get user bookmarks' })
-  @ApiResponse({
-    status: 200,
-    description: 'Bookmarks retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        data: {
-          type: 'array',
-          items: { $ref: '#/components/schemas/Bookmark' },
-        },
-        total: { type: 'number' },
-        page: { type: 'number' },
-        limit: { type: 'number' },
-        totalPages: { type: 'number' },
-      },
-    },
-  })
-  async getUserBookmarks(
-    @Request() req: any,
+  getUserBookmarks(
+    @Request() req: Request & { user: AuthPayload },
     @Query() query: QueryBookmarksDto,
-  ): Promise<{
-    data: Bookmark[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const { data, total } = await this.bookmarksService.getUserBookmarks(
-      req.user.uid,
-      query,
-    );
-
-    const page = query.page || 1;
-    const limit = query.limit || 20;
-    const totalPages = Math.ceil(total / limit);
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages,
-    };
+  ) {
+    return this.bookmarksService.getUserBookmarks(req.user.uid, query);
   }
 
   /**
    * Get a specific bookmark
    */
   @Get(':id')
-  @ApiOperation({ summary: 'Get a specific bookmark' })
-  @ApiResponse({
-    status: 200,
-    description: 'Bookmark retrieved successfully',
-    type: Bookmark,
-  })
-  @ApiResponse({ status: 404, description: 'Bookmark not found' })
-  async getBookmark(
-    @Request() req: any,
-    @Param('id') id: string,
-  ): Promise<Bookmark> {
-    const bookmark = await this.bookmarksService.findOne(
-      id as any,
+  getBookmark(
+    @Request() req: Request & { user: AuthPayload },
+    @Param('id', new SnowflakeIdPipe()) id: string,
+  ) {
+    return this.bookmarksService.findOne(
       {
-        userId: req.user.uid,
+        id,
+      },
+      {
         relations: ['folder'],
-      } as any,
+      },
     );
-
-    if (!bookmark) {
-      throw new Error('Bookmark not found');
-    }
-
-    return bookmark;
   }
 
   /**
    * Update a bookmark
    */
   @Put(':id')
-  @ApiOperation({ summary: 'Update a bookmark' })
-  @ApiResponse({
-    status: 200,
-    description: 'Bookmark updated successfully',
-    type: Bookmark,
-  })
-  @ApiResponse({ status: 404, description: 'Bookmark not found' })
-  async updateBookmark(
-    @Request() req: any,
-    @Param('id') id: string,
+  updateBookmark(
+    @Request() req: Request & { user: AuthPayload },
+    @Param('id', new SnowflakeIdPipe()) id: string,
     @Body() updateBookmarkDto: UpdateBookmarkDto,
-  ): Promise<Bookmark> {
-    return await this.bookmarksService.updateBookmark(
+  ) {
+    return this.bookmarksService.updateBookmark(
       id,
       req.user.uid,
       updateBookmarkDto,
@@ -178,67 +103,19 @@ export class BookmarksController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remove a bookmark' })
-  @ApiResponse({ status: 204, description: 'Bookmark removed successfully' })
-  @ApiResponse({ status: 404, description: 'Bookmark not found' })
-  async removeBookmark(
-    @Request() req: any,
-    @Param('id') id: string,
-  ): Promise<void> {
-    await this.bookmarksService.removeBookmark(id, req.user.uid);
-  }
-
-  /**
-   * Check if content is bookmarked
-   */
-  @Get('check/:type/:id')
-  @ApiOperation({ summary: 'Check if content is bookmarked' })
-  @ApiResponse({
-    status: 200,
-    description: 'Bookmark status retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        isBookmarked: { type: 'boolean' },
-        bookmark: { $ref: '#/components/schemas/Bookmark' },
-      },
-    },
-  })
-  async checkBookmark(
-    @Request() req: any,
-    @Param('type') type: string,
-    @Param('id') id: string,
-  ): Promise<{ isBookmarked: boolean; bookmark?: Bookmark | null }> {
-    const isBookmarked = await this.bookmarksService.isBookmarked(
-      req.user.uid,
-      type as any,
-      id,
-    );
-
-    let bookmark: Bookmark | null = null;
-    if (isBookmarked) {
-      bookmark = await this.bookmarksService.getBookmarkForContent(
-        req.user.uid,
-        type as any,
-        id,
-      );
-    }
-
-    return { isBookmarked, bookmark };
+  removeBookmark(
+    @Request() req: Request & { user: AuthPayload },
+    @Param('id', new SnowflakeIdPipe()) id: string,
+  ) {
+    return this.bookmarksService.removeBookmark(id, req.user.uid);
   }
 
   /**
    * Get bookmark statistics
    */
   @Get('stats/overview')
-  @ApiOperation({ summary: 'Get bookmark statistics' })
-  @ApiResponse({
-    status: 200,
-    description: 'Statistics retrieved successfully',
-    type: BookmarkStatsDto,
-  })
-  async getBookmarkStats(@Request() req: any): Promise<BookmarkStatsDto> {
-    return await this.bookmarksService.getBookmarkStats(req.user.uid);
+  getBookmarkStats(@Request() req: Request & { user: AuthPayload }) {
+    return this.bookmarksService.getBookmarkStats(req.user.uid);
   }
 
   // Folder endpoints
@@ -247,108 +124,45 @@ export class BookmarksController {
    * Create a new bookmark folder
    */
   @Post('folders')
-  @ApiOperation({ summary: 'Create a new bookmark folder' })
-  @ApiResponse({
-    status: 201,
-    description: 'Folder created successfully',
-    type: BookmarkFolder,
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  async createFolder(
-    @Request() req: any,
+  createFolder(
+    @Request() req: Request & { user: AuthPayload },
     @Body() createFolderDto: CreateBookmarkFolderDto,
-  ): Promise<BookmarkFolder> {
-    return await this.bookmarksService.createFolder(
-      req.user.uid,
-      createFolderDto,
-    );
+  ) {
+    return this.bookmarksService.createFolder(req.user.uid, createFolderDto);
   }
 
   /**
    * Get user's bookmark folders
    */
   @Get('folders')
-  @ApiOperation({ summary: 'Get user bookmark folders' })
-  @ApiResponse({
-    status: 200,
-    description: 'Folders retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        data: {
-          type: 'array',
-          items: { $ref: '#/components/schemas/BookmarkFolder' },
-        },
-        total: { type: 'number' },
-        page: { type: 'number' },
-        limit: { type: 'number' },
-        totalPages: { type: 'number' },
-      },
-    },
-  })
-  async getUserFolders(
-    @Request() req: any,
+  getUserFolders(
+    @Request() req: Request & { user: AuthPayload },
     @Query() query: QueryBookmarkFoldersDto,
-  ): Promise<{
-    data: BookmarkFolder[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const { data, total } = await this.bookmarksService.getUserFolders(
-      req.user.uid,
-      query,
-    );
-
-    const page = query.page || 1;
-    const limit = query.limit || 20;
-    const totalPages = Math.ceil(total / limit);
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages,
-    };
+  ) {
+    return this.bookmarksService.getUserFolders(req.user.uid, query);
   }
 
   /**
    * Get a specific folder
    */
   @Get('folders/:id')
-  @ApiOperation({ summary: 'Get a specific bookmark folder' })
-  @ApiResponse({
-    status: 200,
-    description: 'Folder retrieved successfully',
-    type: BookmarkFolder,
-  })
-  @ApiResponse({ status: 404, description: 'Folder not found' })
-  async getFolder(
-    @Request() req: any,
-    @Param('id') id: string,
-  ): Promise<BookmarkFolder> {
-    return await this.bookmarksService.getFolderById(id, req.user.uid);
+  getFolder(
+    @Request() req: Request & { user: AuthPayload },
+    @Param('id', new SnowflakeIdPipe()) id: string,
+  ) {
+    return this.bookmarksService.getFolderById(id, req.user.uid);
   }
 
   /**
    * Update a folder
    */
   @Put('folders/:id')
-  @ApiOperation({ summary: 'Update a bookmark folder' })
-  @ApiResponse({
-    status: 200,
-    description: 'Folder updated successfully',
-    type: BookmarkFolder,
-  })
-  @ApiResponse({ status: 404, description: 'Folder not found' })
-  async updateFolder(
-    @Request() req: any,
-    @Param('id') id: string,
+  updateFolder(
+    @Request() req: Request & { user: AuthPayload },
+    @Param('id', new SnowflakeIdPipe()) id: string,
     @Body() updateFolderDto: UpdateBookmarkFolderDto,
-  ): Promise<BookmarkFolder> {
-    return await this.bookmarksService.updateFolder(
+  ) {
+    return this.bookmarksService.updateFolder(
       id,
       req.user.uid,
       updateFolderDto,
@@ -360,14 +174,11 @@ export class BookmarksController {
    */
   @Delete('folders/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a bookmark folder' })
-  @ApiResponse({ status: 204, description: 'Folder deleted successfully' })
-  @ApiResponse({ status: 404, description: 'Folder not found' })
-  async deleteFolder(
-    @Request() req: any,
-    @Param('id') id: string,
-  ): Promise<void> {
-    await this.bookmarksService.deleteFolder(id, req.user.uid);
+  deleteFolder(
+    @Request() req: Request & { user: AuthPayload },
+    @Param('id', new SnowflakeIdPipe()) id: string,
+  ) {
+    return this.bookmarksService.deleteFolder(id, req.user.uid);
   }
 
   // Admin endpoints
@@ -378,44 +189,8 @@ export class BookmarksController {
   @Get('admin/all')
   @UseGuards(RolesGuard)
   @Roles(USER_CONSTANTS.ROLES.ADMIN, USER_CONSTANTS.ROLES.MODERATOR)
-  @ApiOperation({ summary: 'Get all bookmarks (admin only)' })
-  @ApiResponse({
-    status: 200,
-    description: 'All bookmarks retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        data: {
-          type: 'array',
-          items: { $ref: '#/components/schemas/Bookmark' },
-        },
-        total: { type: 'number' },
-        page: { type: 'number' },
-        limit: { type: 'number' },
-        totalPages: { type: 'number' },
-      },
-    },
-  })
-  async getAllBookmarks(@Query() query: QueryBookmarksDto): Promise<{
-    data: Bookmark[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const { data, total } = await this.bookmarksService.list(query as any);
-
-    const page = query.page || 1;
-    const limit = query.limit || 20;
-    const totalPages = Math.ceil(total / limit);
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages,
-    };
+  getAllBookmarks(@Query() query: QueryBookmarksDto) {
+    return this.bookmarksService.list(query);
   }
 
   /**
@@ -424,43 +199,7 @@ export class BookmarksController {
   @Get('admin/folders')
   @UseGuards(RolesGuard)
   @Roles(USER_CONSTANTS.ROLES.ADMIN, USER_CONSTANTS.ROLES.MODERATOR)
-  @ApiOperation({ summary: 'Get all bookmark folders (admin only)' })
-  @ApiResponse({
-    status: 200,
-    description: 'All folders retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        data: {
-          type: 'array',
-          items: { $ref: '#/components/schemas/BookmarkFolder' },
-        },
-        total: { type: 'number' },
-        page: { type: 'number' },
-        limit: { type: 'number' },
-        totalPages: { type: 'number' },
-      },
-    },
-  })
-  async getAllFolders(@Query() query: QueryBookmarkFoldersDto): Promise<{
-    data: BookmarkFolder[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const [data, total] = await this.bookmarksService.getAllFolders(query);
-
-    const page = query.page || 1;
-    const limit = query.limit || 20;
-    const totalPages = Math.ceil(total / limit);
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages,
-    };
+  getAllFolders(@Query() query: QueryBookmarkFoldersDto) {
+    return this.bookmarksService.getAllFolders(query);
   }
 }

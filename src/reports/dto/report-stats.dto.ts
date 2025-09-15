@@ -1,91 +1,109 @@
 import { IsOptional, IsString, IsEnum, IsDateString } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  REPORT_CONSTANTS,
-  ReportStatus,
-  ReportPriority,
-  ReportableType,
-  ReportReason,
-} from 'src/shared/constants';
+import { ReportStatus, ReportPriority, ReportableType, ReportReason } from 'src/shared/constants';
 
 /**
- * DTO for querying report statistics
+ * DTO for report statistics query parameters
  */
 export class ReportStatsDto {
-  @ApiPropertyOptional({
-    description: 'Filter by report status',
-    enum: REPORT_CONSTANTS.STATUS,
-    example: 'pending',
-  })
   @IsOptional()
-  @IsEnum(REPORT_CONSTANTS.STATUS)
+  @IsEnum(ReportStatus)
   status?: ReportStatus;
 
-  @ApiPropertyOptional({
-    description: 'Filter by report priority',
-    enum: REPORT_CONSTANTS.PRIORITY,
-    example: 'high',
-  })
   @IsOptional()
-  @IsEnum(REPORT_CONSTANTS.PRIORITY)
+  @IsEnum(ReportPriority)
   priority?: ReportPriority;
 
-  @ApiPropertyOptional({
-    description: 'Filter by reportable type',
-    enum: REPORT_CONSTANTS.REPORTABLE_TYPES,
-    example: 'article',
-  })
   @IsOptional()
-  @IsEnum(REPORT_CONSTANTS.REPORTABLE_TYPES)
+  @IsEnum(ReportableType)
   reportableType?: ReportableType;
 
-  @ApiPropertyOptional({
-    description: 'Filter by report reason',
-    enum: REPORT_CONSTANTS.REASONS,
-    example: 'spam',
-  })
   @IsOptional()
-  @IsEnum(REPORT_CONSTANTS.REASONS)
+  @IsEnum(ReportReason)
   reason?: ReportReason;
 
-  @ApiPropertyOptional({
-    description: 'Filter by user ID',
-    example: '1234567890123456789',
-  })
   @IsOptional()
   @IsString()
   userId?: string;
 
-  @ApiPropertyOptional({
-    description: 'Filter by moderator ID',
-    example: '1234567890123456789',
-  })
   @IsOptional()
   @IsString()
   moderatorId?: string;
 
-  @ApiPropertyOptional({
-    description: 'Start date for statistics period',
-    example: '2024-01-01T00:00:00Z',
-  })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({
-    description: 'End date for statistics period',
-    example: '2024-12-31T23:59:59Z',
-  })
   @IsOptional()
   @IsDateString()
   endDate?: string;
 
-  @ApiPropertyOptional({
-    description: 'Group statistics by time period',
-    enum: ['hour', 'day', 'week', 'month', 'year'],
-    example: 'day',
-  })
   @IsOptional()
   @IsEnum(['hour', 'day', 'week', 'month', 'year'])
   groupBy?: 'hour' | 'day' | 'week' | 'month' | 'year';
+}
+
+/**
+ * DTO for basic report counts response
+ */
+export class BasicReportCountsDto {
+  totalReports: number;
+  pendingReports: number;
+  underReviewReports: number;
+  resolvedReports: number;
+  dismissedReports: number;
+  escalatedReports: number;
+}
+
+/**
+ * DTO for report field statistics response
+ */
+export class ReportFieldStatsDto {
+  reportsByStatus: Record<ReportStatus, number>;
+  reportsByPriority: Record<ReportPriority, number>;
+  reportsByType: Record<ReportableType, number>;
+  reportsByReason: Record<ReportReason, number>;
+}
+
+/**
+ * DTO for top users response
+ */
+export class TopUsersDto {
+  userId: string;
+  count: number;
+}
+
+/**
+ * DTO for top moderators response
+ */
+export class TopModeratorsDto {
+  moderatorId: string;
+  count: number;
+}
+
+/**
+ * DTO for recent trends response
+ */
+export class RecentTrendsDto {
+  date: string;
+  count: number;
+}
+
+/**
+ * DTO for complete report statistics response
+ */
+export class ReportStatsResponseDto {
+  totalReports: number;
+  pendingReports: number;
+  underReviewReports: number;
+  resolvedReports: number;
+  dismissedReports: number;
+  escalatedReports: number;
+  reportsByStatus: Record<ReportStatus, number>;
+  reportsByPriority: Record<ReportPriority, number>;
+  reportsByType: Record<ReportableType, number>;
+  reportsByReason: Record<ReportReason, number>;
+  averageResolutionTime: number;
+  topUsers: TopUsersDto[];
+  topModerators: TopModeratorsDto[];
+  recentTrends: RecentTrendsDto[];
 }
