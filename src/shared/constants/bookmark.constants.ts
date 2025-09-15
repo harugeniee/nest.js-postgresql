@@ -25,6 +25,7 @@ export const FOLDER_TYPES = {
   FAVORITES: 'favorites',
   READ_LATER: 'read_later',
   ARCHIVED: 'archived',
+  SYSTEM: 'system',
 } as const;
 
 export type FolderType = (typeof FOLDER_TYPES)[keyof typeof FOLDER_TYPES];
