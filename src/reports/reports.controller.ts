@@ -21,8 +21,12 @@ import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { Roles } from 'src/common/decorators/roles.decorator';
-import { RoleGuard } from 'src/auth/guard/role.guard';
-import { USER_CONSTANTS } from 'src/shared/constants';
+import { RolesGuard } from 'src/auth/guard/role.guard';
+import {
+  USER_CONSTANTS,
+  ReportAction as ReportActionType,
+  ReportResolution,
+} from 'src/shared/constants';
 import {
   ApiTags,
   ApiOperation,
@@ -66,7 +70,7 @@ export class ReportsController {
   @Get()
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get reports with pagination and filtering' })
   @ApiResponse({
     status: 200,
@@ -83,7 +87,7 @@ export class ReportsController {
   @Get(':id')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get a single report by ID' })
   @ApiResponse({
     status: 200,
@@ -104,7 +108,7 @@ export class ReportsController {
   @Put(':id')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Update a report' })
   @ApiResponse({
     status: 200,
@@ -130,7 +134,7 @@ export class ReportsController {
   @Post(':id/assign')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Assign a report to a moderator' })
   @ApiResponse({
     status: 200,
@@ -155,7 +159,7 @@ export class ReportsController {
   @Post(':id/resolve')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Resolve a report' })
   @ApiResponse({
     status: 200,
@@ -170,8 +174,8 @@ export class ReportsController {
     @Request() req: Request & { user: AuthPayload },
     @Body()
     body: {
-      action: string;
-      resolution: string;
+      action: ReportActionType;
+      resolution: ReportResolution;
       resolutionDetails?: string;
       moderatorNotes?: string;
     },
@@ -187,7 +191,7 @@ export class ReportsController {
   @Post(':id/dismiss')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Dismiss a report' })
   @ApiResponse({
     status: 200,
@@ -217,7 +221,7 @@ export class ReportsController {
   @Post(':id/escalate')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Escalate a report' })
   @ApiResponse({
     status: 200,
@@ -247,7 +251,7 @@ export class ReportsController {
   @Post(':id/actions')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Create a report action' })
   @ApiResponse({
     status: 201,
@@ -276,7 +280,7 @@ export class ReportsController {
   @Get('content/:type/:id')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get reports for specific content' })
   @ApiResponse({
     status: 200,
@@ -299,7 +303,7 @@ export class ReportsController {
   @Get('duplicates/:type/:id')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get duplicate reports for content' })
   @ApiResponse({
     status: 200,
@@ -322,7 +326,7 @@ export class ReportsController {
   @Post('merge')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Merge duplicate reports' })
   @ApiResponse({
     status: 200,
@@ -350,7 +354,7 @@ export class ReportsController {
   @Get('stats')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get report statistics' })
   @ApiResponse({
     status: 200,
@@ -386,7 +390,7 @@ export class ReportsController {
   @Get('assigned')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get reports assigned to me' })
   @ApiResponse({
     status: 200,
@@ -407,7 +411,7 @@ export class ReportsController {
   @Get('pending')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get pending reports' })
   @ApiResponse({
     status: 200,
@@ -427,7 +431,7 @@ export class ReportsController {
   @Get('urgent')
   @Auth()
   @Roles(USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN)
-  @UseGuards(RoleGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get urgent reports' })
   @ApiResponse({
     status: 200,

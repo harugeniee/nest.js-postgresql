@@ -31,7 +31,6 @@ import {
 @Index(['status'])
 @Index(['priority'])
 @Index(['reason'])
-@Index(['createdAt'])
 export class Report extends BaseEntityCustom {
   /**
    * ID of the user who submitted the report

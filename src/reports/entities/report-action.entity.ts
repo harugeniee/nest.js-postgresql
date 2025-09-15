@@ -17,7 +17,6 @@ import {
 @Index(['reportId'])
 @Index(['moderatorId'])
 @Index(['action'])
-@Index(['createdAt'])
 export class ReportAction extends BaseEntityCustom {
   /**
    * ID of the report this action belongs to

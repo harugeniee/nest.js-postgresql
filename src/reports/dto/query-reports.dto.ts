@@ -27,7 +27,7 @@ export class QueryReportsDto extends AdvancedPaginationDto {
   })
   @IsOptional()
   @IsEnum(REPORT_CONSTANTS.STATUS)
-  status?: ReportStatus;
+  declare status?: ReportStatus;
 
   @ApiPropertyOptional({
     description: 'Filter by report priority',
@@ -62,7 +62,7 @@ export class QueryReportsDto extends AdvancedPaginationDto {
   })
   @IsOptional()
   @IsString()
-  userId?: string;
+  declare userId?: string;
 
   @ApiPropertyOptional({
     description: 'Filter by moderator ID',

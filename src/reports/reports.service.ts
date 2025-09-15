@@ -54,7 +54,7 @@ export class ReportsService extends BaseService<Report> {
         cache: { enabled: true, ttlSec: 300, prefix: 'reports', swrSec: 60 },
         defaultSearchField: 'description',
         relationsWhitelist: {
-          reporter: true,
+          user: true,
           moderator: true,
           actions: { moderator: true },
         },
@@ -96,7 +96,7 @@ export class ReportsService extends BaseService<Report> {
     }
 
     // Set default priority based on reason
-    if (!data.priority) {
+    if (!data.priority && data.reason) {
       data.priority = this.getDefaultPriorityForReason(data.reason);
     }
 
@@ -426,7 +426,7 @@ export class ReportsService extends BaseService<Report> {
     const cacheKey = `reports:stats:${JSON.stringify(dto)}`;
     const cached = await this.cacheService?.get(cacheKey);
     if (cached) {
-      return cached;
+      return cached as any;
     }
 
     // Build where condition
@@ -726,7 +726,7 @@ export class ReportsService extends BaseService<Report> {
    * @returns Priority level
    */
   private getDefaultPriorityForReason(reason: ReportReason): ReportPriority {
-    const highPriorityReasons = [
+    const highPriorityReasons: ReportReason[] = [
       REPORT_CONSTANTS.REASONS.CHILD_ABUSE,
       REPORT_CONSTANTS.REASONS.TERRORISM,
       REPORT_CONSTANTS.REASONS.EXTREMISM,
@@ -737,17 +737,17 @@ export class ReportsService extends BaseService<Report> {
       REPORT_CONSTANTS.REASONS.GRAPHIC_VIOLENCE,
     ];
 
-    const urgentReasons = [
+    const urgentReasons: ReportReason[] = [
       REPORT_CONSTANTS.REASONS.CHILD_ABUSE,
       REPORT_CONSTANTS.REASONS.TERRORISM,
       REPORT_CONSTANTS.REASONS.SUICIDE,
     ];
 
-    if (urgentReasons.includes(reason)) {
+    if (urgentReasons.includes(reason as any)) {
       return REPORT_CONSTANTS.PRIORITY.URGENT;
     }
 
-    if (highPriorityReasons.includes(reason)) {
+    if (highPriorityReasons.includes(reason as any)) {
       return REPORT_CONSTANTS.PRIORITY.HIGH;
     }
 
@@ -760,7 +760,7 @@ export class ReportsService extends BaseService<Report> {
    * @returns Status
    */
   private getStatusFromAction(action: ReportActionType): ReportStatus {
-    const resolvedActions = [
+    const resolvedActions: ReportActionType[] = [
       REPORT_CONSTANTS.ACTIONS.CONTENT_REMOVED,
       REPORT_CONSTANTS.ACTIONS.CONTENT_HIDDEN,
       REPORT_CONSTANTS.ACTIONS.CONTENT_EDITED,
@@ -770,25 +770,25 @@ export class ReportsService extends BaseService<Report> {
       REPORT_CONSTANTS.ACTIONS.ACCOUNT_DELETED,
     ];
 
-    const dismissedActions = [
+    const dismissedActions: ReportActionType[] = [
       REPORT_CONSTANTS.ACTIONS.REPORT_DISMISSED,
       REPORT_CONSTANTS.ACTIONS.NO_ACTION,
     ];
 
-    const escalatedActions = [
+    const escalatedActions: ReportActionType[] = [
       REPORT_CONSTANTS.ACTIONS.ESCALATED_TO_ADMIN,
       REPORT_CONSTANTS.ACTIONS.ESCALATED_TO_LEGAL,
     ];
 
-    if (resolvedActions.includes(action)) {
+    if (resolvedActions.includes(action as any)) {
       return REPORT_CONSTANTS.STATUS.RESOLVED;
     }
 
-    if (dismissedActions.includes(action)) {
+    if (dismissedActions.includes(action as any)) {
       return REPORT_CONSTANTS.STATUS.DISMISSED;
     }
 
-    if (escalatedActions.includes(action)) {
+    if (escalatedActions.includes(action as any)) {
       return REPORT_CONSTANTS.STATUS.ESCALATED;
     }
 
@@ -807,7 +807,7 @@ export class ReportsService extends BaseService<Report> {
       REPORT_CONSTANTS.REASONS.SUICIDE,
     ];
 
-    if (autoEscalateReasons.includes(report.reason)) {
+    if (autoEscalateReasons.includes(report.reason as any)) {
       await this.escalateReport(
         report.id,
         'system',
