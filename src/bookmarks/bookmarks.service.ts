@@ -14,6 +14,7 @@ import {
   BookmarkStatsDto,
 } from './dto';
 import { BOOKMARK_CONSTANTS, BookmarkableType } from 'src/shared/constants';
+import { BookmarkFolderService } from './services';
 
 /**
  * Bookmark Service
@@ -28,6 +29,7 @@ export class BookmarksService extends BaseService<Bookmark> {
     private readonly bookmarkRepository: Repository<Bookmark>,
     @InjectRepository(BookmarkFolder)
     private readonly folderRepository: Repository<BookmarkFolder>,
+    private readonly folderService: BookmarkFolderService,
   ) {
     super(bookmarkRepository as any, {
       entityName: 'Bookmark',
@@ -259,12 +261,7 @@ export class BookmarksService extends BaseService<Bookmark> {
     userId: string,
     data: CreateBookmarkFolderDto,
   ): Promise<BookmarkFolder> {
-    const folder = this.folderRepository.create({
-      ...data,
-      userId,
-    });
-
-    return await this.folderRepository.save(folder);
+    return await this.folderService.createFolder(userId, data);
   }
 
   /**
@@ -279,26 +276,7 @@ export class BookmarksService extends BaseService<Bookmark> {
     userId: string,
     data: UpdateBookmarkFolderDto,
   ): Promise<BookmarkFolder> {
-    const folder = await this.folderRepository.findOne({
-      where: { id, userId },
-    });
-
-    if (!folder) {
-      throw new HttpException(
-        { messageKey: 'bookmark.FOLDER_NOT_FOUND' },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    if (folder.isSystemFolder()) {
-      throw new HttpException(
-        { messageKey: 'bookmark.FOLDER_CANNOT_BE_MODIFIED' },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    Object.assign(folder, data);
-    return await this.folderRepository.save(folder);
+    return await this.folderService.updateFolder(id, userId, data);
   }
 
   /**
@@ -308,26 +286,7 @@ export class BookmarksService extends BaseService<Bookmark> {
    * @returns {Promise<void>}
    */
   async deleteFolder(id: string, userId: string): Promise<void> {
-    const folder = await this.folderRepository.findOne({
-      where: { id, userId },
-      relations: ['bookmarks'],
-    });
-
-    if (!folder) {
-      throw new HttpException(
-        { messageKey: 'bookmark.FOLDER_NOT_FOUND' },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    if (!folder.canBeDeleted()) {
-      throw new HttpException(
-        { messageKey: 'bookmark.FOLDER_CANNOT_BE_DELETED' },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    await this.folderRepository.remove(folder);
+    return await this.folderService.deleteFolder(id, userId);
   }
 
   /**
@@ -340,52 +299,7 @@ export class BookmarksService extends BaseService<Bookmark> {
     userId: string,
     query: QueryBookmarkFoldersDto,
   ): Promise<{ data: BookmarkFolder[]; total: number }> {
-    const queryBuilder = this.folderRepository
-      .createQueryBuilder('folder')
-      .leftJoinAndSelect('folder.bookmarks', 'bookmarks')
-      .where('folder.userId = :userId', { userId });
-
-    // Apply filters
-    if (query.type) {
-      queryBuilder.andWhere('folder.type = :type', { type: query.type });
-    }
-
-    if (query.visibility) {
-      queryBuilder.andWhere('folder.visibility = :visibility', {
-        visibility: query.visibility,
-      });
-    }
-
-    if (query.isDefault !== undefined) {
-      queryBuilder.andWhere('folder.isDefault = :isDefault', {
-        isDefault: query.isDefault,
-      });
-    }
-
-    if (query.search) {
-      queryBuilder.andWhere(
-        '(folder.name ILIKE :search OR folder.description ILIKE :search)',
-        { search: `%${query.search}%` },
-      );
-    }
-
-    // Apply sorting
-    queryBuilder.orderBy('folder.sortOrder', 'ASC');
-    queryBuilder.addOrderBy('folder.createdAt', 'DESC');
-
-    // Apply pagination
-    const page = query.page || 1;
-    const limit = Math.min(
-      query.limit || 20,
-      BOOKMARK_CONSTANTS.MAX_FOLDERS_PER_PAGE,
-    );
-    const offset = (page - 1) * limit;
-
-    queryBuilder.skip(offset).take(limit);
-
-    const [data, total] = await queryBuilder.getManyAndCount();
-
-    return { data, total };
+    return await this.folderService.getUserFolders(userId, query);
   }
 
   /**
@@ -564,19 +478,7 @@ export class BookmarksService extends BaseService<Bookmark> {
    * @returns {Promise<BookmarkFolder>} Folder
    */
   async getFolderById(id: string, userId: string): Promise<BookmarkFolder> {
-    const folder = await this.folderRepository.findOne({
-      where: { id, userId },
-      relations: ['bookmarks'],
-    });
-
-    if (!folder) {
-      throw new HttpException(
-        { messageKey: 'bookmark.FOLDER_NOT_FOUND' },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    return folder;
+    return await this.folderService.getFolderById(id, userId);
   }
 
   /**
@@ -585,10 +487,7 @@ export class BookmarksService extends BaseService<Bookmark> {
    * @returns {Promise<[BookmarkFolder[], number]>} Folders and total count
    */
   async getAllFolders(query: any): Promise<[BookmarkFolder[], number]> {
-    return await this.folderRepository.findAndCount({
-      ...query,
-      relations: ['user', 'bookmarks'],
-    });
+    return await this.folderService.getAllFolders(query);
   }
 
   /**
