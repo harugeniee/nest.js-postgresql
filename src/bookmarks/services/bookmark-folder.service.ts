@@ -11,6 +11,7 @@ import {
 } from '../dto';
 import { BOOKMARK_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
+import { IPagination } from 'src/common/interface/pagination.interface';
 
 /**
  * Bookmark Folder Service
@@ -181,7 +182,7 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
   async getUserFolders(
     userId: string,
     query: QueryBookmarkFoldersDto,
-  ): Promise<{ data: BookmarkFolder[]; total: number }> {
+  ): Promise<IPagination<BookmarkFolder>> {
     const { page = 1, limit = 20, ...filters } = query;
 
     const where: Record<string, unknown> = {
@@ -206,7 +207,7 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
-    return { data: result.result, total: result.metaData.totalRecords || 0 };
+    return result;
   }
 
   /**
@@ -240,7 +241,7 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
    */
   async getAllFolders(
     query: Record<string, unknown>,
-  ): Promise<[BookmarkFolder[], number]> {
+  ): Promise<IPagination<BookmarkFolder>> {
     const {
       page = 1,
       limit = 20,
@@ -260,7 +261,7 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
       },
     );
 
-    return [result.result, result.metaData.totalRecords || 0];
+    return result;
   }
 
   /**
@@ -280,37 +281,97 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
       bookmarkCount: number;
     }>;
   }> {
-    // Get all folders for user
-    const folders = await this.folderRepository.find({
+    // Use BaseService to get all folders with relations
+    const folders = await this.getUserFoldersWithRelations(userId);
+
+    // Calculate statistics using helper methods
+    const stats = this.calculateFolderStatistics(folders);
+
+    return stats;
+  }
+
+  /**
+   * Get quick folder statistics (lightweight version)
+   * @param userId - User ID
+   * @returns Basic folder statistics
+   */
+  async getQuickFolderStats(userId: string): Promise<{
+    totalFolders: number;
+    customFolders: number;
+    systemFolders: number;
+  }> {
+    // Use BaseService findOne with count for better performance
+    const [totalFolders, customFolders, systemFolders] = await Promise.all([
+      this.folderRepository.count({ where: { userId } }),
+      this.folderRepository.count({
+        where: { userId, type: BOOKMARK_CONSTANTS.FOLDER_TYPES.CUSTOM },
+      }),
+      this.folderRepository.count({
+        where: { userId, type: BOOKMARK_CONSTANTS.FOLDER_TYPES.SYSTEM },
+      }),
+    ]);
+
+    return {
+      totalFolders,
+      customFolders,
+      systemFolders,
+    };
+  }
+
+  /**
+   * Get user folders with relations for statistics
+   * @param userId - User ID
+   * @returns Array of folders with relations
+   */
+  private async getUserFoldersWithRelations(
+    userId: string,
+  ): Promise<BookmarkFolder[]> {
+    // Use repository directly for custom ordering and relations
+    return await this.folderRepository.find({
       where: { userId },
       relations: ['bookmarks'],
       order: { sortOrder: 'ASC' },
     });
+  }
 
-    // Calculate statistics
+  /**
+   * Calculate folder statistics from folder array
+   * @param folders - Array of folders with relations
+   * @returns Calculated statistics
+   */
+  private calculateFolderStatistics(folders: BookmarkFolder[]): {
+    totalFolders: number;
+    customFolders: number;
+    systemFolders: number;
+    publicFolders: number;
+    privateFolders: number;
+    foldersWithCounts: Array<{
+      folderId: string;
+      folderName: string;
+      bookmarkCount: number;
+    }>;
+  } {
     const totalFolders = folders.length;
-    const customFolders = folders.filter(
-      (f) => f.type === BOOKMARK_CONSTANTS.FOLDER_TYPES.CUSTOM,
-    ).length;
-    const systemFolders = folders.filter(
-      (f) => f.type === BOOKMARK_CONSTANTS.FOLDER_TYPES.SYSTEM,
-    ).length;
-    const publicFolders = folders.filter(
-      (f) => f.visibility === BOOKMARK_CONSTANTS.FOLDER_VISIBILITY.PUBLIC,
-    ).length;
-    const privateFolders = folders.filter(
-      (f) => f.visibility === BOOKMARK_CONSTANTS.FOLDER_VISIBILITY.PRIVATE,
-    ).length;
 
-    const foldersWithCounts = folders.map((folder) => ({
-      folderId: folder.id,
-      folderName: folder.name,
-      bookmarkCount:
-        folder.bookmarks?.filter(
-          (bookmark) =>
-            bookmark.status === BOOKMARK_CONSTANTS.BOOKMARK_STATUS.ACTIVE,
-        ).length || 0,
-    }));
+    // Use helper methods for counting
+    const customFolders = this.countFoldersByType(
+      folders,
+      BOOKMARK_CONSTANTS.FOLDER_TYPES.CUSTOM,
+    );
+    const systemFolders = this.countFoldersByType(
+      folders,
+      BOOKMARK_CONSTANTS.FOLDER_TYPES.SYSTEM,
+    );
+    const publicFolders = this.countFoldersByVisibility(
+      folders,
+      BOOKMARK_CONSTANTS.FOLDER_VISIBILITY.PUBLIC,
+    );
+    const privateFolders = this.countFoldersByVisibility(
+      folders,
+      BOOKMARK_CONSTANTS.FOLDER_VISIBILITY.PRIVATE,
+    );
+
+    const foldersWithCounts = this.calculateFoldersWithCounts(folders);
 
     return {
       totalFolders,
@@ -320,6 +381,120 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
       privateFolders,
       foldersWithCounts,
     };
+  }
+
+  /**
+   * Count folders by type
+   * @param folders - Array of folders
+   * @param type - Folder type to count
+   * @returns Count of folders with specified type
+   */
+  private countFoldersByType(folders: BookmarkFolder[], type: string): number {
+    return folders.filter((folder) => folder.type === type).length;
+  }
+
+  /**
+   * Count folders by visibility
+   * @param folders - Array of folders
+   * @param visibility - Folder visibility to count
+   * @returns Count of folders with specified visibility
+   */
+  private countFoldersByVisibility(
+    folders: BookmarkFolder[],
+    visibility: string,
+  ): number {
+    return folders.filter((folder) => folder.visibility === visibility).length;
+  }
+
+  /**
+   * Calculate folders with bookmark counts
+   * @param folders - Array of folders with relations
+   * @returns Array of folders with counts
+   */
+  private calculateFoldersWithCounts(folders: BookmarkFolder[]): Array<{
+    folderId: string;
+    folderName: string;
+    bookmarkCount: number;
+  }> {
+    return folders.map((folder) => ({
+      folderId: folder.id,
+      folderName: folder.name,
+      bookmarkCount: this.countActiveBookmarks(folder.bookmarks || []),
+    }));
+  }
+
+  /**
+   * Count active bookmarks in a folder
+   * @param bookmarks - Array of bookmarks
+   * @returns Count of active bookmarks
+   */
+  private countActiveBookmarks(bookmarks: any[]): number {
+    return bookmarks.filter(
+      (bookmark: any) =>
+        (bookmark as { status?: string })?.status ===
+        BOOKMARK_CONSTANTS.BOOKMARK_STATUS.ACTIVE,
+    ).length;
+  }
+
+  /**
+   * Get folder statistics by criteria (generic method for reusability)
+   * @param userId - User ID
+   * @param criteria - Optional criteria for filtering
+   * @returns Folder statistics based on criteria
+   */
+  async getFolderStatsByCriteria(
+    userId: string,
+    criteria?: {
+      type?: string;
+      visibility?: string;
+      includeBookmarkCounts?: boolean;
+    },
+  ): Promise<{
+    totalFolders: number;
+    filteredFolders: number;
+    foldersWithCounts?: Array<{
+      folderId: string;
+      folderName: string;
+      bookmarkCount: number;
+    }>;
+  }> {
+    const folders = await this.getUserFoldersWithRelations(userId);
+
+    let filteredFolders = folders;
+
+    // Apply filters if criteria provided
+    if (criteria?.type) {
+      filteredFolders = filteredFolders.filter(
+        (folder) => folder.type === criteria.type,
+      );
+    }
+
+    if (criteria?.visibility) {
+      filteredFolders = filteredFolders.filter(
+        (folder) => folder.visibility === criteria.visibility,
+      );
+    }
+
+    const result: {
+      totalFolders: number;
+      filteredFolders: number;
+      foldersWithCounts?: Array<{
+        folderId: string;
+        folderName: string;
+        bookmarkCount: number;
+      }>;
+    } = {
+      totalFolders: folders.length,
+      filteredFolders: filteredFolders.length,
+    };
+
+    // Include bookmark counts if requested
+    if (criteria?.includeBookmarkCounts) {
+      result.foldersWithCounts =
+        this.calculateFoldersWithCounts(filteredFolders);
+    }
+
+    return result;
   }
 
   /**
