@@ -5,7 +5,6 @@ import {
   BOOKMARK_CONSTANTS,
   BookmarkableType,
   BookmarkStatus,
-  BookmarkSortOption,
 } from 'src/shared/constants';
 
 /**

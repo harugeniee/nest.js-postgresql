@@ -12,6 +12,7 @@ import {
 import { BOOKMARK_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
 import { IPagination } from 'src/common/interface/pagination.interface';
+import { AdvancedPaginationDto } from 'src/common/dto';
 
 /**
  * Bookmark Folder Service
@@ -23,11 +24,12 @@ import { IPagination } from 'src/common/interface/pagination.interface';
 export class BookmarkFolderService extends BaseService<BookmarkFolder> {
   constructor(
     @InjectRepository(BookmarkFolder)
-    private readonly folderRepository: Repository<BookmarkFolder>,
+    private readonly bookmarkFolderRepository: Repository<BookmarkFolder>,
+
     cacheService: CacheService,
   ) {
     super(
-      new TypeOrmBaseRepository<BookmarkFolder>(folderRepository),
+      new TypeOrmBaseRepository<BookmarkFolder>(bookmarkFolderRepository),
       {
         entityName: 'BookmarkFolder',
         cache: {
@@ -183,28 +185,9 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
     userId: string,
     query: QueryBookmarkFoldersDto,
   ): Promise<IPagination<BookmarkFolder>> {
-    const { page = 1, limit = 20, ...filters } = query;
-
-    const where: Record<string, unknown> = {
-      userId,
-      ...filters,
-    };
-
     // Use BaseService listOffset method with custom ordering
-    const result = await this.listOffset(
-      { page, limit, ...filters, sortBy: 'createdAt', order: 'DESC' },
-      where,
-      {
-        relations: ['bookmarks'],
-      },
-    );
-
-    // Apply custom ordering after getting results
-    result.result.sort((a, b) => {
-      if (a.sortOrder !== b.sortOrder) {
-        return a.sortOrder - b.sortOrder;
-      }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    const result = await this.listOffset(query, {
+      relations: ['bookmarks'],
     });
 
     return result;
@@ -240,26 +223,12 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
    * @returns All folders with pagination
    */
   async getAllFolders(
-    query: Record<string, unknown>,
+    query: AdvancedPaginationDto,
   ): Promise<IPagination<BookmarkFolder>> {
-    const {
-      page = 1,
-      limit = 20,
-      ...filters
-    } = query as {
-      page?: number;
-      limit?: number;
-      [key: string]: unknown;
-    };
-
     // Use BaseService listOffset method
-    const result = await this.listOffset(
-      { page, limit, sortBy: 'createdAt', order: 'DESC' },
-      filters,
-      {
-        relations: ['user', 'bookmarks'],
-      },
-    );
+    const result = await this.listOffset(query, {
+      relations: ['user', 'bookmarks'],
+    });
 
     return result;
   }
@@ -302,11 +271,11 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
   }> {
     // Use BaseService findOne with count for better performance
     const [totalFolders, customFolders, systemFolders] = await Promise.all([
-      this.folderRepository.count({ where: { userId } }),
-      this.folderRepository.count({
+      this.bookmarkFolderRepository.count({ where: { userId } }),
+      this.bookmarkFolderRepository.count({
         where: { userId, type: BOOKMARK_CONSTANTS.FOLDER_TYPES.CUSTOM },
       }),
-      this.folderRepository.count({
+      this.bookmarkFolderRepository.count({
         where: { userId, type: BOOKMARK_CONSTANTS.FOLDER_TYPES.SYSTEM },
       }),
     ]);
@@ -327,7 +296,7 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
     userId: string,
   ): Promise<BookmarkFolder[]> {
     // Use repository directly for custom ordering and relations
-    return await this.folderRepository.find({
+    return await this.bookmarkFolderRepository.find({
       where: { userId },
       relations: ['bookmarks'],
       order: { sortOrder: 'ASC' },
@@ -525,7 +494,7 @@ export class BookmarkFolderService extends BaseService<BookmarkFolder> {
    */
   async getDefaultFolders(userId: string): Promise<BookmarkFolder[]> {
     // Use repository directly for multiple results with custom ordering
-    return await this.folderRepository.find({
+    return await this.bookmarkFolderRepository.find({
       where: {
         userId,
         isDefault: true,

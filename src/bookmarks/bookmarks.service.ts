@@ -1,6 +1,6 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Not, IsNull } from 'typeorm';
+import { Repository, In, Not, IsNull, FindOptionsWhere } from 'typeorm';
 import { BaseService } from 'src/common/services/base.service';
 import { Bookmark } from './entities/bookmark.entity';
 import { BookmarkFolder } from './entities/bookmark-folder.entity';
@@ -15,6 +15,9 @@ import {
 } from './dto';
 import { BOOKMARK_CONSTANTS, BookmarkableType } from 'src/shared/constants';
 import { BookmarkFolderService } from './services';
+import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
+import { IPagination } from 'src/common/interface/pagination.interface';
+import { AdvancedPaginationDto } from 'src/common/dto';
 
 /**
  * Bookmark Service
@@ -27,11 +30,13 @@ export class BookmarksService extends BaseService<Bookmark> {
   constructor(
     @InjectRepository(Bookmark)
     private readonly bookmarkRepository: Repository<Bookmark>,
+
     @InjectRepository(BookmarkFolder)
-    private readonly folderRepository: Repository<BookmarkFolder>,
-    private readonly folderService: BookmarkFolderService,
+    private readonly bookmarkFolderRepository: Repository<BookmarkFolder>,
+
+    private readonly bookmarkFolderService: BookmarkFolderService,
   ) {
-    super(bookmarkRepository as any, {
+    super(new TypeOrmBaseRepository<Bookmark>(bookmarkRepository), {
       entityName: 'Bookmark',
       relationsWhitelist: {
         user: true,
@@ -69,8 +74,9 @@ export class BookmarksService extends BaseService<Bookmark> {
 
     // Validate folder if provided
     if (data.folderId) {
-      const folder = await this.folderRepository.findOne({
-        where: { id: data.folderId, userId },
+      const folder = await this.bookmarkFolderService.findOne({
+        id: data.folderId,
+        userId,
       });
       if (!folder) {
         throw new HttpException(
@@ -115,8 +121,9 @@ export class BookmarksService extends BaseService<Bookmark> {
 
     // Validate folder if provided
     if (data.folderId) {
-      const folder = await this.folderRepository.findOne({
-        where: { id: data.folderId, userId },
+      const folder = await this.bookmarkFolderService.findOne({
+        id: data.folderId,
+        userId,
       });
       if (!folder) {
         throw new HttpException(
@@ -167,220 +174,19 @@ export class BookmarksService extends BaseService<Bookmark> {
   async getUserBookmarks(
     userId: string,
     query: QueryBookmarksDto,
-  ): Promise<{ data: Bookmark[]; total: number }> {
-    const { page = 1, limit = 20, ...filters } = query;
-    const actualLimit = Math.min(
-      limit,
-      BOOKMARK_CONSTANTS.MAX_BOOKMARKS_PER_PAGE,
-    );
-
+  ): Promise<IPagination<Bookmark>> {
     // Build where condition for BaseService
-    const where: any = {
+    const where: FindOptionsWhere<Bookmark> = {
       userId,
       status: Not(BOOKMARK_CONSTANTS.BOOKMARK_STATUS.DELETED),
-      ...filters,
     };
 
-    // Handle special filters that need custom logic
-    if (query.tags) {
-      // For tags, we'll need to use a custom query builder
-      return await this.getUserBookmarksWithTags(userId, query);
-    }
-
-    if (query.search) {
-      // For search, we'll need to use a custom query builder
-      return await this.getUserBookmarksWithSearch(userId, query);
-    }
-
     // Use BaseService listOffset for standard filtering
-    const result = await this.listOffset(
-      { page, limit: actualLimit, ...filters },
-      where,
-      {
-        relations: ['folder'],
-      },
-    );
+    const result = await this.listOffset(query, where, {
+      relations: ['folder'],
+    });
 
-    // Apply custom sorting if needed
-    if (query.sortBy) {
-      const [field, direction] = query.sortBy.split('_');
-      result.data.sort((a, b) => {
-        const aValue = a[field as keyof Bookmark];
-        const bValue = b[field as keyof Bookmark];
-
-        if (direction.toUpperCase() === 'ASC') {
-          return aValue > bValue ? 1 : -1;
-        } else {
-          return aValue < bValue ? 1 : -1;
-        }
-      });
-    }
-
-    return { data: result.result, total: result.metaData.totalRecords || 0 };
-  }
-
-  /**
-   * Get user bookmarks with tags filtering (custom implementation)
-   */
-  private async getUserBookmarksWithTags(
-    userId: string,
-    query: QueryBookmarksDto,
-  ): Promise<{ data: Bookmark[]; total: number }> {
-    const queryBuilder = this.bookmarkRepository
-      .createQueryBuilder('bookmark')
-      .leftJoinAndSelect('bookmark.folder', 'folder')
-      .where('bookmark.userId = :userId', { userId })
-      .andWhere('bookmark.status != :deletedStatus', {
-        deletedStatus: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.DELETED,
-      });
-
-    // Apply other filters
-    if (query.bookmarkableType) {
-      queryBuilder.andWhere('bookmark.bookmarkableType = :type', {
-        type: query.bookmarkableType,
-      });
-    }
-
-    if (query.folderId) {
-      queryBuilder.andWhere('bookmark.folderId = :folderId', {
-        folderId: query.folderId,
-      });
-    }
-
-    if (query.status) {
-      queryBuilder.andWhere('bookmark.status = :status', {
-        status: query.status,
-      });
-    }
-
-    if (query.isFavorite !== undefined) {
-      queryBuilder.andWhere('bookmark.isFavorite = :isFavorite', {
-        isFavorite: query.isFavorite,
-      });
-    }
-
-    if (query.isReadLater !== undefined) {
-      queryBuilder.andWhere('bookmark.isReadLater = :isReadLater', {
-        isReadLater: query.isReadLater,
-      });
-    }
-
-    // Apply tags filter
-    if (query.tags) {
-      const tags = query.tags.split(',').map((tag) => tag.trim());
-      queryBuilder.andWhere(
-        tags.map((_, index) => `bookmark.tags ILIKE :tag${index}`).join(' OR '),
-        tags.reduce((params, tag, index) => {
-          params[`tag${index}`] = `%${tag}%`;
-          return params;
-        }, {}),
-      );
-    }
-
-    // Apply sorting
-    if (query.sortBy) {
-      const [field, direction] = query.sortBy.split('_');
-      queryBuilder.orderBy(
-        `bookmark.${field}`,
-        direction.toUpperCase() as 'ASC' | 'DESC',
-      );
-    } else {
-      queryBuilder.orderBy('bookmark.createdAt', 'DESC');
-    }
-
-    // Apply pagination
-    const page = query.page || 1;
-    const limit = Math.min(
-      query.limit || 20,
-      BOOKMARK_CONSTANTS.MAX_BOOKMARKS_PER_PAGE,
-    );
-    const offset = (page - 1) * limit;
-
-    queryBuilder.skip(offset).take(limit);
-
-    const [data, total] = await queryBuilder.getManyAndCount();
-
-    return { data, total };
-  }
-
-  /**
-   * Get user bookmarks with search filtering (custom implementation)
-   */
-  private async getUserBookmarksWithSearch(
-    userId: string,
-    query: QueryBookmarksDto,
-  ): Promise<{ data: Bookmark[]; total: number }> {
-    const queryBuilder = this.bookmarkRepository
-      .createQueryBuilder('bookmark')
-      .leftJoinAndSelect('bookmark.folder', 'folder')
-      .where('bookmark.userId = :userId', { userId })
-      .andWhere('bookmark.status != :deletedStatus', {
-        deletedStatus: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.DELETED,
-      });
-
-    // Apply other filters
-    if (query.bookmarkableType) {
-      queryBuilder.andWhere('bookmark.bookmarkableType = :type', {
-        type: query.bookmarkableType,
-      });
-    }
-
-    if (query.folderId) {
-      queryBuilder.andWhere('bookmark.folderId = :folderId', {
-        folderId: query.folderId,
-      });
-    }
-
-    if (query.status) {
-      queryBuilder.andWhere('bookmark.status = :status', {
-        status: query.status,
-      });
-    }
-
-    if (query.isFavorite !== undefined) {
-      queryBuilder.andWhere('bookmark.isFavorite = :isFavorite', {
-        isFavorite: query.isFavorite,
-      });
-    }
-
-    if (query.isReadLater !== undefined) {
-      queryBuilder.andWhere('bookmark.isReadLater = :isReadLater', {
-        isReadLater: query.isReadLater,
-      });
-    }
-
-    // Apply search filter
-    if (query.search) {
-      queryBuilder.andWhere(
-        '(bookmark.note ILIKE :search OR bookmark.tags ILIKE :search)',
-        { search: `%${query.search}%` },
-      );
-    }
-
-    // Apply sorting
-    if (query.sortBy) {
-      const [field, direction] = query.sortBy.split('_');
-      queryBuilder.orderBy(
-        `bookmark.${field}`,
-        direction.toUpperCase() as 'ASC' | 'DESC',
-      );
-    } else {
-      queryBuilder.orderBy('bookmark.createdAt', 'DESC');
-    }
-
-    // Apply pagination
-    const page = query.page || 1;
-    const limit = Math.min(
-      query.limit || 20,
-      BOOKMARK_CONSTANTS.MAX_BOOKMARKS_PER_PAGE,
-    );
-    const offset = (page - 1) * limit;
-
-    queryBuilder.skip(offset).take(limit);
-
-    const [data, total] = await queryBuilder.getManyAndCount();
-
-    return { data, total };
+    return result;
   }
 
   /**
@@ -393,7 +199,7 @@ export class BookmarksService extends BaseService<Bookmark> {
     userId: string,
     data: CreateBookmarkFolderDto,
   ): Promise<BookmarkFolder> {
-    return await this.folderService.createFolder(userId, data);
+    return await this.bookmarkFolderService.createFolder(userId, data);
   }
 
   /**
@@ -408,7 +214,7 @@ export class BookmarksService extends BaseService<Bookmark> {
     userId: string,
     data: UpdateBookmarkFolderDto,
   ): Promise<BookmarkFolder> {
-    return await this.folderService.updateFolder(id, userId, data);
+    return await this.bookmarkFolderService.updateFolder(id, userId, data);
   }
 
   /**
@@ -418,7 +224,7 @@ export class BookmarksService extends BaseService<Bookmark> {
    * @returns {Promise<void>}
    */
   async deleteFolder(id: string, userId: string): Promise<void> {
-    return await this.folderService.deleteFolder(id, userId);
+    return await this.bookmarkFolderService.deleteFolder(id, userId);
   }
 
   /**
@@ -430,8 +236,8 @@ export class BookmarksService extends BaseService<Bookmark> {
   async getUserFolders(
     userId: string,
     query: QueryBookmarkFoldersDto,
-  ): Promise<{ data: BookmarkFolder[]; total: number }> {
-    return await this.folderService.getUserFolders(userId, query);
+  ): Promise<IPagination<BookmarkFolder>> {
+    return await this.bookmarkFolderService.getUserFolders(userId, query);
   }
 
   /**
@@ -478,7 +284,7 @@ export class BookmarksService extends BaseService<Bookmark> {
           status: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.ACTIVE,
         },
       }),
-      this.folderRepository.count({ where: { userId } }),
+      this.bookmarkFolderRepository.count({ where: { userId } }),
     ]);
 
     // Get bookmarks by type using TypeORM methods
@@ -527,7 +333,7 @@ export class BookmarksService extends BaseService<Bookmark> {
       .slice(0, 10);
 
     // Get folders with counts using TypeORM methods
-    const folders = await this.folderRepository.find({
+    const folders = await this.bookmarkFolderRepository.find({
       where: { userId },
       relations: ['bookmarks'],
       order: { sortOrder: 'ASC' },
@@ -610,7 +416,7 @@ export class BookmarksService extends BaseService<Bookmark> {
    * @returns {Promise<BookmarkFolder>} Folder
    */
   async getFolderById(id: string, userId: string): Promise<BookmarkFolder> {
-    return await this.folderService.getFolderById(id, userId);
+    return await this.bookmarkFolderService.getFolderById(id, userId);
   }
 
   /**
@@ -618,8 +424,10 @@ export class BookmarksService extends BaseService<Bookmark> {
    * @param query - Query parameters
    * @returns {Promise<[BookmarkFolder[], number]>} Folders and total count
    */
-  async getAllFolders(query: any): Promise<[BookmarkFolder[], number]> {
-    return await this.folderService.getAllFolders(query);
+  async getAllFolders(
+    query: AdvancedPaginationDto,
+  ): Promise<IPagination<BookmarkFolder>> {
+    return await this.bookmarkFolderService.getAllFolders(query);
   }
 
   /**
@@ -627,18 +435,12 @@ export class BookmarksService extends BaseService<Bookmark> {
    * @param query - Query parameters
    * @returns {Promise<{data: Bookmark[], total: number}>} Paginated bookmarks
    */
-  async list(query: any): Promise<{ data: Bookmark[]; total: number }> {
-    const { page = 1, limit = 20, ...filters } = query;
-
+  async list(query: AdvancedPaginationDto): Promise<IPagination<Bookmark>> {
     // Use BaseService listOffset method
-    const result = await this.listOffset(
-      { page, limit, sortBy: 'createdAt', order: 'DESC' },
-      filters,
-      {
-        relations: ['user', 'folder'],
-      },
-    );
+    const result = await this.listOffset(query, {
+      relations: ['user', 'folder'],
+    });
 
-    return { data: result.result, total: result.metaData.totalRecords || 0 };
+    return result;
   }
 }
