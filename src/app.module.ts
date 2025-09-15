@@ -22,6 +22,7 @@ import { QrModule } from './qr/qr.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { ReportsModule } from './reports/reports.module';
+import { BookmarksModule } from './bookmarks/bookmarks.module';
 import {
   appConfig,
   awsConfig,
@@ -100,6 +101,7 @@ import { WorkerModule } from './workers/worker.module';
     CommentsModule,
     StickersModule,
     ReportsModule,
+    BookmarksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

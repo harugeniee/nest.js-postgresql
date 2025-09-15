@@ -9,3 +9,4 @@ export * from './article.constants';
 export * from './comment.constants';
 export * from './sticker.constants';
 export * from './report.constants';
+export * from './bookmark.constants';
