@@ -1,14 +1,20 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { ReportAction, ReportResolution } from 'src/shared/constants';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  REPORT_CONSTANTS,
+  ReportAction,
+  ReportResolution,
+} from 'src/shared/constants';
 
 /**
  * DTO for resolving a report
  */
 export class ResolveReportDto {
-  @IsEnum(ReportAction)
+  @IsNotEmpty()
+  @IsEnum(Object.values(REPORT_CONSTANTS.ACTIONS))
   action: ReportAction;
 
-  @IsEnum(ReportResolution)
+  @IsNotEmpty()
+  @IsEnum(Object.values(REPORT_CONSTANTS.RESOLUTION))
   resolution: ReportResolution;
 
   @IsOptional()
