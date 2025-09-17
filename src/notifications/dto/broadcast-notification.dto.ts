@@ -12,6 +12,7 @@ import {
   NotificationType,
   NotificationPriority,
 } from 'src/shared/constants';
+import { AdvancedPaginationDto } from 'src/common/dto/advanced-pagination.dto';
 
 /**
  * DTO for creating broadcast notifications
@@ -90,7 +91,7 @@ export class UpdateBroadcastNotificationDto {
 /**
  * DTO for querying broadcast notifications
  */
-export class QueryBroadcastNotificationsDto {
+export class QueryBroadcastNotificationsDto extends AdvancedPaginationDto {
   @IsEnum(NOTIFICATION_CONSTANTS.TYPES)
   @IsOptional()
   type?: NotificationType;
