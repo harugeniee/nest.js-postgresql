@@ -218,7 +218,7 @@ describe('BroadcastNotificationService', () => {
         page: 1,
         limit: 10,
         sortBy: 'createdAt',
-        order: 'DESC' as 'DESC',
+        order: 'DESC' as const,
         type: NOTIFICATION_CONSTANTS.TYPES.SYSTEM_ANNOUNCEMENT,
         priority: NOTIFICATION_CONSTANTS.PRIORITY.HIGH,
         isActive: true,
@@ -244,7 +244,7 @@ describe('BroadcastNotificationService', () => {
     });
 
     it('should get broadcasts without filters', async () => {
-      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' };
+      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' as const };
 
       const mockResult = {
         result: [mockBroadcast],

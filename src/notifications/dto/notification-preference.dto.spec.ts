@@ -3,6 +3,7 @@ import {
   CreateNotificationPreferenceDto,
   UpdateNotificationPreferenceDto,
   BulkUpdateNotificationPreferencesDto,
+  BulkUpdatePreferenceDto,
 } from './notification-preference.dto';
 import { NOTIFICATION_CONSTANTS } from 'src/shared/constants';
 
@@ -155,24 +156,23 @@ describe('BulkUpdateNotificationPreferencesDto', () => {
 
   describe('validation', () => {
     it('should pass validation with valid data', async () => {
-      dto.preferences = [
-        {
-          type: NOTIFICATION_CONSTANTS.TYPES.ARTICLE_LIKED,
-          channel: NOTIFICATION_CONSTANTS.CHANNEL.EMAIL,
-          enabled: true,
-          batched: false,
-          batchFrequency: 60,
-          quietHoursStart: '22:00',
-          quietHoursEnd: '08:00',
-          timezone: 'UTC',
-          settings: { priority: 'high' },
-        },
-        {
-          type: NOTIFICATION_CONSTANTS.TYPES.ARTICLE_COMMENTED,
-          channel: NOTIFICATION_CONSTANTS.CHANNEL.PUSH,
-          enabled: false,
-        },
-      ];
+      const preference1 = new BulkUpdatePreferenceDto();
+      preference1.type = NOTIFICATION_CONSTANTS.TYPES.ARTICLE_LIKED;
+      preference1.channel = NOTIFICATION_CONSTANTS.CHANNEL.EMAIL;
+      preference1.enabled = true;
+      preference1.batched = false;
+      preference1.batchFrequency = 60;
+      preference1.quietHoursStart = '22:00';
+      preference1.quietHoursEnd = '08:00';
+      preference1.timezone = 'UTC';
+      preference1.settings = { priority: 'high' };
+
+      const preference2 = new BulkUpdatePreferenceDto();
+      preference2.type = NOTIFICATION_CONSTANTS.TYPES.ARTICLE_COMMENTED;
+      preference2.channel = NOTIFICATION_CONSTANTS.CHANNEL.PUSH;
+      preference2.enabled = false;
+
+      dto.preferences = [preference1, preference2];
 
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);
@@ -239,12 +239,11 @@ describe('BulkUpdateNotificationPreferencesDto', () => {
     });
 
     it('should pass validation with minimal required fields in preferences', async () => {
-      dto.preferences = [
-        {
-          type: NOTIFICATION_CONSTANTS.TYPES.ARTICLE_LIKED,
-          channel: NOTIFICATION_CONSTANTS.CHANNEL.EMAIL,
-        },
-      ];
+      const preference = new BulkUpdatePreferenceDto();
+      preference.type = NOTIFICATION_CONSTANTS.TYPES.ARTICLE_LIKED;
+      preference.channel = NOTIFICATION_CONSTANTS.CHANNEL.EMAIL;
+
+      dto.preferences = [preference];
 
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);

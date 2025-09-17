@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { BroadcastNotificationController } from './broadcast-notification.controller';
 import { BroadcastNotificationService } from './broadcast-notification.service';
 import { NOTIFICATION_CONSTANTS } from 'src/shared/constants';
+import { CacheService } from 'src/shared/services';
 
 describe('BroadcastNotificationController', () => {
   let controller: BroadcastNotificationController;
@@ -36,6 +39,24 @@ describe('BroadcastNotificationController', () => {
             updateBroadcast: jest.fn(),
             remove: jest.fn(),
             deactivateExpiredBroadcasts: jest.fn(),
+          },
+        },
+        {
+          provide: JwtService,
+          useValue: {
+            verifyAsync: jest.fn(),
+          },
+        },
+        {
+          provide: CacheService,
+          useValue: {
+            getTtl: jest.fn(),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue('test-secret'),
           },
         },
       ],
@@ -83,7 +104,7 @@ describe('BroadcastNotificationController', () => {
         page: 1,
         limit: 10,
         sortBy: 'createdAt',
-        order: 'DESC' as 'DESC',
+        order: 'DESC' as const,
         type: NOTIFICATION_CONSTANTS.TYPES.SYSTEM_ANNOUNCEMENT,
         priority: NOTIFICATION_CONSTANTS.PRIORITY.HIGH,
         isActive: true,
@@ -104,7 +125,7 @@ describe('BroadcastNotificationController', () => {
     });
 
     it('should get broadcast notifications without query parameters', async () => {
-      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' };
+      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' as const };
 
       const mockResult = {
         result: [mockBroadcast],

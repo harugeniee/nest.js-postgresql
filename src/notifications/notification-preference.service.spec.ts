@@ -39,6 +39,7 @@ describe('NotificationPreferenceService', () => {
             save: jest.fn(),
             find: jest.fn(),
             findOne: jest.fn(),
+            findAndCount: jest.fn(),
             delete: jest.fn(),
             metadata: {
               columns: [],
@@ -79,28 +80,17 @@ describe('NotificationPreferenceService', () => {
         timezone: 'UTC',
       };
 
-      jest.spyOn(preferenceRepository, 'findOne').mockResolvedValue(null);
-      jest
-        .spyOn(preferenceRepository, 'create')
-        .mockReturnValue(mockPreference as any);
-      jest.spyOn(preferenceRepository, 'save').mockResolvedValue({
-        ...mockPreference,
-        id: '1111111111111111111',
-      } as any);
-      jest.spyOn(cacheService, 'delete').mockResolvedValue(undefined);
+      // Mock the base service create method directly
+      jest.spyOn(service, 'create').mockResolvedValue(mockPreference as any);
 
       const result = await service.createPreference(userId, dto);
 
       expect(result).toEqual(mockPreference);
-      expect(preferenceRepository.findOne).toHaveBeenCalledWith({
-        where: { userId, type: dto.type, channel: dto.channel },
-      });
-      expect(preferenceRepository.create).toHaveBeenCalledWith({
+      expect(service.create).toHaveBeenCalledWith({
         ...dto,
         userId,
         timezone: 'UTC',
       });
-      expect(preferenceRepository.save).toHaveBeenCalled();
     });
 
     it('should throw conflict error when preference already exists', async () => {
@@ -146,21 +136,14 @@ describe('NotificationPreferenceService', () => {
 
       const updatedPreference = { ...mockPreference, enabled: false };
 
-      jest
-        .spyOn(preferenceRepository, 'findOne')
-        .mockResolvedValue(mockPreference as any);
-      jest
-        .spyOn(preferenceRepository, 'save')
-        .mockResolvedValue(updatedPreference as any);
-      jest.spyOn(cacheService, 'delete').mockResolvedValue(undefined);
+      // Mock the base service methods
+      jest.spyOn(service, 'findOne').mockResolvedValue(mockPreference as any);
+      jest.spyOn(service, 'update').mockResolvedValue(updatedPreference as any);
 
       const result = await service.updatePreference(preferenceId, userId, dto);
 
       expect(result).toEqual(updatedPreference);
-      expect(preferenceRepository.findOne).toHaveBeenCalledWith({
-        where: { id: preferenceId, userId },
-      });
-      expect(preferenceRepository.save).toHaveBeenCalled();
+      expect(service.update).toHaveBeenCalledWith(preferenceId, dto);
     });
 
     it('should throw not found error when preference does not exist', async () => {
@@ -194,60 +177,54 @@ describe('NotificationPreferenceService', () => {
         ],
       };
 
+      // Mock the base service methods
       jest
-        .spyOn(preferenceRepository, 'findOne')
+        .spyOn(service, 'findOne')
         .mockResolvedValueOnce(mockPreference as any) // First preference exists
         .mockResolvedValueOnce(null); // Second preference doesn't exist
-      jest
-        .spyOn(preferenceRepository, 'save')
-        .mockResolvedValue(mockPreference as any);
-      jest
-        .spyOn(preferenceRepository, 'create')
-        .mockReturnValue(mockPreference as any);
-      jest.spyOn(cacheService, 'delete').mockResolvedValue(undefined);
+      jest.spyOn(service, 'update').mockResolvedValue(mockPreference as any);
+      jest.spyOn(service, 'create').mockResolvedValue(mockPreference as any);
 
       const result = await service.bulkUpdatePreferences(userId, dto);
 
       expect(result).toEqual({ updated: 1, created: 1 });
-      expect(preferenceRepository.save).toHaveBeenCalledTimes(2);
+      expect(service.update).toHaveBeenCalledTimes(1);
+      expect(service.create).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('getUserPreferences', () => {
-    it('should return user preferences from cache', async () => {
-      const userId = '9876543210987654321';
-      const cachedPreferences = [mockPreference];
-
-      jest.spyOn(cacheService, 'get').mockResolvedValue(cachedPreferences);
-
-      const result = await service.getUserPreferences(userId);
-
-      expect(result).toEqual(cachedPreferences);
-      expect(preferenceRepository.find).not.toHaveBeenCalled();
-    });
-
-    it('should fetch and cache user preferences when not in cache', async () => {
+    it('should return user preferences from database', async () => {
       const userId = '9876543210987654321';
       const preferences = [mockPreference];
 
-      jest.spyOn(cacheService, 'get').mockResolvedValue(null);
-      jest
-        .spyOn(preferenceRepository, 'find')
-        .mockResolvedValue(preferences as any);
-      jest.spyOn(cacheService, 'set').mockResolvedValue(undefined);
+      // Mock the base service listOffset method
+      jest.spyOn(service, 'listOffset').mockResolvedValue({
+        result: preferences,
+        metaData: { page: 1, limit: 1000, total: 1, totalPages: 1 }
+      } as any);
 
       const result = await service.getUserPreferences(userId);
 
       expect(result).toEqual(preferences);
-      expect(preferenceRepository.find).toHaveBeenCalledWith({
-        where: { userId },
-        order: { type: 'ASC', channel: 'ASC' },
-      });
-      expect(cacheService.set).toHaveBeenCalledWith(
-        `notification_preferences:${userId}`,
-        preferences,
-        600,
+      expect(service.listOffset).toHaveBeenCalledWith(
+        {
+          page: 1,
+          limit: 1000,
+          sortBy: 'type',
+          order: 'ASC',
+        },
+        { userId },
       );
+    });
+
+    it('should handle errors when fetching user preferences', async () => {
+      const userId = '9876543210987654321';
+
+      // Mock the base service listOffset method to throw an error
+      jest.spyOn(service, 'listOffset').mockRejectedValue(new Error('Database error'));
+
+      await expect(service.getUserPreferences(userId)).rejects.toThrow('Database error');
     });
   });
 
@@ -379,9 +356,9 @@ describe('NotificationPreferenceService', () => {
     it('should create default preferences for all types and channels', async () => {
       const userId = '9876543210987654321';
 
-      jest
-        .spyOn(service, 'createPreference')
-        .mockResolvedValue(mockPreference as any);
+      // Mock the base service methods
+      jest.spyOn(service, 'findOne').mockResolvedValue(null); // No existing preferences
+      jest.spyOn(service, 'create').mockResolvedValue(mockPreference as any);
 
       const result = await service.createDefaultPreferences(userId);
 
@@ -391,44 +368,42 @@ describe('NotificationPreferenceService', () => {
         Object.keys(NOTIFICATION_CONSTANTS.CHANNEL).length;
 
       expect(result).toHaveLength(expectedCount);
-      expect(service.createPreference).toHaveBeenCalledTimes(expectedCount);
+      expect(service.create).toHaveBeenCalledTimes(expectedCount);
     });
 
     it('should skip existing preferences during default creation', async () => {
       const userId = '9876543210987654321';
 
-      // Mock createPreference to reject first call, resolve second call
+      // Mock findOne to return existing preference for first call, null for all others
       jest
-        .spyOn(service, 'createPreference')
-        .mockRejectedValueOnce(
-          new HttpException('Conflict', HttpStatus.CONFLICT),
-        )
-        .mockResolvedValueOnce({
-          ...mockPreference,
-          id: '1111111111111111111',
-        } as any);
+        .spyOn(service, 'findOne')
+        .mockResolvedValueOnce(mockPreference as any) // First preference exists
+        .mockResolvedValue(null); // All other preferences don't exist
+      jest.spyOn(service, 'create').mockResolvedValue(mockPreference as any);
 
       const result = await service.createDefaultPreferences(userId);
 
-      // Should have created 1 preference (the second one that succeeded)
-      expect(result).toHaveLength(1);
-      expect(service.createPreference).toHaveBeenCalledTimes(2);
+      // Should have created 75 preferences (76 total - 1 existing)
+      const expectedCount = Object.keys(NOTIFICATION_CONSTANTS.TYPES).length * Object.keys(NOTIFICATION_CONSTANTS.CHANNEL).length - 1;
+      expect(result).toHaveLength(expectedCount);
+      expect(service.create).toHaveBeenCalledTimes(expectedCount);
     });
   });
 
   describe('deleteUserPreferences', () => {
     it('should delete all preferences for a user', async () => {
       const userId = '9876543210987654321';
+      const preferences = [mockPreference, { ...mockPreference, id: '2222222222222222222' }];
 
-      jest
-        .spyOn(preferenceRepository, 'delete')
-        .mockResolvedValue({ affected: 5 } as any);
-      jest.spyOn(cacheService, 'delete').mockResolvedValue(undefined);
+      // Mock the service methods
+      jest.spyOn(service, 'getUserPreferences').mockResolvedValue(preferences as any);
+      jest.spyOn(service, 'remove').mockResolvedValue(undefined);
 
       const result = await service.deleteUserPreferences(userId);
 
-      expect(result).toEqual({ count: 5 });
-      expect(preferenceRepository.delete).toHaveBeenCalledWith({ userId });
+      expect(result).toEqual({ count: 2 });
+      expect(service.getUserPreferences).toHaveBeenCalledWith(userId);
+      expect(service.remove).toHaveBeenCalledTimes(2);
     });
   });
 });

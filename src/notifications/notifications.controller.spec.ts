@@ -1,8 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { AuthPayload } from 'src/common/interface';
 import { NOTIFICATION_CONSTANTS } from 'src/shared/constants';
+import { CacheService } from 'src/shared/services';
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
@@ -61,6 +64,24 @@ describe('NotificationsController', () => {
             updatePreference: jest.fn(),
             bulkUpdatePreferences: jest.fn(),
             getUserPreferences: jest.fn(),
+          },
+        },
+        {
+          provide: JwtService,
+          useValue: {
+            verifyAsync: jest.fn(),
+          },
+        },
+        {
+          provide: CacheService,
+          useValue: {
+            getTtl: jest.fn(),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue('test-secret'),
           },
         },
       ],
@@ -128,7 +149,7 @@ describe('NotificationsController', () => {
         page: 1,
         limit: 10,
         sortBy: 'createdAt',
-        order: 'DESC' as 'DESC',
+        order: 'DESC' as const,
         isRead: false,
         type: NOTIFICATION_CONSTANTS.TYPES.ARTICLE_LIKED,
       };
@@ -156,7 +177,7 @@ describe('NotificationsController', () => {
 
   describe('getUserNotificationsWithBroadcasts', () => {
     it('should get user notifications with broadcasts', async () => {
-      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' };
+      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' as const };
 
       const mockResult = {
         notifications: {

@@ -98,21 +98,55 @@ export class UpdateNotificationPreferenceDto {
 }
 
 /**
+ * DTO for individual preference in bulk update
+ */
+export class BulkUpdatePreferenceDto {
+  @IsEnum(NOTIFICATION_CONSTANTS.TYPES)
+  @IsNotEmpty()
+  type: NotificationType;
+
+  @IsEnum(NOTIFICATION_CONSTANTS.CHANNEL)
+  @IsNotEmpty()
+  channel: NotificationChannel;
+
+  @IsBoolean()
+  @IsOptional()
+  enabled?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  batched?: boolean;
+
+  @IsInt()
+  @Min(1)
+  @Max(1440)
+  @IsOptional()
+  batchFrequency?: number;
+
+  @IsString()
+  @IsOptional()
+  quietHoursStart?: string;
+
+  @IsString()
+  @IsOptional()
+  quietHoursEnd?: string;
+
+  @IsString()
+  @IsOptional()
+  timezone?: string;
+
+  @IsObject()
+  @IsOptional()
+  settings?: Record<string, any>;
+}
+
+/**
  * DTO for bulk updating notification preferences
  */
 export class BulkUpdateNotificationPreferencesDto {
   @IsArray()
   @ArrayMinSize(1)
-  @IsNotEmpty({ each: true })
-  preferences: Array<{
-    type: NotificationType;
-    channel: NotificationChannel;
-    enabled?: boolean;
-    batched?: boolean;
-    batchFrequency?: number;
-    quietHoursStart?: string;
-    quietHoursEnd?: string;
-    timezone?: string;
-    settings?: Record<string, any>;
-  }>;
+  @ValidateNested({ each: true })
+  @Type(() => BulkUpdatePreferenceDto)
+  preferences: BulkUpdatePreferenceDto[];
 }

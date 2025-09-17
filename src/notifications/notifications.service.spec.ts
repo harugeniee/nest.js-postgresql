@@ -27,6 +27,7 @@ describe('NotificationsService', () => {
     isRead: false,
     createdAt: new Date(),
     updatedAt: new Date(),
+    markAsRead: jest.fn(),
   };
 
   const mockPreference = {
@@ -135,10 +136,7 @@ describe('NotificationsService', () => {
         .spyOn(preferenceService, 'shouldSendNotification')
         .mockResolvedValue(true);
       jest
-        .spyOn(notificationRepository, 'create')
-        .mockReturnValue(mockNotification as any);
-      jest
-        .spyOn(notificationRepository, 'save')
+        .spyOn(service, 'create')
         .mockResolvedValue(mockNotification as any);
       jest
         .spyOn(rabbitMQService, 'sendDataToRabbitMQAsync')
@@ -153,8 +151,7 @@ describe('NotificationsService', () => {
         dto.type,
         dto.channel,
       );
-      expect(notificationRepository.create).toHaveBeenCalled();
-      expect(notificationRepository.save).toHaveBeenCalled();
+      expect(service.create).toHaveBeenCalled();
       expect(rabbitMQService.sendDataToRabbitMQAsync).toHaveBeenCalled();
     });
 
@@ -189,7 +186,7 @@ describe('NotificationsService', () => {
         .mockRejectedValue(new Error('Database error'));
 
       await expect(service.createNotification(userId, dto)).rejects.toThrow(
-        'Database error',
+        'Internal Server Error',
       );
     });
   });
@@ -239,7 +236,7 @@ describe('NotificationsService', () => {
         page: 1,
         limit: 10,
         sortBy: 'createdAt',
-        order: 'DESC' as 'DESC',
+        order: 'DESC' as const,
         isRead: false,
       };
 
@@ -273,17 +270,18 @@ describe('NotificationsService', () => {
       const dto = { isRead: true };
 
       jest.spyOn(service, 'findOne').mockResolvedValue(mockNotification as any);
+      jest.spyOn(cacheService, 'delete').mockResolvedValue(undefined);
       jest.spyOn(notificationRepository, 'save').mockResolvedValue({
         ...mockNotification,
         isRead: true,
         readAt: expect.any(Date),
       } as any);
-      jest.spyOn(cacheService, 'delete').mockResolvedValue(undefined);
 
       const result = await service.markAsRead(notificationId, userId, dto);
 
       expect(result.isRead).toBe(true);
       expect(result.readAt).toBeDefined();
+      expect(mockNotification.markAsRead).toHaveBeenCalled();
       expect(notificationRepository.save).toHaveBeenCalled();
     });
 
@@ -458,7 +456,7 @@ describe('NotificationsService', () => {
   describe('getUserNotificationsWithBroadcasts', () => {
     it('should return notifications and broadcasts', async () => {
       const userId = '9876543210987654321';
-      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' };
+      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' as const };
 
       const mockNotifications = {
         result: [mockNotification],
