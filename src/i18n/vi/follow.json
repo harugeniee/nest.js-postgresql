@@ -1,0 +1,32 @@
+{
+  "CANNOT_FOLLOW_YOURSELF": "Bạn không thể theo dõi chính mình",
+  "MISSING_REQUIRED_PARAMETERS": "Thiếu tham số bắt buộc: followerId và followeeId là bắt buộc",
+  "INVALID_BITSET_TYPE": "Loại bitset không hợp lệ. Phải là 'following' hoặc 'followers'",
+  "UNKNOWN_SUGGESTION_ALGORITHM": "Thuật toán gợi ý không xác định",
+
+  "LOCK_ACQUISITION_FAILED": "Không thể lấy khóa cho thao tác. Vui lòng thử lại sau",
+
+  "FOLLOW_OPERATION_FAILED": "Không thể theo dõi người dùng",
+  "UNFOLLOW_OPERATION_FAILED": "Không thể hủy theo dõi người dùng",
+  "GET_FOLLOWING_FAILED": "Không thể lấy danh sách đang theo dõi",
+  "GET_FOLLOWERS_FAILED": "Không thể lấy danh sách người theo dõi",
+  "GET_MUTUAL_FRIENDS_FAILED": "Không thể lấy danh sách bạn chung",
+  "GET_FOLLOW_STATUS_FAILED": "Không thể lấy trạng thái theo dõi",
+  "GET_COUNTERS_FAILED": "Không thể lấy số lượng theo dõi",
+  "GET_SUGGESTIONS_FAILED": "Không thể lấy gợi ý theo dõi",
+
+  "BITSET_NOT_FOUND": "Không tìm thấy bitset cho người dùng",
+  "EXPORT_BITSET_FAILED": "Không thể xuất dữ liệu bitset",
+  "IMPORT_BITSET_FAILED": "Không thể nhập dữ liệu bitset",
+  "REBUILD_BITSET_FAILED": "Không thể xây dựng lại bitset từ edges",
+
+  "GENERATE_FEED_FAILED": "Không thể tạo bảng tin",
+
+  "FOLLOW_SUCCESS": "Theo dõi người dùng thành công",
+  "UNFOLLOW_SUCCESS": "Hủy theo dõi người dùng thành công",
+  "ALREADY_FOLLOWING": "Đã theo dõi người dùng này",
+  "NOT_FOLLOWING": "Chưa theo dõi người dùng này",
+  "BITSET_EXPORTED": "Xuất dữ liệu bitset thành công",
+  "BITSET_IMPORTED": "Nhập dữ liệu bitset thành công",
+  "BITSET_REBUILT": "Xây dựng lại bitset thành công"
+}

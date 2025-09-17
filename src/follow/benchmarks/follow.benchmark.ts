@@ -146,7 +146,7 @@ export class FollowBenchmark {
     // In real implementation, this would use SQL queries
 
     // Benchmark follow operations (simulated)
-    for (let i = 0; i < testData.followOperations.length; i++) {
+    for (const _ of testData.followOperations) {
       const opStart = Date.now();
 
       // Simulate database operations
@@ -157,7 +157,7 @@ export class FollowBenchmark {
     }
 
     // Benchmark unfollow operations (simulated)
-    for (let i = 0; i < testData.unfollowOperations.length; i++) {
+    for (const _ of testData.unfollowOperations) {
       const opStart = Date.now();
 
       // Simulate database operations
@@ -168,7 +168,7 @@ export class FollowBenchmark {
     }
 
     // Benchmark mutual friends calculation (simulated)
-    for (let i = 0; i < testData.mutualFriendsQueries.length; i++) {
+    for (const _ of testData.mutualFriendsQueries) {
       const opStart = Date.now();
 
       // Simulate complex SQL query
@@ -179,7 +179,7 @@ export class FollowBenchmark {
     }
 
     // Benchmark following list retrieval (simulated)
-    for (let i = 0; i < testData.followingListQueries.length; i++) {
+    for (const _ of testData.followingListQueries) {
       const opStart = Date.now();
 
       // Simulate SQL query

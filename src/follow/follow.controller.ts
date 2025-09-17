@@ -9,7 +9,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
-  BadRequestException,
+  HttpException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -343,7 +343,10 @@ export class FollowController {
     @Query('followeeId') followeeId: string,
   ): Promise<FollowStatusDto> {
     if (!followerId || !followeeId) {
-      throw new BadRequestException('followerId and followeeId are required');
+      throw new HttpException(
+        { messageKey: 'follow.MISSING_REQUIRED_PARAMETERS' },
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     return await this.followBitsetService.getFollowStatus(
@@ -392,8 +395,9 @@ export class FollowController {
     @Query('type') type: 'following' | 'followers',
   ): Promise<BitsetExportDto> {
     if (!type || !['following', 'followers'].includes(type)) {
-      throw new BadRequestException(
-        'type must be either "following" or "followers"',
+      throw new HttpException(
+        { messageKey: 'follow.INVALID_BITSET_TYPE' },
+        HttpStatus.BAD_REQUEST,
       );
     }
 

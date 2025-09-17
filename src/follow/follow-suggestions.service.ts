@@ -1,4 +1,10 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Inject,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { FollowBitsetService } from './follow-bitset.service';
 import { FollowCacheService } from './follow-cache.service';
 import { RoaringAdapter, RoaringSet } from './adapters/roaring.adapter';
@@ -70,16 +76,27 @@ export class FollowSuggestionsService {
           );
           break;
         default:
-          throw new Error(`Unknown algorithm: ${algorithm}`);
+          throw new HttpException(
+            { messageKey: 'follow.UNKNOWN_SUGGESTION_ALGORITHM' },
+            HttpStatus.BAD_REQUEST,
+          );
       }
 
       this.logger.debug(
         `Generated ${suggestions.length} suggestions for user ${userId}`,
       );
       return suggestions;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to get suggestions for user ${userId}:`, error);
-      throw error;
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.GET_SUGGESTIONS_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 

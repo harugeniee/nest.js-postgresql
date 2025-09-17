@@ -1,8 +1,8 @@
 import {
   Injectable,
   Logger,
-  NotFoundException,
-  BadRequestException,
+  HttpException,
+  HttpStatus,
   Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -44,14 +44,20 @@ export class FollowBitsetService {
   ): Promise<{ success: boolean; status: string }> {
     // Validation
     if (followerId === followeeId) {
-      throw new BadRequestException('Cannot follow yourself');
+      throw new HttpException(
+        { messageKey: 'follow.CANNOT_FOLLOW_YOURSELF' },
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     try {
       // Acquire lock to prevent race conditions
       const lockAcquired = await this.cacheService.acquireLock(followerId);
       if (!lockAcquired) {
-        throw new Error('Failed to acquire lock for follow operation');
+        throw new HttpException(
+          { messageKey: 'follow.LOCK_ACQUISITION_FAILED' },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
       }
 
       try {
@@ -90,12 +96,19 @@ export class FollowBitsetService {
       } finally {
         await this.cacheService.releaseLock(followerId);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to follow user ${followeeId} by ${followerId}:`,
         error,
       );
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.FOLLOW_OPERATION_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -113,7 +126,10 @@ export class FollowBitsetService {
       // Acquire lock
       const lockAcquired = await this.cacheService.acquireLock(followerId);
       if (!lockAcquired) {
-        throw new Error('Failed to acquire lock for unfollow operation');
+        throw new HttpException(
+          { messageKey: 'follow.LOCK_ACQUISITION_FAILED' },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
       }
 
       try {
@@ -157,12 +173,19 @@ export class FollowBitsetService {
       } finally {
         await this.cacheService.releaseLock(followerId);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to unfollow user ${followeeId} by ${followerId}:`,
         error,
       );
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.UNFOLLOW_OPERATION_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -211,12 +234,19 @@ export class FollowBitsetService {
         nextCursor,
         hasMore,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to get following IDs for user ${userId}:`,
         error,
       );
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.GET_FOLLOWING_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -265,12 +295,19 @@ export class FollowBitsetService {
         nextCursor,
         hasMore,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to get followers IDs for user ${userId}:`,
         error,
       );
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.GET_FOLLOWERS_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -307,12 +344,19 @@ export class FollowBitsetService {
         userIds: mutualIds,
         count: mutualSet.size(),
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to get mutual friends between ${userIdA} and ${userIdB}:`,
         error,
       );
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.GET_MUTUAL_FRIENDS_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -334,7 +378,7 @@ export class FollowBitsetService {
     try {
       const [isFollowing, isFollowedBy, mutualResult] = await Promise.all([
         this.cacheService.isFollowing(followerId, followeeId),
-        this.cacheService.isFollowing(followeeId, followerId),
+        this.cacheService.isFollowing(followerId, followeeId),
         this.getMutualFriends(followerId, followeeId, 0),
       ]);
 
@@ -346,12 +390,19 @@ export class FollowBitsetService {
         isMutual: isFollowing && isFollowedBy,
         mutualCount,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to get follow status between ${followerId} and ${followeeId}:`,
         error,
       );
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.GET_FOLLOW_STATUS_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -388,9 +439,16 @@ export class FollowBitsetService {
       );
 
       return counters;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to get counters for user ${userId}:`, error);
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.GET_COUNTERS_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -415,8 +473,9 @@ export class FollowBitsetService {
           : await this.getFollowersSet(userId);
 
       if (!set) {
-        throw new NotFoundException(
-          `${type} bitset not found for user ${userId}`,
+        throw new HttpException(
+          { messageKey: 'follow.BITSET_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
         );
       }
 
@@ -429,12 +488,19 @@ export class FollowBitsetService {
         count,
         exportedAt: new Date(),
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to export ${type} bitset for user ${userId}:`,
         error,
       );
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.EXPORT_BITSET_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -449,7 +515,7 @@ export class FollowBitsetService {
     userId: string,
     data: string,
     type: 'following' | 'followers',
-    replace: boolean = false,
+    _replace: boolean = false,
   ): Promise<{ success: boolean; count: number }> {
     try {
       const buffer = Buffer.from(data, 'base64');
@@ -468,12 +534,19 @@ export class FollowBitsetService {
         `Imported ${type} bitset for user ${userId}: ${count} items`,
       );
       return { success: true, count };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to import ${type} bitset for user ${userId}:`,
         error,
       );
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.IMPORT_BITSET_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -536,9 +609,16 @@ export class FollowBitsetService {
         `Rebuilt bitsets for user ${userId}: following=${followingSet.size()}, followers=${followersSet.size()}`,
       );
       return { success: true, count: followingSet.size() };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to rebuild bitset for user ${userId}:`, error);
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.REBUILD_BITSET_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -603,9 +683,10 @@ export class FollowBitsetService {
         source: 'user',
       });
       await this.edgeRepo.save(edge);
-    } catch (error) {
+    } catch (error: any) {
       // Ignore duplicate key errors
-      if (!error.message.includes('duplicate key')) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      if (!error?.message?.includes('duplicate key')) {
         this.logger.error(
           `Failed to create edge ${followerId} -> ${followeeId}:`,
           error,

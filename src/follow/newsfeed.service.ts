@@ -1,4 +1,10 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Inject,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { FollowBitsetService } from './follow-bitset.service';
 import { FollowCacheService } from './follow-cache.service';
 import { RoaringAdapter } from './adapters/roaring.adapter';
@@ -81,12 +87,20 @@ export class NewsFeedService {
         nextCursor,
         hasMore: rankedItems.length === limit,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to generate news feed for user ${userId}:`,
         error,
       );
-      throw error;
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        { messageKey: 'follow.GENERATE_FEED_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -122,8 +136,14 @@ export class NewsFeedService {
       }));
 
       return mockItems;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Failed to get content from users:', error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // Return empty array for non-critical errors
       return [];
     }
   }
@@ -157,9 +177,15 @@ export class NewsFeedService {
       rankedItems.sort((a, b) => b.score - a.score);
 
       return rankedItems;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Failed to rank feed items:', error);
-      return items; // Return original order if ranking fails
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // Return original order if ranking fails
+      return items;
     }
   }
 
@@ -294,8 +320,13 @@ export class NewsFeedService {
       // time decay, and other factors to determine trending content
 
       return [];
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Failed to get trending content:', error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       return [];
     }
   }
@@ -331,11 +362,16 @@ export class NewsFeedService {
       );
 
       return recommendations;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to get content recommendations for user ${userId}:`,
         error,
       );
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       return [];
     }
   }
@@ -361,8 +397,13 @@ export class NewsFeedService {
         `Getting content from extended network of ${userIds.length} users`,
       );
       return [];
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Failed to get content from extended network:', error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       return [];
     }
   }
@@ -385,11 +426,17 @@ export class NewsFeedService {
       }
 
       this.logger.debug(`Invalidated feed cache for user ${userId}`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to invalidate feed cache for user ${userId}:`,
         error,
       );
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // Non-critical error, just log
     }
   }
 
@@ -411,8 +458,13 @@ export class NewsFeedService {
         avgEngagement: 0, // Placeholder
         lastFeedUpdate: new Date(),
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to get feed stats for user ${userId}:`, error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       return {
         followingCount: 0,
         avgEngagement: 0,

@@ -44,6 +44,9 @@ export class FollowCacheService {
       this.logger.debug(`Cache hit for following set: ${userId}`);
       // Note: This would need to be deserialized by the roaring adapter
       // For now, return null as we need the adapter to deserialize
+      // TODO: Implement proper deserialization using roaring adapter
+      // This is a placeholder implementation that always returns null
+      // In a real implementation, this would deserialize the cached buffer
       return null;
     } catch (error) {
       this.logger.error(
@@ -91,6 +94,9 @@ export class FollowCacheService {
       }
 
       this.logger.debug(`Cache hit for followers set: ${userId}`);
+      // TODO: Implement proper deserialization using roaring adapter
+      // This is a placeholder implementation that always returns null
+      // In a real implementation, this would deserialize the cached buffer
       return null; // Would need adapter to deserialize
     } catch (error) {
       this.logger.error(

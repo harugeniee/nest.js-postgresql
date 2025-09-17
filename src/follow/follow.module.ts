@@ -2,7 +2,7 @@ import { Module, OnModuleInit, Inject } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '../shared/services/cache/cache.module';
-import { followConfig } from '../config/follow.config';
+import { followConfig, FollowConfig } from '../config/follow.config';
 
 // Entities
 import { UserFollowBitset } from './entities/user-follow-bitset.entity';
@@ -78,12 +78,12 @@ export class FollowModule implements OnModuleInit {
     }
 
     // Log configuration
-    const config = this.configService.get('follow');
+    const config = this.configService.get<FollowConfig>('follow');
     console.log('🔗 Follow Module initialized with config:', {
-      backend: config.backend,
-      storageMode: config.storageMode,
-      persistIntervalSec: config.persistIntervalSec,
-      maxFollowsPerSecond: config.maxFollowsPerSecond,
+      backend: config?.backend,
+      storageMode: config?.storageMode,
+      persistIntervalSec: config?.persistIntervalSec,
+      maxFollowsPerSecond: config?.maxFollowsPerSecond,
     });
   }
 }
