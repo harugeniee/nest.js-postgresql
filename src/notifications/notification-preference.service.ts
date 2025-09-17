@@ -59,8 +59,10 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
   ): Promise<NotificationPreference> {
     try {
       // Check if preference already exists
-      const existing = await this.preferenceRepository.findOne({
-        where: { userId, type: dto.type, channel: dto.channel },
+      const existing = await this.findOne({
+        userId,
+        type: dto.type,
+        channel: dto.channel,
       });
 
       if (existing) {
@@ -70,19 +72,18 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
         );
       }
 
-      const preference = this.preferenceRepository.create({
+      // Use BaseService.create() method
+      const saved = await this.create({
         ...dto,
         userId,
         timezone: dto.timezone || 'UTC',
       });
 
-      const saved = await this.preferenceRepository.save(preference);
-
       // Invalidate user preferences cache
       await this.invalidateUserPreferencesCache(userId);
 
       this.logger.log(
-        `Notification preference created: ${saved?.id}, user: ${userId}, type: ${dto.type}`,
+        `Notification preference created: ${saved.id}, user: ${userId}, type: ${dto.type}`,
       );
 
       return saved;
@@ -101,19 +102,21 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
     dto: UpdateNotificationPreferenceDto,
   ): Promise<NotificationPreference> {
     try {
-      const preference = await this.preferenceRepository.findOne({
-        where: { id: preferenceId, userId },
+      // Check if preference exists and belongs to user
+      const existing = await this.findOne({
+        id: preferenceId,
+        userId,
       });
 
-      if (!preference) {
+      if (!existing) {
         throw new HttpException(
           { messageKey: 'notification.PREFERENCE_NOT_FOUND' },
           HttpStatus.NOT_FOUND,
         );
       }
 
-      Object.assign(preference, dto);
-      const updated = await this.preferenceRepository.save(preference);
+      // Use BaseService.update() method
+      const updated = await this.update(preferenceId, dto);
 
       // Invalidate user preferences cache
       await this.invalidateUserPreferencesCache(userId);
@@ -139,21 +142,21 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
 
     try {
       for (const pref of dto.preferences) {
-        const existing = await this.preferenceRepository.findOne({
-          where: { userId, type: pref.type, channel: pref.channel },
+        const existing = await this.findOne({
+          userId,
+          type: pref.type,
+          channel: pref.channel,
         });
 
         if (existing) {
-          Object.assign(existing, pref);
-          await this.preferenceRepository.save(existing);
+          await this.update(existing.id, pref);
           updated++;
         } else {
-          const newPreference = this.preferenceRepository.create({
+          await this.create({
             ...pref,
             userId,
             timezone: pref.timezone || 'UTC',
           });
-          await this.preferenceRepository.save(newPreference);
           created++;
         }
       }
@@ -177,23 +180,18 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
    */
   async getUserPreferences(userId: string): Promise<NotificationPreference[]> {
     try {
-      // Check cache first
-      const cacheKey = `notification_preferences:${userId}`;
-      const cached = await this.cacheService?.get(cacheKey);
-      if (cached) {
-        this.logger.debug(`User preferences cache hit for user ${userId}`);
-        return cached as NotificationPreference[];
-      }
+      // Use BaseService.listOffset() with custom ordering
+      const result = await this.listOffset(
+        {
+          page: 1,
+          limit: 1000, // Large limit to get all preferences
+          sortBy: 'type',
+          order: 'ASC',
+        },
+        { userId },
+      );
 
-      const preferences = await this.preferenceRepository.find({
-        where: { userId },
-        order: { type: 'ASC', channel: 'ASC' },
-      });
-
-      // Cache the result for 10 minutes
-      await this.cacheService?.set(cacheKey, preferences, 600);
-
-      return preferences;
+      return result.result;
     } catch (error) {
       this.logger.error('Failed to get user preferences:', error);
       throw error;
@@ -231,8 +229,10 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
     channel: NotificationChannel,
   ): Promise<boolean> {
     try {
-      const preference = await this.preferenceRepository.findOne({
-        where: { userId, type, channel },
+      const preference = await this.findOne({
+        userId,
+        type,
+        channel,
       });
 
       return !!preference;
@@ -252,8 +252,10 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
     date: Date = new Date(),
   ): Promise<boolean> {
     try {
-      const preference = await this.preferenceRepository.findOne({
-        where: { userId, type, channel },
+      const preference = await this.findOne({
+        userId,
+        type,
+        channel,
       });
 
       if (!preference) {
@@ -296,20 +298,33 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
 
       for (const pref of defaultPreferences) {
         try {
-          const preference = await this.createPreference(userId, pref);
-          createdPreferences.push(preference);
-        } catch (error) {
-          // Skip if preference already exists
-          if (
-            error instanceof HttpException &&
-            error.getStatus() === HttpStatus.CONFLICT
-          ) {
+          // Check if preference already exists
+          const existing = await this.findOne({
+            userId,
+            type: pref.type,
+            channel: pref.channel,
+          });
+
+          if (existing) {
             this.logger.debug(
               `Preference already exists: ${pref.type}-${pref.channel}`,
             );
             continue;
           }
-          throw error;
+
+          // Use BaseService.create() method
+          const preference = await this.create({
+            ...pref,
+            userId,
+          });
+          createdPreferences.push(preference);
+        } catch (error) {
+          this.logger.error(
+            `Failed to create preference ${pref.type}-${pref.channel}:`,
+            error,
+          );
+          // Continue with other preferences even if one fails
+          continue;
         }
       }
 
@@ -329,16 +344,21 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
    */
   async deleteUserPreferences(userId: string): Promise<{ count: number }> {
     try {
-      const result = await this.preferenceRepository.delete({ userId });
+      // Get all preferences for the user first
+      const preferences = await this.getUserPreferences(userId);
+      const count = preferences.length;
+
+      // Delete each preference using BaseService.remove()
+      for (const preference of preferences) {
+        await this.remove(preference.id);
+      }
 
       // Invalidate user preferences cache
       await this.invalidateUserPreferencesCache(userId);
 
-      this.logger.log(
-        `Deleted ${result.affected} preferences for user ${userId}`,
-      );
+      this.logger.log(`Deleted ${count} preferences for user ${userId}`);
 
-      return { count: result.affected || 0 };
+      return { count };
     } catch (error) {
       this.logger.error('Failed to delete user preferences:', error);
       throw error;

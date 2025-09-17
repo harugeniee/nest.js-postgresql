@@ -83,12 +83,10 @@ describe('NotificationPreferenceService', () => {
       jest
         .spyOn(preferenceRepository, 'create')
         .mockReturnValue(mockPreference as any);
-      jest
-        .spyOn(preferenceRepository, 'save')
-        .mockResolvedValue({
-          ...mockPreference,
-          id: '1111111111111111111',
-        } as any);
+      jest.spyOn(preferenceRepository, 'save').mockResolvedValue({
+        ...mockPreference,
+        id: '1111111111111111111',
+      } as any);
       jest.spyOn(cacheService, 'delete').mockResolvedValue(undefined);
 
       const result = await service.createPreference(userId, dto);

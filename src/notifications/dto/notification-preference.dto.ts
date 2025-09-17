@@ -10,7 +10,9 @@ import {
   IsObject,
   IsArray,
   ArrayMinSize,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   NOTIFICATION_CONSTANTS,
   NotificationType,

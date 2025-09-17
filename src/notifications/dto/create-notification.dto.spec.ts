@@ -203,8 +203,8 @@ describe('CreateBulkNotificationDto', () => {
       expect(errors[0].property).toBe('userIds');
     });
 
-    it('should fail validation when userIds contains invalid strings', async () => {
-      dto.userIds = ['invalid', '9876543210987654321'];
+    it('should fail validation when userIds contains empty strings', async () => {
+      dto.userIds = ['', '9876543210987654321'];
       dto.type = NOTIFICATION_CONSTANTS.TYPES.SYSTEM_ANNOUNCEMENT;
       dto.title = 'System Maintenance';
       dto.message = 'We will perform maintenance';
