@@ -1,6 +1,6 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere, In, Between } from 'typeorm';
+import { Repository, FindOptionsWhere, Between } from 'typeorm';
 import { BaseService } from 'src/common/services';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { CacheService } from 'src/shared/services';
@@ -34,7 +34,7 @@ export class NotificationsService extends BaseService<Notification> {
     @InjectRepository(NotificationPreference)
     private readonly preferenceRepository: Repository<NotificationPreference>,
 
-    private readonly cacheService: CacheService,
+    protected readonly cacheService: CacheService,
     private readonly rabbitMQService: RabbitMQService,
   ) {
     super(
@@ -66,8 +66,8 @@ export class NotificationsService extends BaseService<Notification> {
    */
   async createNotification(
     userId: string,
-    dto: CreateNotificationDto,
-  ): Promise<Notification> {
+    dto: Omit<CreateNotificationDto, 'userId'>,
+  ): Promise<Notification | null> {
     try {
       // Check user preferences
       const shouldSend = await this.checkUserPreferences(
@@ -80,7 +80,7 @@ export class NotificationsService extends BaseService<Notification> {
         this.logger.debug(
           `Notification blocked by user preferences: ${userId}, ${dto.type}`,
         );
-        return undefined;
+        return null;
       }
 
       // Create notification entity
@@ -126,7 +126,6 @@ export class NotificationsService extends BaseService<Notification> {
           try {
             const notification = await this.createNotification(userId, {
               ...dto,
-              userId,
             });
             return notification ? 1 : 0;
           } catch (error) {
@@ -197,23 +196,26 @@ export class NotificationsService extends BaseService<Notification> {
         );
       }
 
-      // Search filter
-      if (query.search) {
-        where.title = query.search as any; // Will be handled by BaseService
-      }
-
-      // Sort options
-      const sortBy = query.sortBy || 'createdAt';
-      const sortOrder = query.sortOrder || 'DESC';
-
-      return await this.findMany(where, {
-        page: query.page || 1,
-        limit: query.limit || 20,
-        search: query.search,
-        searchFields: ['title', 'message'],
-        order: { [sortBy]: sortOrder },
+      // Use findAndCount from BaseService
+      const [notifications, total] = await this.repo.findAndCount({
+        where,
         relations: ['user'],
+        order: { [query.sortBy || 'createdAt']: query.sortOrder || 'DESC' },
+        skip: ((query.page || 1) - 1) * (query.limit || 20),
+        take: query.limit || 20,
       });
+
+      return {
+        result: notifications,
+        metaData: {
+          currentPage: query.page || 1,
+          pageSize: query.limit || 20,
+          totalRecords: total,
+          totalPages: Math.ceil(total / (query.limit || 20)),
+          hasNextPage:
+            (query.page || 1) < Math.ceil(total / (query.limit || 20)),
+        },
+      };
     } catch (error) {
       this.logger.error('Failed to get user notifications:', error);
       throw error;
@@ -229,7 +231,7 @@ export class NotificationsService extends BaseService<Notification> {
     dto: MarkAsReadDto = {},
   ): Promise<Notification> {
     try {
-      const notification = await this.findOne(
+      const notification = await this.repo.findOne(
         { id: notificationId, userId },
         { relations: ['user'] },
       );
@@ -248,10 +250,7 @@ export class NotificationsService extends BaseService<Notification> {
         }
       }
 
-      const updated = await this.update(notificationId, {
-        isRead: notification.isRead,
-        readAt: notification.readAt,
-      });
+      const updated = await this.repo.save(notification);
 
       this.logger.log(`Notification marked as read: ${notificationId}`);
 
@@ -293,7 +292,7 @@ export class NotificationsService extends BaseService<Notification> {
     byStatus: Record<string, number>;
   }> {
     try {
-      const [total, unread, byType, byStatus] = await Promise.all([
+      const [total, unread, byTypeRaw, byStatusRaw] = await Promise.all([
         this.notificationRepository.count({ where: { userId } }),
         this.notificationRepository.count({ where: { userId, isRead: false } }),
         this.notificationRepository
@@ -312,15 +311,30 @@ export class NotificationsService extends BaseService<Notification> {
           .getRawMany(),
       ]);
 
-      const byTypeMap = byType.reduce((acc, item) => {
-        acc[item.type] = parseInt(item.count);
-        return acc;
-      }, {});
+      const byType = byTypeRaw as { type: string; count: string }[];
+      const byStatus = byStatusRaw as { status: string; count: string }[];
 
-      const byStatusMap = byStatus.reduce((acc, item) => {
-        acc[item.status] = parseInt(item.count);
-        return acc;
-      }, {});
+      const byTypeMap = byType.reduce(
+        (
+          acc: Record<string, number>,
+          item: { type: string; count: string },
+        ) => {
+          acc[item.type] = parseInt(item.count);
+          return acc;
+        },
+        {},
+      );
+
+      const byStatusMap = byStatus.reduce(
+        (
+          acc: Record<string, number>,
+          item: { status: string; count: string },
+        ) => {
+          acc[item.status] = parseInt(item.count);
+          return acc;
+        },
+        {},
+      );
 
       return {
         total,
