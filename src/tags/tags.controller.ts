@@ -90,20 +90,6 @@ export class TagsController {
     return this.tagsService.getFeaturedTags(limit);
   }
 
-  @Get('search')
-  @ApiOperation({ summary: 'Search tags by name or description' })
-  @ApiResponse({
-    status: 200,
-    description: 'Search results retrieved successfully',
-    type: [Tag],
-  })
-  searchTags(
-    @Query('q') query: string,
-    @Query('limit') limit?: number,
-  ): Promise<Tag[]> {
-    return this.tagsService.searchTags(query, limit);
-  }
-
   @Get('stats')
   @ApiOperation({ summary: 'Get tag statistics' })
   @ApiResponse({

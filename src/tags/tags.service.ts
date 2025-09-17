@@ -1,6 +1,14 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, DeepPartial } from 'typeorm';
+import {
+  Repository,
+  Between,
+  DeepPartial,
+  FindOptionsWhere,
+  Not,
+  IsNull,
+  MoreThanOrEqual,
+} from 'typeorm';
 import { BaseService } from 'src/common/services';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { CacheService } from 'src/shared/services';
@@ -59,8 +67,8 @@ export class TagsService extends BaseService<Tag> {
     }
 
     // Check if slug already exists
-    const existingTag = await this.tagRepository.findOne({
-      where: { slug: createTagDto.slug },
+    const existingTag = await this.findOne({
+      slug: createTagDto.slug,
     });
 
     if (existingTag) {
@@ -131,7 +139,7 @@ export class TagsService extends BaseService<Tag> {
    */
   async findAll(query: QueryTagsDto): Promise<IPagination<Tag>> {
     try {
-      const extraFilter: Record<string, unknown> = {};
+      const extraFilter: FindOptionsWhere<Tag> = {};
 
       // Apply custom filters
       if (query.isActive !== undefined) {
@@ -161,7 +169,7 @@ export class TagsService extends BaseService<Tag> {
       }
 
       // Use BaseService.listOffset with custom filters
-      return await this.listOffset(query as any, extraFilter);
+      return await this.listOffset(query, extraFilter);
     } catch (error) {
       this.logger.error(
         `Error fetching tags: ${(error as Error).message}`,
@@ -176,46 +184,14 @@ export class TagsService extends BaseService<Tag> {
    * Uses BaseService.findOne with custom relations
    */
   async findBySlug(slug: string): Promise<Tag> {
-    try {
-      const tag = await this.findOne({ slug }, { relations: ['articles'] });
-      if (!tag) {
-        throw new HttpException(
-          { messageKey: 'tag.NOT_FOUND' },
-          HttpStatus.NOT_FOUND,
-        );
-      }
-      return tag;
-    } catch (error) {
-      this.logger.error(
-        `Error fetching tag by slug: ${(error as Error).message}`,
-        (error as Error).stack,
+    const tag = await this.findOne({ slug });
+    if (!tag) {
+      throw new HttpException(
+        { messageKey: 'tag.NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
       );
-      throw error;
     }
-  }
-
-  /**
-   * Get tag by ID
-   * Uses BaseService.findById
-   */
-  async findById(id: string): Promise<Tag> {
-    return await super.findById(id);
-  }
-
-  /**
-   * Update tag
-   * Uses BaseService.update
-   */
-  async update(id: string, updateTagDto: UpdateTagDto): Promise<Tag> {
-    return await super.update(id, updateTagDto);
-  }
-
-  /**
-   * Delete tag
-   * Uses BaseService.remove (soft delete)
-   */
-  async remove(id: string): Promise<void> {
-    return await super.remove(id);
+    return tag;
   }
 
   /**
@@ -369,53 +345,6 @@ export class TagsService extends BaseService<Tag> {
   }
 
   /**
-   * Search tags with suggestions
-   * Uses BaseService caching methods
-   */
-  async searchTags(
-    query: string,
-    limit: number = TAG_CONSTANTS.SEARCH.MAX_SUGGESTIONS,
-  ): Promise<Tag[]> {
-    try {
-      if (!query || query.length < TAG_CONSTANTS.SEARCH.MIN_QUERY_LENGTH) {
-        return [];
-      }
-
-      const cacheKey = this.buildCacheKey('search', { query, limit });
-      if (cacheKey) {
-        const cached = await this.getCachedResult<Tag[]>(cacheKey);
-        if (cached) {
-          return cached;
-        }
-      }
-
-      const tags = await this.tagRepository.find({
-        where: [
-          { name: Like(`%${query}%`), isActive: true },
-          { description: Like(`%${query}%`), isActive: true },
-        ],
-        order: { usageCount: 'DESC' },
-        take: limit,
-      });
-
-      if (cacheKey && this.cache) {
-        await this.cacheService?.set(
-          cacheKey,
-          tags,
-          TAG_CONSTANTS.CACHE.TTL_SEC,
-        );
-      }
-      return tags;
-    } catch (error) {
-      this.logger.error(
-        `Error searching tags: ${(error as Error).message}`,
-        (error as Error).stack,
-      );
-      throw error;
-    }
-  }
-
-  /**
    * Get tag statistics
    * Uses BaseService caching methods
    */
@@ -463,19 +392,8 @@ export class TagsService extends BaseService<Tag> {
             ),
           },
         }),
-        this.tagRepository
-          .createQueryBuilder('tag')
-          .select('SUM(tag.usageCount)', 'total')
-          .getRawOne()
-          .then((result: any) => parseInt(result?.total) || 0),
-        this.tagRepository
-          .createQueryBuilder('tag')
-          .select(['tag.name', 'tag.usageCount'])
-          .orderBy('tag.usageCount', 'DESC')
-          .limit(1)
-          .getRawOne() as Promise<
-          { name: string; usageCount: number } | undefined
-        >,
+        this.getTotalUsageCount(),
+        this.getMostUsedTag(),
         this.getTagsByCategory(),
         this.getTagsByColor(),
       ]);
@@ -516,26 +434,57 @@ export class TagsService extends BaseService<Tag> {
   }
 
   /**
+   * Get total usage count across all tags
+   */
+  private async getTotalUsageCount(): Promise<number> {
+    const tags = await this.tagRepository.find({
+      select: ['usageCount'],
+    });
+    return tags.reduce((sum, tag) => sum + tag.usageCount, 0);
+  }
+
+  /**
+   * Get most used tag
+   */
+  private async getMostUsedTag(): Promise<{
+    name: string;
+    usageCount: number;
+  } | null> {
+    const tag = await this.tagRepository.findOne({
+      select: ['name', 'usageCount'],
+      order: { usageCount: 'DESC' },
+    });
+    return tag ? { name: tag.name, usageCount: tag.usageCount } : null;
+  }
+
+  /**
    * Get tags by category
+   * Groups tags by their metadata.category field and returns count for each category
    */
   private async getTagsByCategory(): Promise<Record<string, number>> {
     try {
-      const result = await this.tagRepository
-        .createQueryBuilder('tag')
-        .select('tag.metadata->category', 'category')
-        .addSelect('COUNT(*)', 'count')
-        .where('tag.metadata->category IS NOT NULL')
-        .groupBy('tag.metadata->category')
-        .getRawMany();
-
-      return result.reduce(
-        (acc, item: any) => {
-          const category = item.category;
-          acc[category] = parseInt(item.count);
-          return acc;
+      // Find all tags that have a category in their metadata
+      const tags = await this.tagRepository.find({
+        where: {
+          metadata: Not(IsNull()),
         },
-        {} as Record<string, number>,
-      );
+        select: ['metadata'],
+      });
+
+      // Filter tags that have category in metadata and group by category
+      const categoryCount: Record<string, number> = {};
+
+      tags.forEach((tag) => {
+        if (
+          tag.metadata?.category &&
+          typeof tag.metadata.category === 'string'
+        ) {
+          const category = tag.metadata.category;
+          categoryCount[category] = (categoryCount[category] || 0) + 1;
+        }
+      });
+
+      return categoryCount;
     } catch (error) {
       this.logger.error(
         `Error getting tags by category: ${(error as Error).message}`,
@@ -547,24 +496,28 @@ export class TagsService extends BaseService<Tag> {
 
   /**
    * Get tags by color
+   * Groups tags by their color field and returns count for each color
    */
   private async getTagsByColor(): Promise<Record<string, number>> {
     try {
-      const result = await this.tagRepository
-        .createQueryBuilder('tag')
-        .select('tag.color', 'color')
-        .addSelect('COUNT(*)', 'count')
-        .where('tag.color IS NOT NULL')
-        .groupBy('tag.color')
-        .getRawMany();
-
-      return result.reduce(
-        (acc, item: any) => {
-          acc[item.color] = parseInt(item.count);
-          return acc;
+      // Find all tags that have a color
+      const tags = await this.tagRepository.find({
+        where: {
+          color: Not(IsNull()),
         },
-        {} as Record<string, number>,
-      );
+        select: ['color'],
+      });
+
+      // Group tags by color and count occurrences
+      const colorCount: Record<string, number> = {};
+
+      tags.forEach((tag) => {
+        if (tag.color) {
+          colorCount[tag.color] = (colorCount[tag.color] || 0) + 1;
+        }
+      });
+
+      return colorCount;
     } catch (error) {
       this.logger.error(
         `Error getting tags by color: ${(error as Error).message}`,
@@ -576,6 +529,7 @@ export class TagsService extends BaseService<Tag> {
 
   /**
    * Get recent trends
+   * Returns daily tag creation counts for the last 30 days
    */
   private async getRecentTrends(): Promise<
     Array<{ date: string; count: number }>
@@ -584,19 +538,29 @@ export class TagsService extends BaseService<Tag> {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const result = await this.tagRepository
-        .createQueryBuilder('tag')
-        .select('DATE(tag.createdAt)', 'date')
-        .addSelect('COUNT(*)', 'count')
-        .where('tag.createdAt >= :date', { date: thirtyDaysAgo })
-        .groupBy('DATE(tag.createdAt)')
-        .orderBy('date', 'ASC')
-        .getRawMany();
+      // Find all tags created in the last 30 days
+      const tags = await this.tagRepository.find({
+        where: {
+          createdAt: MoreThanOrEqual(thirtyDaysAgo),
+        },
+        select: ['createdAt'],
+        order: {
+          createdAt: 'ASC',
+        },
+      });
 
-      return result.map((item: any) => ({
-        date: item.date,
-        count: parseInt(item.count),
-      }));
+      // Group tags by date and count occurrences
+      const dateCount: Record<string, number> = {};
+
+      tags.forEach((tag) => {
+        const date = tag.createdAt.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+        dateCount[date] = (dateCount[date] || 0) + 1;
+      });
+
+      // Convert to array format and sort by date
+      return Object.entries(dateCount)
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
     } catch (error) {
       this.logger.error(
         `Error getting recent trends: ${(error as Error).message}`,
@@ -632,7 +596,6 @@ export class TagsService extends BaseService<Tag> {
         `${this.cache.prefix}:popular:*`,
         `${this.cache.prefix}:trending:*`,
         `${this.cache.prefix}:featured:*`,
-        `${this.cache.prefix}:search:*`,
         `${this.cache.prefix}:stats:*`,
       ];
 
