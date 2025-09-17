@@ -135,9 +135,7 @@ describe('NotificationsService', () => {
       jest
         .spyOn(preferenceService, 'shouldSendNotification')
         .mockResolvedValue(true);
-      jest
-        .spyOn(service, 'create')
-        .mockResolvedValue(mockNotification as any);
+      jest.spyOn(service, 'create').mockResolvedValue(mockNotification as any);
       jest
         .spyOn(rabbitMQService, 'sendDataToRabbitMQAsync')
         .mockResolvedValue(true);
@@ -456,7 +454,12 @@ describe('NotificationsService', () => {
   describe('getUserNotificationsWithBroadcasts', () => {
     it('should return notifications and broadcasts', async () => {
       const userId = '9876543210987654321';
-      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' as const };
+      const query = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC' as const,
+      };
 
       const mockNotifications = {
         result: [mockNotification],

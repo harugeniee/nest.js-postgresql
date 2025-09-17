@@ -201,7 +201,7 @@ describe('NotificationPreferenceService', () => {
       // Mock the base service listOffset method
       jest.spyOn(service, 'listOffset').mockResolvedValue({
         result: preferences,
-        metaData: { page: 1, limit: 1000, total: 1, totalPages: 1 }
+        metaData: { page: 1, limit: 1000, total: 1, totalPages: 1 },
       } as any);
 
       const result = await service.getUserPreferences(userId);
@@ -222,9 +222,13 @@ describe('NotificationPreferenceService', () => {
       const userId = '9876543210987654321';
 
       // Mock the base service listOffset method to throw an error
-      jest.spyOn(service, 'listOffset').mockRejectedValue(new Error('Database error'));
+      jest
+        .spyOn(service, 'listOffset')
+        .mockRejectedValue(new Error('Database error'));
 
-      await expect(service.getUserPreferences(userId)).rejects.toThrow('Database error');
+      await expect(service.getUserPreferences(userId)).rejects.toThrow(
+        'Database error',
+      );
     });
   });
 
@@ -384,7 +388,10 @@ describe('NotificationPreferenceService', () => {
       const result = await service.createDefaultPreferences(userId);
 
       // Should have created 75 preferences (76 total - 1 existing)
-      const expectedCount = Object.keys(NOTIFICATION_CONSTANTS.TYPES).length * Object.keys(NOTIFICATION_CONSTANTS.CHANNEL).length - 1;
+      const expectedCount =
+        Object.keys(NOTIFICATION_CONSTANTS.TYPES).length *
+          Object.keys(NOTIFICATION_CONSTANTS.CHANNEL).length -
+        1;
       expect(result).toHaveLength(expectedCount);
       expect(service.create).toHaveBeenCalledTimes(expectedCount);
     });
@@ -393,10 +400,15 @@ describe('NotificationPreferenceService', () => {
   describe('deleteUserPreferences', () => {
     it('should delete all preferences for a user', async () => {
       const userId = '9876543210987654321';
-      const preferences = [mockPreference, { ...mockPreference, id: '2222222222222222222' }];
+      const preferences = [
+        mockPreference,
+        { ...mockPreference, id: '2222222222222222222' },
+      ];
 
       // Mock the service methods
-      jest.spyOn(service, 'getUserPreferences').mockResolvedValue(preferences as any);
+      jest
+        .spyOn(service, 'getUserPreferences')
+        .mockResolvedValue(preferences as any);
       jest.spyOn(service, 'remove').mockResolvedValue(undefined);
 
       const result = await service.deleteUserPreferences(userId);

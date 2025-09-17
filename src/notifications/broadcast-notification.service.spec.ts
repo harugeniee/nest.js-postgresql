@@ -244,7 +244,12 @@ describe('BroadcastNotificationService', () => {
     });
 
     it('should get broadcasts without filters', async () => {
-      const query = { page: 1, limit: 10, sortBy: 'createdAt', order: 'DESC' as const };
+      const query = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC' as const,
+      };
 
       const mockResult = {
         result: [mockBroadcast],
