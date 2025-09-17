@@ -4,6 +4,7 @@ import {
   ReportPriority,
   ReportableType,
   ReportReason,
+  REPORT_CONSTANTS,
 } from 'src/shared/constants';
 
 /**
@@ -11,20 +12,20 @@ import {
  */
 export class ReportStatsDto {
   @IsOptional()
-  @IsEnum(ReportStatus)
-  status?: ReportStatus;
+  @IsEnum(REPORT_CONSTANTS.STATUS)
+  status?: ReportStatus = REPORT_CONSTANTS.STATUS.PENDING;
 
   @IsOptional()
-  @IsEnum(ReportPriority)
-  priority?: ReportPriority;
+  @IsEnum(REPORT_CONSTANTS.PRIORITY)
+  priority?: ReportPriority = REPORT_CONSTANTS.PRIORITY.MEDIUM;
 
   @IsOptional()
-  @IsEnum(ReportableType)
-  reportableType?: ReportableType;
+  @IsEnum(REPORT_CONSTANTS.REPORTABLE_TYPES)
+  reportableType?: ReportableType = REPORT_CONSTANTS.REPORTABLE_TYPES.ARTICLE;
 
   @IsOptional()
-  @IsEnum(ReportReason)
-  reason?: ReportReason;
+  @IsEnum(REPORT_CONSTANTS.REASONS)
+  reason?: ReportReason = REPORT_CONSTANTS.REASONS.SPAM;
 
   @IsOptional()
   @IsString()

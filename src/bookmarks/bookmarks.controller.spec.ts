@@ -2,7 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { BookmarksController } from './bookmarks.controller';
 import { BookmarksService } from './bookmarks.service';
-import { CreateBookmarkDto, CreateBookmarkFolderDto, UpdateBookmarkDto, UpdateBookmarkFolderDto, QueryBookmarksDto, QueryBookmarkFoldersDto } from './dto';
+import {
+  CreateBookmarkDto,
+  CreateBookmarkFolderDto,
+  UpdateBookmarkDto,
+  UpdateBookmarkFolderDto,
+  QueryBookmarksDto,
+  QueryBookmarkFoldersDto,
+} from './dto';
 import { BOOKMARK_CONSTANTS } from 'src/shared/constants';
 
 describe('BookmarksController', () => {
@@ -137,7 +144,10 @@ describe('BookmarksController', () => {
         isReadLater: false,
       };
 
-      const bookmarkWithFolder = { ...mockBookmark, folderId: '1111111111111111111' };
+      const bookmarkWithFolder = {
+        ...mockBookmark,
+        folderId: '1111111111111111111',
+      };
       mockBookmarksService.createBookmark.mockResolvedValue(bookmarkWithFolder);
 
       const result = await controller.createBookmark(
@@ -158,7 +168,10 @@ describe('BookmarksController', () => {
         bookmarkableId: '9876543210987654321',
       };
 
-      const minimalBookmark = { ...mockBookmark, bookmarkableType: BOOKMARK_CONSTANTS.BOOKMARKABLE_TYPES.MEDIA };
+      const minimalBookmark = {
+        ...mockBookmark,
+        bookmarkableType: BOOKMARK_CONSTANTS.BOOKMARKABLE_TYPES.MEDIA,
+      };
       mockBookmarksService.createBookmark.mockResolvedValue(minimalBookmark);
 
       const result = await controller.createBookmark(
@@ -179,10 +192,15 @@ describe('BookmarksController', () => {
         bookmarkableId: '9876543210987654321',
       };
 
-      const error = new HttpException('Duplicate bookmark', HttpStatus.CONFLICT);
+      const error = new HttpException(
+        'Duplicate bookmark',
+        HttpStatus.CONFLICT,
+      );
       mockBookmarksService.createBookmark.mockRejectedValue(error);
 
-      await expect(controller.createBookmark(mockRequest, createBookmarkDto)).rejects.toThrow(error);
+      await expect(
+        controller.createBookmark(mockRequest, createBookmarkDto),
+      ).rejects.toThrow(error);
     });
   });
 
@@ -258,10 +276,15 @@ describe('BookmarksController', () => {
         order: 'DESC',
       };
 
-      const error = new HttpException('Database error', HttpStatus.INTERNAL_SERVER_ERROR);
+      const error = new HttpException(
+        'Database error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
       mockBookmarksService.getUserBookmarks.mockRejectedValue(error);
 
-      await expect(controller.getUserBookmarks(mockRequest, query)).rejects.toThrow(error);
+      await expect(
+        controller.getUserBookmarks(mockRequest, query),
+      ).rejects.toThrow(error);
     });
   });
 
@@ -287,14 +310,21 @@ describe('BookmarksController', () => {
     it('should throw error when bookmark not found', async () => {
       mockBookmarksService.findOne.mockResolvedValue(null);
 
-      await expect(controller.getBookmark(mockRequest, 'nonexistent')).rejects.toThrow();
+      await expect(
+        controller.getBookmark(mockRequest, 'nonexistent'),
+      ).rejects.toThrow();
     });
 
     it('should handle service errors when getting bookmark', async () => {
-      const error = new HttpException('Database error', HttpStatus.INTERNAL_SERVER_ERROR);
+      const error = new HttpException(
+        'Database error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
       mockBookmarksService.findOne.mockRejectedValue(error);
 
-      await expect(controller.getBookmark(mockRequest, '1234567890123456789')).rejects.toThrow(error);
+      await expect(
+        controller.getBookmark(mockRequest, '1234567890123456789'),
+      ).rejects.toThrow(error);
     });
   });
 
@@ -329,7 +359,10 @@ describe('BookmarksController', () => {
         status: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.ARCHIVED,
       };
 
-      const archivedBookmark = { ...mockBookmark, status: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.ARCHIVED };
+      const archivedBookmark = {
+        ...mockBookmark,
+        status: BOOKMARK_CONSTANTS.BOOKMARK_STATUS.ARCHIVED,
+      };
       mockBookmarksService.updateBookmark.mockResolvedValue(archivedBookmark);
 
       const result = await controller.updateBookmark(
@@ -347,10 +380,19 @@ describe('BookmarksController', () => {
         note: 'Updated note',
       };
 
-      const error = new HttpException('Bookmark not found', HttpStatus.NOT_FOUND);
+      const error = new HttpException(
+        'Bookmark not found',
+        HttpStatus.NOT_FOUND,
+      );
       mockBookmarksService.updateBookmark.mockRejectedValue(error);
 
-      await expect(controller.updateBookmark(mockRequest, '1234567890123456789', updateBookmarkDto)).rejects.toThrow(error);
+      await expect(
+        controller.updateBookmark(
+          mockRequest,
+          '1234567890123456789',
+          updateBookmarkDto,
+        ),
+      ).rejects.toThrow(error);
     });
   });
 
@@ -367,13 +409,17 @@ describe('BookmarksController', () => {
     });
 
     it('should handle service errors when removing bookmark', async () => {
-      const error = new HttpException('Bookmark not found', HttpStatus.NOT_FOUND);
+      const error = new HttpException(
+        'Bookmark not found',
+        HttpStatus.NOT_FOUND,
+      );
       mockBookmarksService.removeBookmark.mockRejectedValue(error);
 
-      await expect(controller.removeBookmark(mockRequest, '1234567890123456789')).rejects.toThrow(error);
+      await expect(
+        controller.removeBookmark(mockRequest, '1234567890123456789'),
+      ).rejects.toThrow(error);
     });
   });
-
 
   describe('getBookmarkStats', () => {
     it('should return comprehensive bookmark statistics', async () => {
@@ -429,10 +475,15 @@ describe('BookmarksController', () => {
     });
 
     it('should handle service errors when getting bookmark stats', async () => {
-      const error = new HttpException('Database error', HttpStatus.INTERNAL_SERVER_ERROR);
+      const error = new HttpException(
+        'Database error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
       mockBookmarksService.getBookmarkStats.mockRejectedValue(error);
 
-      await expect(controller.getBookmarkStats(mockRequest)).rejects.toThrow(error);
+      await expect(controller.getBookmarkStats(mockRequest)).rejects.toThrow(
+        error,
+      );
     });
   });
 
@@ -486,10 +537,15 @@ describe('BookmarksController', () => {
         name: 'Test Folder',
       };
 
-      const error = new HttpException('Folder name already exists', HttpStatus.CONFLICT);
+      const error = new HttpException(
+        'Folder name already exists',
+        HttpStatus.CONFLICT,
+      );
       mockBookmarksService.createFolder.mockRejectedValue(error);
 
-      await expect(controller.createFolder(mockRequest, createFolderDto)).rejects.toThrow(error);
+      await expect(
+        controller.createFolder(mockRequest, createFolderDto),
+      ).rejects.toThrow(error);
     });
   });
 
@@ -563,16 +619,23 @@ describe('BookmarksController', () => {
         order: 'DESC',
       };
 
-      const error = new HttpException('Database error', HttpStatus.INTERNAL_SERVER_ERROR);
+      const error = new HttpException(
+        'Database error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
       mockBookmarksService.getUserFolders.mockRejectedValue(error);
 
-      await expect(controller.getUserFolders(mockRequest, query)).rejects.toThrow(error);
+      await expect(
+        controller.getUserFolders(mockRequest, query),
+      ).rejects.toThrow(error);
     });
   });
 
   describe('getFolder', () => {
     it('should return a specific folder with relations', async () => {
-      mockBookmarksService.getFolderById = jest.fn().mockResolvedValue(mockFolder);
+      mockBookmarksService.getFolderById = jest
+        .fn()
+        .mockResolvedValue(mockFolder);
 
       const result = await controller.getFolder(
         mockRequest,
@@ -590,14 +653,21 @@ describe('BookmarksController', () => {
       const error = new HttpException('Folder not found', HttpStatus.NOT_FOUND);
       mockBookmarksService.getFolderById = jest.fn().mockRejectedValue(error);
 
-      await expect(controller.getFolder(mockRequest, 'nonexistent')).rejects.toThrow(error);
+      await expect(
+        controller.getFolder(mockRequest, 'nonexistent'),
+      ).rejects.toThrow(error);
     });
 
     it('should handle service errors when getting folder', async () => {
-      const error = new HttpException('Database error', HttpStatus.INTERNAL_SERVER_ERROR);
+      const error = new HttpException(
+        'Database error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
       mockBookmarksService.getFolderById = jest.fn().mockRejectedValue(error);
 
-      await expect(controller.getFolder(mockRequest, '1111111111111111111')).rejects.toThrow(error);
+      await expect(
+        controller.getFolder(mockRequest, '1111111111111111111'),
+      ).rejects.toThrow(error);
     });
   });
 
@@ -633,7 +703,10 @@ describe('BookmarksController', () => {
         visibility: BOOKMARK_CONSTANTS.FOLDER_VISIBILITY.PUBLIC,
       };
 
-      const publicFolder = { ...mockFolder, visibility: BOOKMARK_CONSTANTS.FOLDER_VISIBILITY.PUBLIC };
+      const publicFolder = {
+        ...mockFolder,
+        visibility: BOOKMARK_CONSTANTS.FOLDER_VISIBILITY.PUBLIC,
+      };
       mockBookmarksService.updateFolder.mockResolvedValue(publicFolder);
 
       const result = await controller.updateFolder(
@@ -643,7 +716,9 @@ describe('BookmarksController', () => {
       );
 
       expect(result).toEqual(publicFolder);
-      expect(result.visibility).toBe(BOOKMARK_CONSTANTS.FOLDER_VISIBILITY.PUBLIC);
+      expect(result.visibility).toBe(
+        BOOKMARK_CONSTANTS.FOLDER_VISIBILITY.PUBLIC,
+      );
     });
 
     it('should handle service errors when updating folder', async () => {
@@ -654,7 +729,13 @@ describe('BookmarksController', () => {
       const error = new HttpException('Folder not found', HttpStatus.NOT_FOUND);
       mockBookmarksService.updateFolder.mockRejectedValue(error);
 
-      await expect(controller.updateFolder(mockRequest, '1111111111111111111', updateFolderDto)).rejects.toThrow(error);
+      await expect(
+        controller.updateFolder(
+          mockRequest,
+          '1111111111111111111',
+          updateFolderDto,
+        ),
+      ).rejects.toThrow(error);
     });
   });
 
@@ -674,14 +755,21 @@ describe('BookmarksController', () => {
       const error = new HttpException('Folder not found', HttpStatus.NOT_FOUND);
       mockBookmarksService.deleteFolder.mockRejectedValue(error);
 
-      await expect(controller.deleteFolder(mockRequest, '1111111111111111111')).rejects.toThrow(error);
+      await expect(
+        controller.deleteFolder(mockRequest, '1111111111111111111'),
+      ).rejects.toThrow(error);
     });
 
     it('should handle forbidden deletion of system folder', async () => {
-      const error = new HttpException('System folder cannot be deleted', HttpStatus.FORBIDDEN);
+      const error = new HttpException(
+        'System folder cannot be deleted',
+        HttpStatus.FORBIDDEN,
+      );
       mockBookmarksService.deleteFolder.mockRejectedValue(error);
 
-      await expect(controller.deleteFolder(mockRequest, '1111111111111111111')).rejects.toThrow(error);
+      await expect(
+        controller.deleteFolder(mockRequest, '1111111111111111111'),
+      ).rejects.toThrow(error);
     });
   });
 
@@ -722,7 +810,10 @@ describe('BookmarksController', () => {
         order: 'DESC',
       };
 
-      const error = new HttpException('Database error', HttpStatus.INTERNAL_SERVER_ERROR);
+      const error = new HttpException(
+        'Database error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
       mockBookmarksService.list.mockRejectedValue(error);
 
       await expect(controller.getAllBookmarks(query)).rejects.toThrow(error);
@@ -765,7 +856,10 @@ describe('BookmarksController', () => {
         order: 'DESC',
       };
 
-      const error = new HttpException('Database error', HttpStatus.INTERNAL_SERVER_ERROR);
+      const error = new HttpException(
+        'Database error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
       mockBookmarksService.getAllFolders.mockRejectedValue(error);
 
       await expect(controller.getAllFolders(query)).rejects.toThrow(error);
