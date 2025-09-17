@@ -7,12 +7,10 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { JwtAccessTokenGuard, RolesGuard } from 'src/auth/guard';
-import { Auth, Roles } from 'src/common/decorators';
+import { Auth } from 'src/common/decorators';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { TagsService } from './tags.service';
 import { CreateTagDto, UpdateTagDto, QueryTagsDto, TagStatsDto } from './dto';

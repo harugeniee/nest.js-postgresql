@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { TagsService } from './tags.service';
 import { Tag } from './entities/tag.entity';
@@ -43,7 +42,6 @@ describe('TagsService', () => {
     delete: jest.fn(),
     count: jest.fn(),
     increment: jest.fn(),
-    createQueryBuilder: jest.fn(),
   };
 
   const mockCacheService = {
@@ -365,33 +363,36 @@ describe('TagsService', () => {
 
     it('should calculate statistics from database if not cached', async () => {
       mockCacheService.get.mockResolvedValue(null);
-      mockRepository.count.mockResolvedValue(100);
-      mockRepository.createQueryBuilder.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        getRawOne: jest.fn().mockResolvedValue({ total: '1000' }),
+      mockRepository.count
+        .mockResolvedValueOnce(100) // totalTags
+        .mockResolvedValueOnce(95) // activeTags
+        .mockResolvedValueOnce(5) // inactiveTags
+        .mockResolvedValueOnce(10) // featuredTags
+        .mockResolvedValueOnce(50) // popularTags
+        .mockResolvedValueOnce(20); // trendingTags
+
+      // Mock the helper methods
+      jest.spyOn(service, 'getTotalUsageCount').mockResolvedValue(1000);
+      jest.spyOn(service, 'getMostUsedTag').mockResolvedValue({
+        name: 'JavaScript',
+        usageCount: 150,
       });
+      jest.spyOn(service, 'getTagsByCategory').mockResolvedValue({
+        technology: 50,
+      });
+      jest.spyOn(service, 'getTagsByColor').mockResolvedValue({
+        '#3B82F6': 20,
+      });
+      jest.spyOn(service, 'getRecentTrends').mockResolvedValue([]);
 
-      // Mock the complex query builder methods
-      const mockQueryBuilder = {
-        select: jest.fn().mockReturnThis(),
-        addSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        groupBy: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        getRawOne: jest
-          .fn()
-          .mockResolvedValue({ name: 'JavaScript', usageCount: 150 }),
-        getRawMany: jest.fn().mockResolvedValue([]),
-      };
-
-      mockRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
       mockCacheService.set.mockResolvedValue(undefined);
 
       const result = await service.getStats();
 
       expect(result).toBeDefined();
       expect(result.totalTags).toBe(100);
+      expect(result.totalUsageCount).toBe(1000);
+      expect(result.mostUsedTag).toBe('JavaScript');
       expect(mockCacheService.set).toHaveBeenCalledWith(
         'tags:stats',
         expect.any(Object),
@@ -453,6 +454,133 @@ describe('TagsService', () => {
       mockRepository.findOne.mockResolvedValue(null);
 
       const result = await service.getContentSuggestions(content);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getTotalUsageCount', () => {
+    it('should return total usage count across all tags', async () => {
+      const tags = [
+        { usageCount: 100 },
+        { usageCount: 200 },
+        { usageCount: 300 },
+      ];
+
+      mockRepository.find.mockResolvedValue(tags);
+
+      const result = await service.getTotalUsageCount();
+
+      expect(result).toBe(600);
+      expect(mockRepository.find).toHaveBeenCalledWith({
+        select: ['usageCount'],
+      });
+    });
+  });
+
+  describe('getMostUsedTag', () => {
+    it('should return most used tag', async () => {
+      const mostUsedTag = { name: 'JavaScript', usageCount: 150 };
+
+      mockRepository.findOne.mockResolvedValue(mostUsedTag);
+
+      const result = await service.getMostUsedTag();
+
+      expect(result).toEqual(mostUsedTag);
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        select: ['name', 'usageCount'],
+        order: { usageCount: 'DESC' },
+      });
+    });
+
+    it('should return null if no tags exist', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.getMostUsedTag();
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getTagsByCategory', () => {
+    it('should return tags grouped by category', async () => {
+      const tags = [
+        { metadata: { category: 'technology' } },
+        { metadata: { category: 'technology' } },
+        { metadata: { category: 'lifestyle' } },
+        { metadata: { category: 'business' } },
+        { metadata: { other: 'value' } }, // Should be ignored
+      ];
+
+      mockRepository.find.mockResolvedValue(tags);
+
+      const result = await service.getTagsByCategory();
+
+      expect(result).toEqual({
+        technology: 2,
+        lifestyle: 1,
+        business: 1,
+      });
+    });
+
+    it('should return empty object if no tags with categories exist', async () => {
+      mockRepository.find.mockResolvedValue([]);
+
+      const result = await service.getTagsByCategory();
+
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('getTagsByColor', () => {
+    it('should return tags grouped by color', async () => {
+      const tags = [
+        { color: '#3B82F6' },
+        { color: '#3B82F6' },
+        { color: '#10B981' },
+        { color: '#F59E0B' },
+        { color: null }, // Should be ignored
+      ];
+
+      mockRepository.find.mockResolvedValue(tags);
+
+      const result = await service.getTagsByColor();
+
+      expect(result).toEqual({
+        '#3B82F6': 2,
+        '#10B981': 1,
+        '#F59E0B': 1,
+      });
+    });
+  });
+
+  describe('getRecentTrends', () => {
+    it('should return recent trends for last 30 days', async () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const tags = [
+        { createdAt: new Date('2024-01-01') },
+        { createdAt: new Date('2024-01-01') },
+        { createdAt: new Date('2024-01-02') },
+        { createdAt: new Date('2024-01-15') },
+      ];
+
+      mockRepository.find.mockResolvedValue(tags);
+
+      const result = await service.getRecentTrends();
+
+      expect(result).toEqual([
+        { date: '2024-01-01', count: 2 },
+        { date: '2024-01-02', count: 1 },
+        { date: '2024-01-15', count: 1 },
+      ]);
+    });
+
+    it('should return empty array if no tags in last 30 days', async () => {
+      mockRepository.find.mockResolvedValue([]);
+
+      const result = await service.getRecentTrends();
 
       expect(result).toEqual([]);
     });

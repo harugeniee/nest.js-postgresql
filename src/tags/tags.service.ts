@@ -15,7 +15,7 @@ import { CacheService } from 'src/shared/services';
 import { IPagination } from 'src/common/interface';
 import { createSlug } from 'src/common/utils/slug.util';
 import { Tag } from './entities/tag.entity';
-import { CreateTagDto, QueryTagsDto, TagStatsDto, UpdateTagDto } from './dto';
+import { CreateTagDto, QueryTagsDto, TagStatsDto } from './dto';
 import { TAG_CONSTANTS } from 'src/shared/constants/tag.constants';
 
 @Injectable()
@@ -638,7 +638,7 @@ export class TagsService extends BaseService<Tag> {
       const contentLower = content.toLowerCase();
 
       // Check against content suggestions
-      for (const [category, tags] of Object.entries(
+      for (const [, tags] of Object.entries(
         TAG_CONSTANTS.CONTENT_SUGGESTIONS,
       )) {
         for (const tagName of tags) {
