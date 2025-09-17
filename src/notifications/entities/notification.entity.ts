@@ -21,7 +21,6 @@ import {
 @Index(['status'])
 @Index(['priority'])
 @Index(['channel'])
-@Index(['createdAt'])
 export class Notification extends BaseEntityCustom {
   /**
    * ID of the user who will receive this notification

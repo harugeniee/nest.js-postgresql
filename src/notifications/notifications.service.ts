@@ -7,6 +7,7 @@ import { CacheService } from 'src/shared/services';
 import { RabbitMQService } from 'src/shared/services/rabbitmq/rabbitmq.service';
 import { IPagination } from 'src/common/interface';
 import { Notification, NotificationPreference } from './entities';
+import { NotificationPreferenceService } from './notification-preference.service';
 import {
   CreateNotificationDto,
   CreateBulkNotificationDto,
@@ -37,6 +38,7 @@ export class NotificationsService extends BaseService<Notification> {
 
     protected readonly cacheService: CacheService,
     private readonly rabbitMQService: RabbitMQService,
+    private readonly preferenceService: NotificationPreferenceService,
   ) {
     super(
       new TypeOrmBaseRepository<Notification>(notificationRepository),
@@ -343,30 +345,7 @@ export class NotificationsService extends BaseService<Notification> {
     userId: string,
     dto: CreateNotificationPreferenceDto,
   ): Promise<NotificationPreference> {
-    try {
-      // Check if preference already exists
-      const existing = await this.preferenceRepository.findOne({
-        where: { userId, type: dto.type, channel: dto.channel },
-      });
-
-      if (existing) {
-        throw new HttpException(
-          { messageKey: 'notification.PREFERENCE_ALREADY_EXISTS' },
-          HttpStatus.CONFLICT,
-        );
-      }
-
-      const preference = this.preferenceRepository.create({
-        ...dto,
-        userId,
-        timezone: dto.timezone || 'UTC',
-      });
-
-      return await this.preferenceRepository.save(preference);
-    } catch (error) {
-      this.logger.error('Failed to create notification preference:', error);
-      throw error;
-    }
+    return await this.preferenceService.createPreference(userId, dto);
   }
 
   /**
@@ -377,24 +356,11 @@ export class NotificationsService extends BaseService<Notification> {
     userId: string,
     dto: UpdateNotificationPreferenceDto,
   ): Promise<NotificationPreference> {
-    try {
-      const preference = await this.preferenceRepository.findOne({
-        where: { id: preferenceId, userId },
-      });
-
-      if (!preference) {
-        throw new HttpException(
-          { messageKey: 'notification.PREFERENCE_NOT_FOUND' },
-          HttpStatus.NOT_FOUND,
-        );
-      }
-
-      Object.assign(preference, dto);
-      return await this.preferenceRepository.save(preference);
-    } catch (error) {
-      this.logger.error('Failed to update notification preference:', error);
-      throw error;
-    }
+    return await this.preferenceService.updatePreference(
+      preferenceId,
+      userId,
+      dto,
+    );
   }
 
   /**
@@ -404,54 +370,14 @@ export class NotificationsService extends BaseService<Notification> {
     userId: string,
     dto: BulkUpdateNotificationPreferencesDto,
   ): Promise<{ updated: number; created: number }> {
-    let updated = 0;
-    let created = 0;
-
-    try {
-      for (const pref of dto.preferences) {
-        const existing = await this.preferenceRepository.findOne({
-          where: { userId, type: pref.type, channel: pref.channel },
-        });
-
-        if (existing) {
-          Object.assign(existing, pref);
-          await this.preferenceRepository.save(existing);
-          updated++;
-        } else {
-          const newPreference = this.preferenceRepository.create({
-            ...pref,
-            userId,
-            timezone: pref.timezone || 'UTC',
-          });
-          await this.preferenceRepository.save(newPreference);
-          created++;
-        }
-      }
-
-      this.logger.log(
-        `Bulk preferences updated: ${updated} updated, ${created} created`,
-      );
-
-      return { updated, created };
-    } catch (error) {
-      this.logger.error('Failed to bulk update preferences:', error);
-      throw error;
-    }
+    return await this.preferenceService.bulkUpdatePreferences(userId, dto);
   }
 
   /**
    * Get user notification preferences
    */
   async getUserPreferences(userId: string): Promise<NotificationPreference[]> {
-    try {
-      return await this.preferenceRepository.find({
-        where: { userId },
-        order: { type: 'ASC', channel: 'ASC' },
-      });
-    } catch (error) {
-      this.logger.error('Failed to get user preferences:', error);
-      throw error;
-    }
+    return await this.preferenceService.getUserPreferences(userId);
   }
 
   /**
@@ -515,16 +441,11 @@ export class NotificationsService extends BaseService<Notification> {
     channel: NotificationChannel,
   ): Promise<boolean> {
     try {
-      const preference = await this.preferenceRepository.findOne({
-        where: { userId, type, channel },
-      });
-
-      if (!preference) {
-        // Default to enabled if no preference exists
-        return true;
-      }
-
-      return preference.shouldSend();
+      return await this.preferenceService.shouldSendNotification(
+        userId,
+        type,
+        channel,
+      );
     } catch (error) {
       this.logger.error('Failed to check user preferences:', error);
       // Default to enabled on error
