@@ -553,8 +553,10 @@ export class TagsService extends BaseService<Tag> {
       const dateCount: Record<string, number> = {};
 
       tags.forEach((tag) => {
-        const date = tag.createdAt.toISOString().split('T')[0]; // Get YYYY-MM-DD format
-        dateCount[date] = (dateCount[date] || 0) + 1;
+        if (tag.createdAt) {
+          const date = tag.createdAt.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+          dateCount[date] = (dateCount[date] || 0) + 1;
+        }
       });
 
       // Convert to array format and sort by date
