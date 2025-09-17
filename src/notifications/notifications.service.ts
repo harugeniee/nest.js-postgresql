@@ -292,49 +292,28 @@ export class NotificationsService extends BaseService<Notification> {
     byStatus: Record<string, number>;
   }> {
     try {
-      const [total, unread, byTypeRaw, byStatusRaw] = await Promise.all([
-        this.notificationRepository.count({ where: { userId } }),
-        this.notificationRepository.count({ where: { userId, isRead: false } }),
-        this.notificationRepository
-          .createQueryBuilder('notification')
-          .select('notification.type', 'type')
-          .addSelect('COUNT(*)', 'count')
-          .where('notification.userId = :userId', { userId })
-          .groupBy('notification.type')
-          .getRawMany(),
-        this.notificationRepository
-          .createQueryBuilder('notification')
-          .select('notification.status', 'status')
-          .addSelect('COUNT(*)', 'count')
-          .where('notification.userId = :userId', { userId })
-          .groupBy('notification.status')
-          .getRawMany(),
-      ]);
+      // Get all notifications for the user
+      const notifications = await this.notificationRepository.find({
+        where: { userId },
+        select: ['type', 'status', 'isRead'],
+      });
 
-      const byType = byTypeRaw as { type: string; count: string }[];
-      const byStatus = byStatusRaw as { status: string; count: string }[];
+      // Calculate basic stats
+      const total = notifications.length;
+      const unread = notifications.filter((n) => !n.isRead).length;
 
-      const byTypeMap = byType.reduce(
-        (
-          acc: Record<string, number>,
-          item: { type: string; count: string },
-        ) => {
-          acc[item.type] = parseInt(item.count);
-          return acc;
-        },
-        {},
-      );
+      // Group by type
+      const byTypeMap: Record<string, number> = {};
+      notifications.forEach((notification) => {
+        byTypeMap[notification.type] = (byTypeMap[notification.type] || 0) + 1;
+      });
 
-      const byStatusMap = byStatus.reduce(
-        (
-          acc: Record<string, number>,
-          item: { status: string; count: string },
-        ) => {
-          acc[item.status] = parseInt(item.count);
-          return acc;
-        },
-        {},
-      );
+      // Group by status
+      const byStatusMap: Record<string, number> = {};
+      notifications.forEach((notification) => {
+        byStatusMap[notification.status] =
+          (byStatusMap[notification.status] || 0) + 1;
+      });
 
       return {
         total,
