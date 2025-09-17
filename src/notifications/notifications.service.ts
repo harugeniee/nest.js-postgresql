@@ -1,6 +1,6 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere, Between } from 'typeorm';
+import { Repository, FindOptionsWhere } from 'typeorm';
 import { BaseService } from 'src/common/services';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { CacheService } from 'src/shared/services';
@@ -15,6 +15,7 @@ import {
   UpdateNotificationPreferenceDto,
   BulkUpdateNotificationPreferencesDto,
   MarkAsReadDto,
+  NotificationStatsDto,
 } from './dto';
 import {
   NOTIFICATION_CONSTANTS,
@@ -96,6 +97,9 @@ export class NotificationsService extends BaseService<Notification> {
       // Send to queue for processing
       await this.sendToQueue(notification);
 
+      // Invalidate user stats cache
+      await this.invalidateUserStatsCache(userId);
+
       this.logger.log(
         `Notification created and queued: ${notification.id}, type: ${dto.type}`,
       );
@@ -172,50 +176,24 @@ export class NotificationsService extends BaseService<Notification> {
     query: QueryNotificationsDto,
   ): Promise<IPagination<Notification>> {
     try {
-      const where: FindOptionsWhere<Notification> = { userId };
+      // Build extra filter for user-specific notifications
+      const extraFilter: FindOptionsWhere<Notification> = { userId };
 
-      // Apply filters
-      if (query.type) where.type = query.type;
-      if (query.status) where.status = query.status;
-      if (query.priority) where.priority = query.priority;
-      if (query.channel) where.channel = query.channel;
-      if (query.isRead !== undefined) where.isRead = query.isRead;
+      // Apply additional filters
+      if (query.type) extraFilter.type = query.type;
+      if (query.status) extraFilter.status = query.status;
+      if (query.priority) extraFilter.priority = query.priority;
+      if (query.channel) extraFilter.channel = query.channel;
+      if (query.isRead !== undefined) extraFilter.isRead = query.isRead;
       if (query.relatedEntityType)
-        where.relatedEntityType = query.relatedEntityType;
-      if (query.relatedEntityId) where.relatedEntityId = query.relatedEntityId;
+        extraFilter.relatedEntityType = query.relatedEntityType;
+      if (query.relatedEntityId)
+        extraFilter.relatedEntityId = query.relatedEntityId;
 
-      // Date range filter
-      if (query.startDate || query.endDate) {
-        const startDate = query.startDate
-          ? new Date(query.startDate)
-          : undefined;
-        const endDate = query.endDate ? new Date(query.endDate) : undefined;
-        where.createdAt = Between(
-          startDate || new Date(0),
-          endDate || new Date(),
-        );
-      }
-
-      // Use findAndCount from BaseService
-      const [notifications, total] = await this.repo.findAndCount({
-        where,
+      // Use BaseService listOffset for pagination with caching and search
+      return await this.listOffset(query, extraFilter, {
         relations: ['user'],
-        order: { [query.sortBy || 'createdAt']: query.sortOrder || 'DESC' },
-        skip: ((query.page || 1) - 1) * (query.limit || 20),
-        take: query.limit || 20,
       });
-
-      return {
-        result: notifications,
-        metaData: {
-          currentPage: query.page || 1,
-          pageSize: query.limit || 20,
-          totalRecords: total,
-          totalPages: Math.ceil(total / (query.limit || 20)),
-          hasNextPage:
-            (query.page || 1) < Math.ceil(total / (query.limit || 20)),
-        },
-      };
     } catch (error) {
       this.logger.error('Failed to get user notifications:', error);
       throw error;
@@ -231,7 +209,7 @@ export class NotificationsService extends BaseService<Notification> {
     dto: MarkAsReadDto = {},
   ): Promise<Notification> {
     try {
-      const notification = await this.repo.findOne(
+      const notification = await this.findOne(
         { id: notificationId, userId },
         { relations: ['user'] },
       );
@@ -251,6 +229,9 @@ export class NotificationsService extends BaseService<Notification> {
       }
 
       const updated = await this.repo.save(notification);
+
+      // Invalidate user stats cache when notification is marked as read
+      await this.invalidateUserStatsCache(userId);
 
       this.logger.log(`Notification marked as read: ${notificationId}`);
 
@@ -284,43 +265,71 @@ export class NotificationsService extends BaseService<Notification> {
 
   /**
    * Get notification statistics for a user
+   * Optimized for large datasets using database aggregation and caching
    */
-  async getUserNotificationStats(userId: string): Promise<{
-    total: number;
-    unread: number;
-    byType: Record<string, number>;
-    byStatus: Record<string, number>;
-  }> {
+  async getUserNotificationStats(
+    userId: string,
+  ): Promise<NotificationStatsDto> {
     try {
-      // Get all notifications for the user
-      const notifications = await this.notificationRepository.find({
-        where: { userId },
-        select: ['type', 'status', 'isRead'],
-      });
+      // Check cache first
+      const cacheKey = `notification:stats:${userId}`;
+      const cached = await this.cacheService?.get(cacheKey);
+      if (cached) {
+        this.logger.debug(`Notification stats cache hit for user ${userId}`);
+        return cached as NotificationStatsDto;
+      }
 
-      // Calculate basic stats
-      const total = notifications.length;
-      const unread = notifications.filter((n) => !n.isRead).length;
+      // Use database aggregation for better performance with large datasets
+      const [total, unread, byTypeRaw, byStatusRaw] = await Promise.all([
+        // Total count
+        this.notificationRepository.count({ where: { userId } }),
 
-      // Group by type
+        // Unread count
+        this.notificationRepository.count({
+          where: { userId, isRead: false },
+        }),
+
+        // Group by type using raw query for better performance
+        this.notificationRepository
+          .createQueryBuilder('notification')
+          .select('notification.type', 'type')
+          .addSelect('COUNT(*)', 'count')
+          .where('notification.userId = :userId', { userId })
+          .groupBy('notification.type')
+          .getRawMany(),
+
+        // Group by status using raw query for better performance
+        this.notificationRepository
+          .createQueryBuilder('notification')
+          .select('notification.status', 'status')
+          .addSelect('COUNT(*)', 'count')
+          .where('notification.userId = :userId', { userId })
+          .groupBy('notification.status')
+          .getRawMany(),
+      ]);
+
+      // Convert raw results to maps
       const byTypeMap: Record<string, number> = {};
-      notifications.forEach((notification) => {
-        byTypeMap[notification.type] = (byTypeMap[notification.type] || 0) + 1;
+      byTypeRaw.forEach((item: { type: string; count: string }) => {
+        byTypeMap[item.type] = parseInt(item.count, 10);
       });
 
-      // Group by status
       const byStatusMap: Record<string, number> = {};
-      notifications.forEach((notification) => {
-        byStatusMap[notification.status] =
-          (byStatusMap[notification.status] || 0) + 1;
+      byStatusRaw.forEach((item: { status: string; count: string }) => {
+        byStatusMap[item.status] = parseInt(item.count, 10);
       });
 
-      return {
+      const result = {
         total,
         unread,
         byType: byTypeMap,
         byStatus: byStatusMap,
       };
+
+      // Cache the result for 5 minutes
+      await this.cacheService?.set(cacheKey, result, 300);
+
+      return result;
     } catch (error) {
       this.logger.error('Failed to get notification stats:', error);
       throw error;
@@ -539,5 +548,23 @@ export class NotificationsService extends BaseService<Notification> {
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Invalidate user notification stats cache
+   */
+  private async invalidateUserStatsCache(userId: string): Promise<void> {
+    try {
+      const cacheKey = `notification:stats:${userId}`;
+      await this.cacheService?.delete(cacheKey);
+      this.logger.debug(
+        `Invalidated notification stats cache for user ${userId}`,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to invalidate stats cache for user ${userId}:`,
+        error,
+      );
+    }
   }
 }

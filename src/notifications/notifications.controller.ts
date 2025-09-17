@@ -24,6 +24,7 @@ import {
   UpdateNotificationPreferenceDto,
   BulkUpdateNotificationPreferencesDto,
   MarkAsReadDto,
+  NotificationStatsDto,
 } from './dto';
 
 @Controller('notifications')
@@ -57,7 +58,9 @@ export class NotificationsController {
 
   @Get('stats')
   @HttpCode(HttpStatus.OK)
-  getNotificationStats(@Request() req: Request & { user: AuthPayload }) {
+  getNotificationStats(
+    @Request() req: Request & { user: AuthPayload },
+  ): Promise<NotificationStatsDto> {
     return this.notificationsService.getUserNotificationStats(req.user.uid);
   }
 
@@ -78,9 +81,9 @@ export class NotificationsController {
   updateNotification(
     @Param('id', new SnowflakeIdPipe()) id: string,
     @Body() dto: UpdateNotificationDto,
-    @Request() req: Request & { user: AuthPayload },
+    @Request() _req: Request & { user: AuthPayload },
   ) {
-    return this.notificationsService.update({ id, userId: req.user.uid }, dto);
+    return this.notificationsService.update(id, dto);
   }
 
   @Put(':id/read')
@@ -103,9 +106,9 @@ export class NotificationsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   deleteNotification(
     @Param('id', new SnowflakeIdPipe()) id: string,
-    @Request() req: Request & { user: AuthPayload },
+    @Request() _req: Request & { user: AuthPayload },
   ) {
-    return this.notificationsService.remove({ id, userId: req.user.uid });
+    return this.notificationsService.remove(id);
   }
 
   // Notification Preferences endpoints
@@ -148,8 +151,8 @@ export class NotificationsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   deletePreference(
     @Param('id', new SnowflakeIdPipe()) id: string,
-    @Request() req: Request & { user: AuthPayload },
+    @Request() _req: Request & { user: AuthPayload },
   ) {
-    return this.notificationsService.remove(id, req.user.uid);
+    return this.notificationsService.remove(id);
   }
 }

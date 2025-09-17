@@ -1,11 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsOptional,
-  IsEnum,
-  IsBoolean,
-  IsString,
-  IsDateString,
-} from 'class-validator';
+import { IsOptional, IsEnum, IsBoolean, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AdvancedPaginationDto } from 'src/common/dto/advanced-pagination.dto';
 import {
@@ -36,7 +30,7 @@ export class QueryNotificationsDto extends AdvancedPaginationDto {
   })
   @IsEnum(NOTIFICATION_CONSTANTS.STATUS)
   @IsOptional()
-  status?: NotificationStatus;
+  declare status?: NotificationStatus;
 
   @ApiPropertyOptional({
     description: 'Filter by notification priority',
@@ -80,46 +74,4 @@ export class QueryNotificationsDto extends AdvancedPaginationDto {
   @IsString()
   @IsOptional()
   relatedEntityId?: string;
-
-  @ApiPropertyOptional({
-    description: 'Filter by date range - start date (ISO string)',
-    example: '2024-01-01T00:00:00Z',
-  })
-  @IsDateString()
-  @IsOptional()
-  startDate?: string;
-
-  @ApiPropertyOptional({
-    description: 'Filter by date range - end date (ISO string)',
-    example: '2024-01-31T23:59:59Z',
-  })
-  @IsDateString()
-  @IsOptional()
-  endDate?: string;
-
-  @ApiPropertyOptional({
-    description: 'Search in title and message',
-    example: 'article liked',
-  })
-  @IsString()
-  @IsOptional()
-  search?: string;
-
-  @ApiPropertyOptional({
-    description: 'Sort by field',
-    enum: ['createdAt', 'updatedAt', 'sentAt', 'readAt', 'priority', 'type'],
-    default: 'createdAt',
-  })
-  @IsEnum(['createdAt', 'updatedAt', 'sentAt', 'readAt', 'priority', 'type'])
-  @IsOptional()
-  sortBy?: string;
-
-  @ApiPropertyOptional({
-    description: 'Sort order',
-    enum: ['ASC', 'DESC'],
-    default: 'DESC',
-  })
-  @IsEnum(['ASC', 'DESC'])
-  @IsOptional()
-  sortOrder?: 'ASC' | 'DESC';
 }
