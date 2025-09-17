@@ -41,6 +41,7 @@ import { CacheModule, MailModule, RabbitmqModule } from './shared/services';
 import { StickersModule } from './stickers/stickers.module';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -104,6 +105,7 @@ import { WorkerModule } from './workers/worker.module';
     ReportsModule,
     BookmarksModule,
     TagsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

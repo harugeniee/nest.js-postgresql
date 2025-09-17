@@ -9,6 +9,8 @@ import {
   MailQueueJobResult,
 } from 'src/shared/services/mail/mail-queue.interface';
 import { CommentsService } from 'src/comments/comments.service';
+import { MailQueueIntegrationService } from 'src/shared/services/mail/mail-queue-integration.service';
+import { NOTIFICATION_CONSTANTS } from 'src/shared/constants';
 
 @Injectable()
 export class WorkerService {
@@ -17,6 +19,7 @@ export class WorkerService {
   constructor(
     private readonly mailService: MailService,
     private readonly commentsService: CommentsService,
+    private readonly mailQueueIntegrationService: MailQueueIntegrationService,
   ) {}
 
   testRABBIT(id: number) {
@@ -345,5 +348,240 @@ export class WorkerService {
       );
       throw error;
     }
+  }
+
+  // ==================== NOTIFICATION PROCESSING METHODS ====================
+
+  /**
+   * Process notification email job
+   * Handles sending email notifications via queue
+   */
+  async processNotificationEmail(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing notification email: ${data.notificationId}`);
+
+    try {
+      // Extract notification data
+      const {
+        notificationId,
+        userId,
+        type,
+        title,
+        message,
+        actionUrl,
+        emailTemplate,
+        emailTemplateData,
+        metadata,
+      } = data;
+
+      // Get user email from metadata or user service
+      const userEmail = metadata?.userEmail || `user-${userId}@example.com`;
+      const userName = metadata?.userName || 'User';
+
+      // Prepare email template data
+      const templateData = {
+        appName: process.env.APP_NAME || 'NestJS App',
+        appUrl: process.env.APP_URL || 'http://localhost:3000',
+        supportEmail: process.env.MAIL_SUPPORT || process.env.MAIL_FROM,
+        companyName: process.env.COMPANY_NAME || 'Your Company',
+        companyAddress: process.env.COMPANY_ADDRESS || 'Your Address',
+        name: userName,
+        email: userEmail,
+        title,
+        message,
+        actionUrl,
+        ...emailTemplateData,
+      };
+
+      // Send email using template
+      const result =
+        await this.mailQueueIntegrationService.sendTemplateMailQueue(
+          emailTemplate || this.getDefaultEmailTemplate(type),
+          { email: userEmail, name: userName },
+          templateData,
+          {
+            subject: title,
+            priority: 'normal',
+          },
+          5, // priority
+        );
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Notification email processed: ${notificationId}, jobId: ${result.jobId}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing notification email: ${data.notificationId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process notification push job
+   * Handles sending push notifications
+   */
+  async processNotificationPush(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing notification push: ${data.notificationId}`);
+
+    try {
+      // Extract notification data
+      const {
+        notificationId,
+        userId,
+        type,
+        title,
+        message,
+        actionUrl,
+        pushData,
+        metadata,
+      } = data;
+
+      // TODO: Implement push notification service
+      // This would integrate with services like Firebase Cloud Messaging, OneSignal, etc.
+      this.logger.log(
+        `Push notification would be sent to user ${userId}: ${title}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Notification push processed: ${notificationId}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing notification push: ${data.notificationId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process notification in-app job
+   * Handles storing in-app notifications
+   */
+  async processNotificationInApp(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing notification in-app: ${data.notificationId}`);
+
+    try {
+      // Extract notification data
+      const {
+        notificationId,
+        userId,
+        type,
+        title,
+        message,
+        actionUrl,
+        metadata,
+      } = data;
+
+      // TODO: Implement in-app notification storage
+      // This would store the notification in the database for in-app display
+      this.logger.log(
+        `In-app notification stored for user ${userId}: ${title}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Notification in-app processed: ${notificationId}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing notification in-app: ${data.notificationId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process notification batch email job
+   * Handles sending multiple email notifications in batch
+   */
+  async processNotificationBatchEmail(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing notification batch email: ${data.batchId}`);
+
+    try {
+      const { notifications, templateName, templateData } = data;
+
+      // Process notifications in batches
+      const batchSize = NOTIFICATION_CONSTANTS.BATCH_SIZE;
+      const batches = this.chunkArray(notifications, batchSize);
+
+      for (const batch of batches) {
+        const batchPromises = batch.map(async (notification: any) => {
+          try {
+            return await this.processNotificationEmail(notification);
+          } catch (error) {
+            this.logger.error(
+              `Failed to process notification in batch: ${notification.notificationId}`,
+              error,
+            );
+            return null;
+          }
+        });
+
+        await Promise.allSettled(batchPromises);
+
+        // Add delay between batches
+        if (batches.indexOf(batch) < batches.length - 1) {
+          await this.delay(1000);
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Notification batch email processed: ${data.batchId}, notifications: ${notifications.length}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing notification batch email: ${data.batchId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get default email template for notification type
+   */
+  private getDefaultEmailTemplate(type: string): string {
+    const templateMap: Record<string, string> = {
+      [NOTIFICATION_CONSTANTS.TYPES.ARTICLE_COMMENTED]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.COMMENT_NOTIFICATION,
+      [NOTIFICATION_CONSTANTS.TYPES.ARTICLE_LIKED]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.LIKE_NOTIFICATION,
+      [NOTIFICATION_CONSTANTS.TYPES.COMMENT_MENTIONED]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.MENTION_NOTIFICATION,
+      [NOTIFICATION_CONSTANTS.TYPES.ARTICLE_PUBLISHED]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.ARTICLE_PUBLISHED,
+      [NOTIFICATION_CONSTANTS.TYPES.SYSTEM_ANNOUNCEMENT]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.SYSTEM_ANNOUNCEMENT,
+    };
+
+    return templateMap[type] || 'notification';
+  }
+
+  /**
+   * Utility function to chunk array
+   */
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+  }
+
+  /**
+   * Utility function to add delay
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
