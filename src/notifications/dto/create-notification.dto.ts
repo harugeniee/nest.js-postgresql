@@ -10,6 +10,7 @@ import {
   IsDateString,
   IsObject,
   IsArray,
+  ArrayMinSize,
 } from 'class-validator';
 import {
   NOTIFICATION_CONSTANTS,
@@ -90,8 +91,9 @@ export class CreateNotificationDto {
  */
 export class CreateBulkNotificationDto {
   @IsArray()
+  @ArrayMinSize(1)
   @IsString({ each: true })
-  @IsNotEmpty()
+  @IsNotEmpty({ each: true })
   userIds: string[];
 
   @IsEnum(NOTIFICATION_CONSTANTS.TYPES)

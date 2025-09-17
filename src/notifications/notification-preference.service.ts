@@ -82,7 +82,7 @@ export class NotificationPreferenceService extends BaseService<NotificationPrefe
       await this.invalidateUserPreferencesCache(userId);
 
       this.logger.log(
-        `Notification preference created: ${saved.id}, user: ${userId}, type: ${dto.type}`,
+        `Notification preference created: ${saved?.id}, user: ${userId}, type: ${dto.type}`,
       );
 
       return saved;

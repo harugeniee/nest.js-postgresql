@@ -8,6 +8,8 @@ import {
   Max,
   IsNotEmpty,
   IsObject,
+  IsArray,
+  ArrayMinSize,
 } from 'class-validator';
 import {
   NOTIFICATION_CONSTANTS,
@@ -97,6 +99,9 @@ export class UpdateNotificationPreferenceDto {
  * DTO for bulk updating notification preferences
  */
 export class BulkUpdateNotificationPreferencesDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsNotEmpty({ each: true })
   preferences: Array<{
     type: NotificationType;
     channel: NotificationChannel;
