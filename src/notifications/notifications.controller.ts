@@ -56,6 +56,18 @@ export class NotificationsController {
     return this.notificationsService.getUserNotifications(req.user.uid, query);
   }
 
+  @Get('with-broadcasts')
+  @HttpCode(HttpStatus.OK)
+  getUserNotificationsWithBroadcasts(
+    @Query() query: QueryNotificationsDto,
+    @Request() req: Request & { user: AuthPayload },
+  ) {
+    return this.notificationsService.getUserNotificationsWithBroadcasts(
+      req.user.uid,
+      query,
+    );
+  }
+
   @Get('stats')
   @HttpCode(HttpStatus.OK)
   getNotificationStats(

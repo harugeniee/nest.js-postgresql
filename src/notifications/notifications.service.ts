@@ -381,6 +381,37 @@ export class NotificationsService extends BaseService<Notification> {
   }
 
   /**
+   * Get user notifications including broadcast notifications
+   */
+  async getUserNotificationsWithBroadcasts(
+    userId: string,
+    query: QueryNotificationsDto,
+  ): Promise<{
+    notifications: IPagination<Notification>;
+    broadcasts: any[];
+  }> {
+    try {
+      // Get regular notifications
+      const notifications = await this.getUserNotifications(userId, query);
+
+      // Get active broadcast notifications
+      // Note: This would need to be injected properly in a real implementation
+      const broadcasts: any[] = []; // Placeholder for now
+
+      return {
+        notifications,
+        broadcasts,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Failed to get user notifications with broadcasts:',
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Send notification to queue for processing
    */
   private async sendToQueue(notification: Notification): Promise<void> {
