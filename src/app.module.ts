@@ -42,6 +42,7 @@ import { StickersModule } from './stickers/stickers.module';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { FollowModule } from './follow/follow.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     BookmarksModule,
     TagsModule,
     NotificationsModule,
+    FollowModule,
   ],
   controllers: [AppController],
   providers: [AppService],
