@@ -23,6 +23,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { ReportsModule } from './reports/reports.module';
 import { BookmarksModule } from './bookmarks/bookmarks.module';
+import { TagsModule } from './tags/tags.module';
 import {
   appConfig,
   awsConfig,
@@ -102,6 +103,7 @@ import { WorkerModule } from './workers/worker.module';
     StickersModule,
     ReportsModule,
     BookmarksModule,
+    TagsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
