@@ -4,9 +4,11 @@ import { TagsService } from './tags.service';
 
 // Mock the Auth decorator
 jest.mock('src/common/decorators', () => ({
-  Auth: () => (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
-    return descriptor;
-  },
+  Auth:
+    () =>
+    (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+      return descriptor;
+    },
 }));
 
 describe('TagsController', () => {

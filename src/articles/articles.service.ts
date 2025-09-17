@@ -14,7 +14,13 @@ import {
   UpdateArticleStatusDto,
 } from './dto/schedule-article.dto';
 import { ScheduledPublishingService } from './services/scheduled-publishing.service';
-import { FindOptionsWhere, Repository, LessThanOrEqual, Not } from 'typeorm';
+import {
+  FindOptionsWhere,
+  Repository,
+  LessThanOrEqual,
+  Not,
+  DeepPartial,
+} from 'typeorm';
 
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -46,13 +52,17 @@ export class ArticlesService extends BaseService<Article> {
   }
 
   protected async beforeCreate(
-    data: CreateArticleDto,
-  ): Promise<CreateArticleDto> {
+    data: DeepPartial<Article>,
+  ): Promise<DeepPartial<Article>> {
     // Get existing slugs to avoid collisions
     const existingSlugs = await this.getExistingSlugs();
 
     // Generate unique slug from title
     const title = data.title;
+
+    if (!title) {
+      return data;
+    }
 
     const slug = createArticleSlug(title, existingSlugs, {
       maxLength: 80,
@@ -73,8 +83,40 @@ export class ArticlesService extends BaseService<Article> {
    * @param createArticleDto - Article data
    * @returns Created article
    */
-  async create(createArticleDto: CreateArticleDto): Promise<Article> {
-    return await super.create(createArticleDto);
+  async createArticle(createArticleDto: CreateArticleDto): Promise<Article> {
+    // Use tagsArray field for backward compatibility with string[] tags
+    const articleData: DeepPartial<Article> = {
+      ...createArticleDto,
+      // Store tags as string array in tagsArray field
+      tagsArray: createArticleDto.tags,
+      // Don't set tags relationship - it will be handled separately if needed
+      tags: undefined,
+    };
+
+    return await super.create(articleData);
+  }
+
+  /**
+   * Update an article
+   *
+   * @param id - Article ID
+   * @param updateArticleDto - Update data
+   * @returns Updated article
+   */
+  async updateArticle(
+    id: string,
+    updateArticleDto: UpdateArticleDto,
+  ): Promise<Article> {
+    // Use tagsArray field for backward compatibility with string[] tags
+    const articleData: DeepPartial<Article> = {
+      ...updateArticleDto,
+      // Store tags as string array in tagsArray field
+      tagsArray: updateArticleDto.tags,
+      // Don't set tags relationship - it will be handled separately if needed
+      tags: undefined,
+    };
+
+    return await super.update(id, articleData);
   }
 
   /**
@@ -130,7 +172,7 @@ export class ArticlesService extends BaseService<Article> {
 
   protected async beforeUpdate(
     id: string,
-    patch: UpdateArticleDto,
+    patch: DeepPartial<Article>,
   ): Promise<void> {
     // If title is being updated, regenerate slug
     if (patch.title && typeof patch.title === 'string') {
@@ -145,20 +187,6 @@ export class ArticlesService extends BaseService<Article> {
         patch.slug = newSlug;
       }
     }
-  }
-
-  /**
-   * Update an article
-   *
-   * @param id - Article ID
-   * @param updateArticleDto - Update data
-   * @returns Updated article
-   */
-  async update(
-    id: string,
-    updateArticleDto: UpdateArticleDto,
-  ): Promise<Article> {
-    return await super.update(id, updateArticleDto);
   }
 
   /**
