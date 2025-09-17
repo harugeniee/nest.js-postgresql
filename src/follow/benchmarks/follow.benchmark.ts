@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomInt } from 'crypto';
 import { FollowBitsetService } from '../follow-bitset.service';
 import { FollowCacheService } from '../follow-cache.service';
 import { RoaringAdapter } from '../adapters/roaring.adapter';
@@ -214,31 +215,31 @@ export class FollowBenchmark {
     // Generate follow operations
     for (let i = 0; i < 1000; i++) {
       testData.followOperations.push({
-        followerId: `user_${Math.floor(Math.random() * 1000)}`,
-        followeeId: `user_${Math.floor(Math.random() * 1000)}`,
+        followerId: `user_${randomInt(0, 1000)}`,
+        followeeId: `user_${randomInt(0, 1000)}`,
       });
     }
 
     // Generate unfollow operations
     for (let i = 0; i < 500; i++) {
       testData.unfollowOperations.push({
-        followerId: `user_${Math.floor(Math.random() * 1000)}`,
-        followeeId: `user_${Math.floor(Math.random() * 1000)}`,
+        followerId: `user_${randomInt(0, 1000)}`,
+        followeeId: `user_${randomInt(0, 1000)}`,
       });
     }
 
     // Generate mutual friends queries
     for (let i = 0; i < 200; i++) {
       testData.mutualFriendsQueries.push({
-        userIdA: `user_${Math.floor(Math.random() * 1000)}`,
-        userIdB: `user_${Math.floor(Math.random() * 1000)}`,
+        userIdA: `user_${randomInt(0, 1000)}`,
+        userIdB: `user_${randomInt(0, 1000)}`,
       });
     }
 
     // Generate following list queries
     for (let i = 0; i < 300; i++) {
       testData.followingListQueries.push({
-        userId: `user_${Math.floor(Math.random() * 1000)}`,
+        userId: `user_${randomInt(0, 1000)}`,
       });
     }
 
@@ -391,7 +392,7 @@ export class FollowBenchmark {
    */
   private async simulateTraditionalFollow(): Promise<void> {
     // Simulate database insert
-    await new Promise((resolve) => setTimeout(resolve, Math.random() * 10 + 5));
+    await new Promise((resolve) => setTimeout(resolve, randomInt(5, 15)));
   }
 
   /**
@@ -399,7 +400,7 @@ export class FollowBenchmark {
    */
   private async simulateTraditionalUnfollow(): Promise<void> {
     // Simulate database update
-    await new Promise((resolve) => setTimeout(resolve, Math.random() * 8 + 3));
+    await new Promise((resolve) => setTimeout(resolve, randomInt(3, 11)));
   }
 
   /**
@@ -408,7 +409,7 @@ export class FollowBenchmark {
   private async simulateTraditionalMutualFriends(): Promise<void> {
     // Simulate complex SQL query with JOINs
     await new Promise((resolve) =>
-      setTimeout(resolve, Math.random() * 50 + 20),
+      setTimeout(resolve, randomInt(20, 70)),
     );
   }
 
@@ -418,7 +419,7 @@ export class FollowBenchmark {
   private async simulateTraditionalFollowingList(): Promise<void> {
     // Simulate SQL query with ORDER BY and LIMIT
     await new Promise((resolve) =>
-      setTimeout(resolve, Math.random() * 30 + 10),
+      setTimeout(resolve, randomInt(10, 40)),
     );
   }
 
