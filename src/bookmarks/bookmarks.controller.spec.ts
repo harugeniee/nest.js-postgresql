@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { BookmarksController } from './bookmarks.controller';
 import { BookmarksService } from './bookmarks.service';
 import {
@@ -11,6 +13,7 @@ import {
   QueryBookmarkFoldersDto,
 } from './dto';
 import { BOOKMARK_CONSTANTS } from 'src/shared/constants';
+import { CacheService } from 'src/shared/services';
 
 describe('BookmarksController', () => {
   let controller: BookmarksController;
@@ -93,6 +96,27 @@ describe('BookmarksController', () => {
         {
           provide: BookmarksService,
           useValue: mockBookmarksService,
+        },
+        {
+          provide: JwtService,
+          useValue: {
+            verifyAsync: jest.fn(),
+            sign: jest.fn(),
+          },
+        },
+        {
+          provide: CacheService,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -219,16 +243,23 @@ describe('BookmarksController', () => {
       };
 
       const expectedResult = {
-        data: [mockBookmark],
-        total: 1,
-        page: 1,
-        limit: 20,
-        totalPages: 1,
+        result: [mockBookmark],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 1,
+          totalPages: 1,
+        },
       };
 
       mockBookmarksService.getUserBookmarks.mockResolvedValue({
-        data: [mockBookmark],
-        total: 1,
+        result: [mockBookmark],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 1,
+          totalPages: 1,
+        },
       });
 
       const result = await controller.getUserBookmarks(mockRequest, query);
@@ -250,22 +281,29 @@ describe('BookmarksController', () => {
       };
 
       const expectedResult = {
-        data: [],
-        total: 0,
-        page: 1,
-        limit: 20,
-        totalPages: 0,
+        result: [],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 0,
+          totalPages: 0,
+        },
       };
 
       mockBookmarksService.getUserBookmarks.mockResolvedValue({
-        data: [],
-        total: 0,
+        result: [],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 0,
+          totalPages: 0,
+        },
       });
 
       const result = await controller.getUserBookmarks(mockRequest, query);
 
       expect(result).toEqual(expectedResult);
-      expect(result.data).toHaveLength(0);
+      expect(result.result).toHaveLength(0);
     });
 
     it('should handle service errors when getting user bookmarks', async () => {
@@ -299,20 +337,25 @@ describe('BookmarksController', () => {
 
       expect(result).toEqual(mockBookmark);
       expect(mockBookmarksService.findOne).toHaveBeenCalledWith(
-        '1234567890123456789',
+        { id: '1234567890123456789' },
         {
-          where: { userId: mockRequest.user.uid },
           relations: ['folder'],
         },
       );
     });
 
-    it('should throw error when bookmark not found', async () => {
+    it('should return null when bookmark not found', async () => {
       mockBookmarksService.findOne.mockResolvedValue(null);
 
-      await expect(
-        controller.getBookmark(mockRequest, 'nonexistent'),
-      ).rejects.toThrow();
+      const result = await controller.getBookmark(mockRequest, 'nonexistent');
+
+      expect(result).toBeNull();
+      expect(mockBookmarksService.findOne).toHaveBeenCalledWith(
+        { id: 'nonexistent' },
+        {
+          relations: ['folder'],
+        },
+      );
     });
 
     it('should handle service errors when getting bookmark', async () => {
@@ -562,16 +605,23 @@ describe('BookmarksController', () => {
       };
 
       const expectedResult = {
-        data: [mockFolder],
-        total: 1,
-        page: 1,
-        limit: 20,
-        totalPages: 1,
+        result: [mockFolder],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 1,
+          totalPages: 1,
+        },
       };
 
       mockBookmarksService.getUserFolders.mockResolvedValue({
-        data: [mockFolder],
-        total: 1,
+        result: [mockFolder],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 1,
+          totalPages: 1,
+        },
       });
 
       const result = await controller.getUserFolders(mockRequest, query);
@@ -593,22 +643,29 @@ describe('BookmarksController', () => {
       };
 
       const expectedResult = {
-        data: [],
-        total: 0,
-        page: 1,
-        limit: 20,
-        totalPages: 0,
+        result: [],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 0,
+          totalPages: 0,
+        },
       };
 
       mockBookmarksService.getUserFolders.mockResolvedValue({
-        data: [],
-        total: 0,
+        result: [],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 0,
+          totalPages: 0,
+        },
       });
 
       const result = await controller.getUserFolders(mockRequest, query);
 
       expect(result).toEqual(expectedResult);
-      expect(result.data).toHaveLength(0);
+      expect(result.result).toHaveLength(0);
     });
 
     it('should handle service errors when getting user folders', async () => {
@@ -784,16 +841,23 @@ describe('BookmarksController', () => {
       };
 
       const expectedResult = {
-        data: [mockBookmark],
-        total: 1,
-        page: 1,
-        limit: 20,
-        totalPages: 1,
+        result: [mockBookmark],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 1,
+          totalPages: 1,
+        },
       };
 
       mockBookmarksService.list.mockResolvedValue({
-        data: [mockBookmark],
-        total: 1,
+        result: [mockBookmark],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 1,
+          totalPages: 1,
+        },
       });
 
       const result = await controller.getAllBookmarks(query);
@@ -830,16 +894,23 @@ describe('BookmarksController', () => {
       };
 
       const expectedResult = {
-        data: [mockFolder],
-        total: 1,
-        page: 1,
-        limit: 20,
-        totalPages: 1,
+        result: [mockFolder],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 1,
+          totalPages: 1,
+        },
       };
 
       mockBookmarksService.getAllFolders.mockResolvedValue({
-        data: [mockFolder],
-        total: 1,
+        result: [mockFolder],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 1,
+          totalPages: 1,
+        },
       });
 
       const result = await controller.getAllFolders(query);

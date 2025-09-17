@@ -12,7 +12,7 @@ import { ResolveReportDto } from './dto/resolve-report.dto';
 import { DismissReportDto } from './dto/dismiss-report.dto';
 import { EscalateReportDto } from './dto/escalate-report.dto';
 import { MergeReportsDto } from './dto/merge-reports.dto';
-import { JwtAccessTokenGuard } from 'src/auth/guard';
+import { JwtAccessTokenGuard, RolesGuard } from 'src/auth/guard';
 import { JwtService } from '@nestjs/jwt';
 import { CacheService } from 'src/shared/services';
 import { ConfigService } from '@nestjs/config';
@@ -99,7 +99,7 @@ describe('ReportsController', () => {
           },
         },
         {
-          provide: RoleGuard,
+          provide: RolesGuard,
           useValue: {
             canActivate: jest.fn().mockReturnValue(true),
           },
@@ -228,6 +228,8 @@ describe('ReportsController', () => {
       const dto: QueryReportsDto = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
         status: 'resolved',
       };
 
@@ -254,6 +256,8 @@ describe('ReportsController', () => {
       const dto: QueryReportsDto = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const error = new HttpException(
@@ -938,6 +942,8 @@ describe('ReportsController', () => {
       const dto: Omit<QueryReportsDto, 'userId'> = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const mockResult = {
@@ -964,6 +970,8 @@ describe('ReportsController', () => {
       const dto: Omit<QueryReportsDto, 'userId'> = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const error = new HttpException(
@@ -1010,6 +1018,8 @@ describe('ReportsController', () => {
       const dto: Omit<QueryReportsDto, 'moderatorId'> = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const mockResult = {
@@ -1036,6 +1046,8 @@ describe('ReportsController', () => {
       const dto: Omit<QueryReportsDto, 'moderatorId'> = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const error = new HttpException(
@@ -1082,6 +1094,8 @@ describe('ReportsController', () => {
       const dto: Omit<QueryReportsDto, 'status'> = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const mockResult = {
@@ -1107,6 +1121,8 @@ describe('ReportsController', () => {
       const dto: Omit<QueryReportsDto, 'status'> = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const error = new HttpException(
@@ -1151,6 +1167,8 @@ describe('ReportsController', () => {
       const dto: Omit<QueryReportsDto, 'priority'> = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const mockResult = {
@@ -1176,6 +1194,8 @@ describe('ReportsController', () => {
       const dto: Omit<QueryReportsDto, 'priority'> = {
         page: 1,
         limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const error = new HttpException(

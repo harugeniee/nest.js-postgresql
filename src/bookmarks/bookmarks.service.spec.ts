@@ -14,6 +14,7 @@ import {
 import { BOOKMARK_CONSTANTS } from 'src/shared/constants';
 import { BookmarkFolderService } from './services';
 import { CacheService } from 'src/shared/services';
+import { AdvancedPaginationDto } from 'src/common/dto/advanced-pagination.dto';
 
 describe('BookmarksService', () => {
   let service: BookmarksService;
@@ -415,8 +416,13 @@ describe('BookmarksService', () => {
       };
 
       jest.spyOn(service as any, 'listOffset').mockResolvedValue({
-        data: [],
-        total: 0,
+        result: [],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 0,
+          totalPages: 0,
+        },
       });
 
       const result = await service.getUserBookmarks(
@@ -425,10 +431,15 @@ describe('BookmarksService', () => {
       );
 
       expect(result).toEqual({
-        data: [],
-        total: 0,
+        result: [],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 0,
+          totalPages: 0,
+        },
       });
-      expect(result.data).toHaveLength(0);
+      expect(result.result).toHaveLength(0);
     });
 
     it('should handle service errors when getting user bookmarks', async () => {
@@ -490,17 +501,27 @@ describe('BookmarksService', () => {
       };
 
       mockBookmarkFolderService.getUserFolders.mockResolvedValue({
-        data: [],
-        total: 0,
+        result: [],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 0,
+          totalPages: 0,
+        },
       });
 
       const result = await service.getUserFolders('1234567890123456789', query);
 
       expect(result).toEqual({
-        data: [],
-        total: 0,
+        result: [],
+        metaData: {
+          currentPage: 1,
+          pageSize: 20,
+          totalRecords: 0,
+          totalPages: 0,
+        },
       });
-      expect(result.data).toHaveLength(0);
+      expect(result.result).toHaveLength(0);
     });
 
     it('should handle service errors when getting user folders', async () => {
@@ -925,11 +946,11 @@ describe('BookmarksService', () => {
 
   describe('list (admin)', () => {
     it('should return all bookmarks for admin', async () => {
-      const query = {
+      const query: AdvancedPaginationDto = {
         page: 1,
         limit: 20,
         sortBy: 'createdAt',
-        order: 'DESC',
+        order: 'DESC' as 'ASC' | 'DESC',
       };
 
       jest.spyOn(service as any, 'listOffset').mockResolvedValue({
@@ -952,11 +973,11 @@ describe('BookmarksService', () => {
     });
 
     it('should handle service errors when listing all bookmarks', async () => {
-      const query = {
+      const query: AdvancedPaginationDto = {
         page: 1,
         limit: 20,
         sortBy: 'createdAt',
-        order: 'DESC',
+        order: 'DESC' as 'ASC' | 'DESC',
       };
 
       const error = new HttpException(
@@ -971,11 +992,11 @@ describe('BookmarksService', () => {
 
   describe('getAllFolders (admin)', () => {
     it('should return all folders for admin', async () => {
-      const query = {
+      const query: AdvancedPaginationDto = {
         page: 1,
         limit: 20,
         sortBy: 'createdAt',
-        order: 'DESC',
+        order: 'DESC' as 'ASC' | 'DESC',
       };
 
       mockBookmarkFolderService.getAllFolders.mockResolvedValue({
@@ -995,11 +1016,11 @@ describe('BookmarksService', () => {
     });
 
     it('should handle service errors when getting all folders', async () => {
-      const query = {
+      const query: AdvancedPaginationDto = {
         page: 1,
         limit: 20,
         sortBy: 'createdAt',
-        order: 'DESC',
+        order: 'DESC' as 'ASC' | 'DESC',
       };
 
       const error = new HttpException(
