@@ -1,13 +1,13 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere, Like, Between } from 'typeorm';
+import { Repository, Like, Between, DeepPartial } from 'typeorm';
 import { BaseService } from 'src/common/services';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { CacheService } from 'src/shared/services';
 import { IPagination } from 'src/common/interface';
 import { createSlug } from 'src/common/utils/slug.util';
 import { Tag } from './entities/tag.entity';
-import { CreateTagDto, QueryTagsDto, TagStatsDto } from './dto';
+import { CreateTagDto, QueryTagsDto, TagStatsDto, UpdateTagDto } from './dto';
 import { TAG_CONSTANTS } from 'src/shared/constants/tag.constants';
 
 @Injectable()
@@ -43,138 +43,137 @@ export class TagsService extends BaseService<Tag> {
   }
 
   /**
-   * Create a new tag
+   * Override beforeCreate to handle tag-specific logic
    */
-  async create(createTagDto: CreateTagDto): Promise<Tag> {
-    try {
-      // Generate slug if not provided
-      if (!createTagDto.slug) {
-        createTagDto.slug = createSlug(createTagDto.name, {
-          maxLength: TAG_CONSTANTS.SLUG_MAX_LENGTH,
-          separator: '-',
-        });
-      }
+  protected async beforeCreate(
+    data: DeepPartial<Tag>,
+  ): Promise<DeepPartial<Tag>> {
+    const createTagDto = data as CreateTagDto;
 
-      // Check if slug already exists
-      const existingTag = await this.tagRepository.findOne({
-        where: { slug: createTagDto.slug },
+    // Generate slug if not provided
+    if (!createTagDto.slug) {
+      createTagDto.slug = createSlug(createTagDto.name, {
+        maxLength: TAG_CONSTANTS.SLUG_MAX_LENGTH,
+        separator: '-',
       });
-
-      if (existingTag) {
-        throw new HttpException(
-          {
-            messageKey: 'tag.SLUG_ALREADY_EXISTS',
-            suggestion: `${createTagDto.slug}-${Date.now()}`,
-          },
-          HttpStatus.CONFLICT,
-        );
-      }
-
-      // Set default color if not provided
-      if (!createTagDto.color) {
-        createTagDto.color = this.getRandomColor();
-      }
-
-      // Set default meta title and description if not provided
-      if (!createTagDto.metaTitle) {
-        createTagDto.metaTitle =
-          TAG_CONSTANTS.SEO.DEFAULT_META_TITLE_TEMPLATE.replace(
-            '{tagName}',
-            createTagDto.name,
-          );
-      }
-
-      if (!createTagDto.metaDescription) {
-        createTagDto.metaDescription =
-          TAG_CONSTANTS.SEO.DEFAULT_META_DESCRIPTION_TEMPLATE.replace(
-            '{tagName}',
-            createTagDto.name,
-          );
-      }
-
-      const tag = await super.create(createTagDto);
-
-      // Invalidate cache
-      await this.invalidateTagCaches();
-
-      this.logger.log(`Tag created: ${tag.name} (${tag.slug})`);
-      return tag;
-    } catch (error) {
-      this.logger.error(`Error creating tag: ${error.message}`, error.stack);
-      throw error;
     }
+
+    // Check if slug already exists
+    const existingTag = await this.tagRepository.findOne({
+      where: { slug: createTagDto.slug },
+    });
+
+    if (existingTag) {
+      throw new HttpException(
+        {
+          messageKey: 'tag.SLUG_ALREADY_EXISTS',
+          suggestion: `${createTagDto.slug}-${Date.now()}`,
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    // Set default color if not provided
+    if (!createTagDto.color) {
+      createTagDto.color = this.getRandomColor();
+    }
+
+    // Set default meta title and description if not provided
+    if (!createTagDto.metaTitle) {
+      createTagDto.metaTitle =
+        TAG_CONSTANTS.SEO.DEFAULT_META_TITLE_TEMPLATE.replace(
+          '{tagName}',
+          createTagDto.name,
+        );
+    }
+
+    if (!createTagDto.metaDescription) {
+      createTagDto.metaDescription =
+        TAG_CONSTANTS.SEO.DEFAULT_META_DESCRIPTION_TEMPLATE.replace(
+          '{tagName}',
+          createTagDto.name,
+        );
+    }
+
+    return createTagDto;
+  }
+
+  /**
+   * Override afterCreate to handle post-creation logic
+   */
+  protected async afterCreate(entity: Tag): Promise<void> {
+    // Invalidate tag caches
+    await this.invalidateTagCaches();
+    this.logger.log(`Tag created: ${entity.name} (${entity.slug})`);
+  }
+
+  /**
+   * Override afterUpdate to handle post-update logic
+   */
+  protected async afterUpdate(entity: Tag): Promise<void> {
+    // Invalidate tag caches
+    await this.invalidateTagCaches();
+    this.logger.log(`Tag updated: ${entity.name} (${entity.slug})`);
+  }
+
+  /**
+   * Override afterDelete to handle post-deletion logic
+   */
+  protected async afterDelete(id: string): Promise<void> {
+    // Invalidate tag caches
+    await this.invalidateTagCaches();
+    this.logger.log(`Tag deleted: ${id}`);
   }
 
   /**
    * Get all tags with filtering and pagination
+   * Uses BaseService.listOffset with custom filtering
    */
   async findAll(query: QueryTagsDto): Promise<IPagination<Tag>> {
     try {
-      const where: FindOptionsWhere<Tag> = {};
+      const extraFilter: Record<string, unknown> = {};
 
-      // Apply filters
+      // Apply custom filters
       if (query.isActive !== undefined) {
-        where.isActive = query.isActive;
+        extraFilter.isActive = query.isActive;
       }
 
       if (query.isFeatured !== undefined) {
-        where.isFeatured = query.isFeatured;
+        extraFilter.isFeatured = query.isFeatured;
       }
 
       if (query.category) {
-        where.metadata = { category: query.category };
+        extraFilter.metadata = { category: query.category };
       }
 
       if (query.color) {
-        where.color = query.color;
+        extraFilter.color = query.color;
       }
 
       if (
         query.minUsageCount !== undefined ||
         query.maxUsageCount !== undefined
       ) {
-        where.usageCount = Between(
+        extraFilter.usageCount = Between(
           query.minUsageCount || 0,
           query.maxUsageCount || Number.MAX_SAFE_INTEGER,
         );
       }
 
-      // Apply search
-      if (query.query) {
-        where.name = Like(`%${query.query}%`);
-      }
-
-      // Apply sorting
-      const sortBy = query.sortBy || TAG_CONSTANTS.SEARCH.DEFAULT_SORT_BY;
-      const order = query.order || 'DESC';
-
-      let orderBy: Record<string, 'ASC' | 'DESC'> = {};
-      switch (sortBy) {
-        case 'name':
-          orderBy = { name: order };
-          break;
-        case 'usage':
-          orderBy = { usageCount: order };
-          break;
-        case 'created':
-          orderBy = { createdAt: order };
-          break;
-        case 'updated':
-          orderBy = { updatedAt: order };
-          break;
-        default:
-          orderBy = { usageCount: 'DESC' };
-      }
-
-      return await this.listOffset(query as any, where);
+      // Use BaseService.listOffset with custom filters
+      return await this.listOffset(query as any, extraFilter);
     } catch (error) {
-      this.logger.error(`Error fetching tags: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error fetching tags: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       throw error;
     }
   }
 
   /**
    * Get tag by slug
+   * Uses BaseService.findOne with custom relations
    */
   async findBySlug(slug: string): Promise<Tag> {
     try {
@@ -188,15 +187,40 @@ export class TagsService extends BaseService<Tag> {
       return tag;
     } catch (error) {
       this.logger.error(
-        `Error fetching tag by slug: ${error.message}`,
-        error.stack,
+        `Error fetching tag by slug: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
   }
 
   /**
+   * Get tag by ID
+   * Uses BaseService.findById
+   */
+  async findById(id: string): Promise<Tag> {
+    return await super.findById(id);
+  }
+
+  /**
+   * Update tag
+   * Uses BaseService.update
+   */
+  async update(id: string, updateTagDto: UpdateTagDto): Promise<Tag> {
+    return await super.update(id, updateTagDto);
+  }
+
+  /**
+   * Delete tag
+   * Uses BaseService.remove (soft delete)
+   */
+  async remove(id: string): Promise<void> {
+    return await super.remove(id);
+  }
+
+  /**
    * Update tag usage count
+   * Uses direct repository access for performance
    */
   async updateUsageCount(tagId: string, increment: number = 1): Promise<void> {
     try {
@@ -206,12 +230,13 @@ export class TagsService extends BaseService<Tag> {
         increment,
       );
 
-      // Invalidate cache
+      // Invalidate cache using BaseService method
+      await this.invalidateCacheForEntity(tagId);
       await this.invalidateTagCaches();
     } catch (error) {
       this.logger.error(
-        `Error updating tag usage count: ${error.message}`,
-        error.stack,
+        `Error updating tag usage count: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -219,13 +244,16 @@ export class TagsService extends BaseService<Tag> {
 
   /**
    * Get popular tags
+   * Uses BaseService caching methods
    */
   async getPopularTags(limit: number = 20): Promise<Tag[]> {
     try {
-      const cacheKey = `tags:popular:${limit}`;
-      const cached = await this.cacheService?.get<Tag[]>(cacheKey);
-      if (cached) {
-        return cached;
+      const cacheKey = this.buildCacheKey('popular', { limit });
+      if (cacheKey) {
+        const cached = await this.getCachedResult<Tag[]>(cacheKey);
+        if (cached) {
+          return cached;
+        }
       }
 
       const tags = await this.tagRepository.find({
@@ -240,16 +268,18 @@ export class TagsService extends BaseService<Tag> {
         take: limit,
       });
 
-      await this.cacheService?.set(
-        cacheKey,
-        tags,
-        TAG_CONSTANTS.CACHE.POPULAR_TTL_SEC,
-      );
+      if (cacheKey && this.cache) {
+        await this.cacheService?.set(
+          cacheKey,
+          tags,
+          TAG_CONSTANTS.CACHE.POPULAR_TTL_SEC,
+        );
+      }
       return tags;
     } catch (error) {
       this.logger.error(
-        `Error fetching popular tags: ${error.message}`,
-        error.stack,
+        `Error fetching popular tags: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -257,13 +287,16 @@ export class TagsService extends BaseService<Tag> {
 
   /**
    * Get trending tags
+   * Uses BaseService caching methods
    */
   async getTrendingTags(limit: number = 10): Promise<Tag[]> {
     try {
-      const cacheKey = `tags:trending:${limit}`;
-      const cached = await this.cacheService?.get<Tag[]>(cacheKey);
-      if (cached) {
-        return cached;
+      const cacheKey = this.buildCacheKey('trending', { limit });
+      if (cacheKey) {
+        const cached = await this.getCachedResult<Tag[]>(cacheKey);
+        if (cached) {
+          return cached;
+        }
       }
 
       const tags = await this.tagRepository.find({
@@ -278,16 +311,18 @@ export class TagsService extends BaseService<Tag> {
         take: limit,
       });
 
-      await this.cacheService?.set(
-        cacheKey,
-        tags,
-        TAG_CONSTANTS.CACHE.POPULAR_TTL_SEC,
-      );
+      if (cacheKey && this.cache) {
+        await this.cacheService?.set(
+          cacheKey,
+          tags,
+          TAG_CONSTANTS.CACHE.POPULAR_TTL_SEC,
+        );
+      }
       return tags;
     } catch (error) {
       this.logger.error(
-        `Error fetching trending tags: ${error.message}`,
-        error.stack,
+        `Error fetching trending tags: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -295,13 +330,16 @@ export class TagsService extends BaseService<Tag> {
 
   /**
    * Get featured tags
+   * Uses BaseService caching methods
    */
   async getFeaturedTags(limit: number = 10): Promise<Tag[]> {
     try {
-      const cacheKey = `tags:featured:${limit}`;
-      const cached = await this.cacheService?.get<Tag[]>(cacheKey);
-      if (cached) {
-        return cached;
+      const cacheKey = this.buildCacheKey('featured', { limit });
+      if (cacheKey) {
+        const cached = await this.getCachedResult<Tag[]>(cacheKey);
+        if (cached) {
+          return cached;
+        }
       }
 
       const tags = await this.tagRepository.find({
@@ -313,16 +351,18 @@ export class TagsService extends BaseService<Tag> {
         take: limit,
       });
 
-      await this.cacheService?.set(
-        cacheKey,
-        tags,
-        TAG_CONSTANTS.CACHE.POPULAR_TTL_SEC,
-      );
+      if (cacheKey && this.cache) {
+        await this.cacheService?.set(
+          cacheKey,
+          tags,
+          TAG_CONSTANTS.CACHE.POPULAR_TTL_SEC,
+        );
+      }
       return tags;
     } catch (error) {
       this.logger.error(
-        `Error fetching featured tags: ${error.message}`,
-        error.stack,
+        `Error fetching featured tags: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -330,6 +370,7 @@ export class TagsService extends BaseService<Tag> {
 
   /**
    * Search tags with suggestions
+   * Uses BaseService caching methods
    */
   async searchTags(
     query: string,
@@ -340,10 +381,12 @@ export class TagsService extends BaseService<Tag> {
         return [];
       }
 
-      const cacheKey = `tags:search:${query}:${limit}`;
-      const cached = await this.cacheService?.get<Tag[]>(cacheKey);
-      if (cached) {
-        return cached;
+      const cacheKey = this.buildCacheKey('search', { query, limit });
+      if (cacheKey) {
+        const cached = await this.getCachedResult<Tag[]>(cacheKey);
+        if (cached) {
+          return cached;
+        }
       }
 
       const tags = await this.tagRepository.find({
@@ -355,23 +398,35 @@ export class TagsService extends BaseService<Tag> {
         take: limit,
       });
 
-      await this.cacheService?.set(cacheKey, tags, TAG_CONSTANTS.CACHE.TTL_SEC);
+      if (cacheKey && this.cache) {
+        await this.cacheService?.set(
+          cacheKey,
+          tags,
+          TAG_CONSTANTS.CACHE.TTL_SEC,
+        );
+      }
       return tags;
     } catch (error) {
-      this.logger.error(`Error searching tags: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error searching tags: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       throw error;
     }
   }
 
   /**
    * Get tag statistics
+   * Uses BaseService caching methods
    */
   async getStats(): Promise<TagStatsDto> {
     try {
-      const cacheKey = 'tags:stats';
-      const cached = await this.cacheService?.get<TagStatsDto>(cacheKey);
-      if (cached) {
-        return cached;
+      const cacheKey = this.buildCacheKey('stats', {});
+      if (cacheKey) {
+        const cached = await this.getCachedResult<TagStatsDto>(cacheKey);
+        if (cached) {
+          return cached;
+        }
       }
 
       const [
@@ -412,13 +467,15 @@ export class TagsService extends BaseService<Tag> {
           .createQueryBuilder('tag')
           .select('SUM(tag.usageCount)', 'total')
           .getRawOne()
-          .then((result) => parseInt(result.total) || 0),
+          .then((result: any) => parseInt(result?.total) || 0),
         this.tagRepository
           .createQueryBuilder('tag')
           .select(['tag.name', 'tag.usageCount'])
           .orderBy('tag.usageCount', 'DESC')
           .limit(1)
-          .getRawOne(),
+          .getRawOne() as Promise<
+          { name: string; usageCount: number } | undefined
+        >,
         this.getTagsByCategory(),
         this.getTagsByColor(),
       ]);
@@ -441,16 +498,18 @@ export class TagsService extends BaseService<Tag> {
         recentTrends: await this.getRecentTrends(),
       };
 
-      await this.cacheService?.set(
-        cacheKey,
-        stats,
-        TAG_CONSTANTS.CACHE.STATS_TTL_SEC,
-      );
+      if (cacheKey && this.cache) {
+        await this.cacheService?.set(
+          cacheKey,
+          stats,
+          TAG_CONSTANTS.CACHE.STATS_TTL_SEC,
+        );
+      }
       return stats;
     } catch (error) {
       this.logger.error(
-        `Error getting tag statistics: ${error.message}`,
-        error.stack,
+        `Error getting tag statistics: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -470,7 +529,7 @@ export class TagsService extends BaseService<Tag> {
         .getRawMany();
 
       return result.reduce(
-        (acc, item) => {
+        (acc, item: any) => {
           const category = item.category;
           acc[category] = parseInt(item.count);
           return acc;
@@ -479,8 +538,8 @@ export class TagsService extends BaseService<Tag> {
       );
     } catch (error) {
       this.logger.error(
-        `Error getting tags by category: ${error.message}`,
-        error.stack,
+        `Error getting tags by category: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       return {};
     }
@@ -500,7 +559,7 @@ export class TagsService extends BaseService<Tag> {
         .getRawMany();
 
       return result.reduce(
-        (acc, item) => {
+        (acc, item: any) => {
           acc[item.color] = parseInt(item.count);
           return acc;
         },
@@ -508,8 +567,8 @@ export class TagsService extends BaseService<Tag> {
       );
     } catch (error) {
       this.logger.error(
-        `Error getting tags by color: ${error.message}`,
-        error.stack,
+        `Error getting tags by color: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       return {};
     }
@@ -534,14 +593,14 @@ export class TagsService extends BaseService<Tag> {
         .orderBy('date', 'ASC')
         .getRawMany();
 
-      return result.map((item) => ({
+      return result.map((item: any) => ({
         date: item.date,
         count: parseInt(item.count),
       }));
     } catch (error) {
       this.logger.error(
-        `Error getting recent trends: ${error.message}`,
-        error.stack,
+        `Error getting recent trends: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       return [];
     }
@@ -557,54 +616,51 @@ export class TagsService extends BaseService<Tag> {
 
   /**
    * Invalidate tag-related caches
+   * Uses BaseService cache invalidation methods
    */
   private async invalidateTagCaches(): Promise<void> {
     try {
+      if (!this.cache) return;
+
+      // Use BaseService method to invalidate list caches
+      await this.cacheService?.deleteKeysByPattern(
+        `${this.cache.prefix}:list:*`,
+      );
+
+      // Invalidate specific tag caches
       const patterns = [
-        'tags:popular:*',
-        'tags:trending:*',
-        'tags:featured:*',
-        'tags:search:*',
-        'tags:stats',
+        `${this.cache.prefix}:popular:*`,
+        `${this.cache.prefix}:trending:*`,
+        `${this.cache.prefix}:featured:*`,
+        `${this.cache.prefix}:search:*`,
+        `${this.cache.prefix}:stats:*`,
       ];
 
       for (const pattern of patterns) {
-        await this.cacheService?.delete(pattern);
+        await this.cacheService?.deleteKeysByPattern(pattern);
       }
     } catch (error) {
       this.logger.error(
-        `Error invalidating tag caches: ${error.message}`,
-        error.stack,
+        `Error invalidating tag caches: ${(error as Error).message}`,
+        (error as Error).stack,
       );
     }
   }
 
   /**
    * Bulk create tags from array of names
+   * Uses BaseService.createMany for better performance
    */
   async bulkCreate(tagNames: string[]): Promise<Tag[]> {
     try {
-      const tags: Tag[] = [];
+      const createData: DeepPartial<Tag>[] = tagNames.map((name) => ({ name }));
 
-      for (const name of tagNames) {
-        try {
-          const tag = await this.create({ name });
-          tags.push(tag);
-        } catch (error) {
-          // Skip if tag already exists
-          if (error.status === HttpStatus.CONFLICT) {
-            this.logger.warn(`Tag already exists: ${name}`);
-            continue;
-          }
-          throw error;
-        }
-      }
-
-      return tags;
+      // Use BaseService.createMany for better performance
+      return await this.createMany(createData);
     } catch (error) {
       this.logger.error(
-        `Error bulk creating tags: ${error.message}`,
-        error.stack,
+        `Error bulk creating tags: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -637,8 +693,8 @@ export class TagsService extends BaseService<Tag> {
       return suggestions.slice(0, TAG_CONSTANTS.SEARCH.MAX_SUGGESTIONS);
     } catch (error) {
       this.logger.error(
-        `Error getting content suggestions: ${error.message}`,
-        error.stack,
+        `Error getting content suggestions: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       return [];
     }

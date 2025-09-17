@@ -272,13 +272,13 @@ describe('TagsController', () => {
     });
   });
 
-  describe('findOne', () => {
+  describe('findById', () => {
     it('should return tag by ID', async () => {
       const id = '123456789';
 
       mockTagsService.findById.mockResolvedValue(mockTag);
 
-      const result = await controller.findOne(id);
+      const result = await controller.findById(id);
 
       expect(result).toEqual(mockTag);
       expect(service.findById).toHaveBeenCalledWith(id);

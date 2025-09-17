@@ -152,7 +152,7 @@ export class TagsController {
     type: Tag,
   })
   @ApiResponse({ status: 404, description: 'Tag not found' })
-  findOne(@Param('id', new SnowflakeIdPipe()) id: string): Promise<Tag> {
+  findById(@Param('id', new SnowflakeIdPipe()) id: string): Promise<Tag> {
     return this.tagsService.findById(id);
   }
 

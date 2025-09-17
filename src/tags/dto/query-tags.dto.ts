@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
+  IsIn,
   Min,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -15,16 +16,6 @@ import {
 } from 'src/shared/constants/tag.constants';
 
 export class QueryTagsDto extends AdvancedPaginationDto {
-  @ApiPropertyOptional({
-    description: 'Search query for tag name or description',
-    example: 'javascript',
-    minLength: TAG_CONSTANTS.SEARCH.MIN_QUERY_LENGTH,
-    maxLength: TAG_CONSTANTS.SEARCH.MAX_QUERY_LENGTH,
-  })
-  @IsOptional()
-  @IsString()
-  query?: string;
-
   @ApiPropertyOptional({
     description: 'Filter by tag status',
     example: true,
@@ -81,15 +72,6 @@ export class QueryTagsDto extends AdvancedPaginationDto {
   @Min(0)
   @Type(() => Number)
   maxUsageCount?: number;
-
-  @ApiPropertyOptional({
-    description: 'Sort by field',
-    example: 'usage',
-    enum: TAG_CONSTANTS.SEARCH.SORT_OPTIONS,
-  })
-  @IsOptional()
-  @IsEnum(TAG_CONSTANTS.SEARCH.SORT_OPTIONS)
-  sortBy?: TagSortOption;
 
   @ApiPropertyOptional({
     description: 'Include inactive tags in results',
