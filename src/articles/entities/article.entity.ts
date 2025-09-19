@@ -1,6 +1,15 @@
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { User } from 'src/users/entities/user.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Tag } from 'src/tags/entities/tag.entity';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  ManyToMany,
+  JoinTable,
+} from 'typeorm';
 import {
   ArticleStatus,
   ArticleVisibility,
@@ -133,15 +142,37 @@ export class Article extends BaseEntityCustom {
 
   /**
    * Array of tags for categorization and search
-   * Stored as JSON array of strings
+   * Many-to-Many relationship with Tag entity
    * Can be null if no tags are assigned
+   */
+  @ManyToMany(() => Tag, (tag) => tag.articles, {
+    cascade: false, // Don't cascade delete tags when article is deleted
+    eager: false, // Don't load tags by default for performance
+  })
+  @JoinTable({
+    name: 'article_tags',
+    joinColumn: {
+      name: 'article_id',
+      referencedColumnName: 'id',
+    },
+    inverseJoinColumn: {
+      name: 'tag_id',
+      referencedColumnName: 'id',
+    },
+  })
+  tags?: Tag[];
+
+  /**
+   * Legacy tags field for backward compatibility
+   * Stored as JSON array of strings
+   * This will be populated from the tags relationship
    */
   @Column({
     type: 'json',
     nullable: true,
-    comment: 'Array of tags for categorization',
+    comment: 'Legacy tags array for backward compatibility',
   })
-  tags?: string[];
+  tagsArray?: string[];
 
   /**
    * URL of the cover image for the article

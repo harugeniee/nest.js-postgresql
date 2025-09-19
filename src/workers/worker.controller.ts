@@ -237,4 +237,93 @@ export class WorkerController {
       channel.nack(originalMsg, false, true);
     }
   }
+
+  // Notification job handlers
+  @MessagePattern('notification.send_email')
+  async handleNotificationEmail(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Notification email job received:', data);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await this.workerService.processNotificationEmail(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing notification email:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern('notification.send_push')
+  async handleNotificationPush(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Notification push job received:', data);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await this.workerService.processNotificationPush(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing notification push:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern('notification.send_in_app')
+  async handleNotificationInApp(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Notification in-app job received:', data);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await this.workerService.processNotificationInApp(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing notification in-app:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern('notification.batch_email')
+  async handleNotificationBatchEmail(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Notification batch email job received:', data);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await this.workerService.processNotificationBatchEmail(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing notification batch email:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
 }

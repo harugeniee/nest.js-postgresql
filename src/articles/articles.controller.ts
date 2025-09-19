@@ -20,7 +20,7 @@ export class ArticlesController {
 
   @Post()
   create(@Body() createArticleDto: CreateArticleDto) {
-    return this.articlesService.create(createArticleDto);
+    return this.articlesService.createArticle(createArticleDto);
   }
 
   @Get()
@@ -38,7 +38,7 @@ export class ArticlesController {
     @Param('id', new SnowflakeIdPipe()) id: string,
     @Body() updateArticleDto: UpdateArticleDto,
   ) {
-    return this.articlesService.update(id, updateArticleDto);
+    return this.articlesService.updateArticle(id, updateArticleDto);
   }
 
   @Delete(':id')

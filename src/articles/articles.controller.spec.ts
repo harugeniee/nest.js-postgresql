@@ -98,13 +98,15 @@ describe('ArticlesController', () => {
       };
 
       jest
-        .spyOn(articlesService, 'create')
+        .spyOn(articlesService, 'createArticle')
         .mockResolvedValue(mockArticle as Article);
 
       const result = await controller.create(createArticleDto);
 
       expect(result).toEqual(mockArticle);
-      expect(articlesService.create).toHaveBeenCalledWith(createArticleDto);
+      expect(articlesService.createArticle).toHaveBeenCalledWith(
+        createArticleDto,
+      );
     });
   });
 
@@ -174,13 +176,13 @@ describe('ArticlesController', () => {
       };
 
       jest
-        .spyOn(articlesService, 'update')
+        .spyOn(articlesService, 'updateArticle')
         .mockResolvedValue(mockUpdatedArticle as Article);
 
       const result = await controller.update(articleId, updateData);
 
       expect(result).toEqual(mockUpdatedArticle);
-      expect(articlesService.update).toHaveBeenCalledWith(
+      expect(articlesService.updateArticle).toHaveBeenCalledWith(
         articleId,
         updateData,
       );

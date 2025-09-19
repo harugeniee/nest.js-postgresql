@@ -21,6 +21,9 @@ import { MediaModule } from './media/media.module';
 import { QrModule } from './qr/qr.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { ReactionsModule } from './reactions/reactions.module';
+import { ReportsModule } from './reports/reports.module';
+import { BookmarksModule } from './bookmarks/bookmarks.module';
+import { TagsModule } from './tags/tags.module';
 import {
   appConfig,
   awsConfig,
@@ -38,6 +41,8 @@ import { CacheModule, MailModule, RabbitmqModule } from './shared/services';
 import { StickersModule } from './stickers/stickers.module';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { FollowModule } from './follow/follow.module';
 
 @Module({
   imports: [
@@ -98,6 +103,11 @@ import { WorkerModule } from './workers/worker.module';
     ReactionsModule,
     CommentsModule,
     StickersModule,
+    ReportsModule,
+    BookmarksModule,
+    TagsModule,
+    NotificationsModule,
+    FollowModule,
   ],
   controllers: [AppController],
   providers: [AppService],
