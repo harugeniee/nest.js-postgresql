@@ -9,7 +9,9 @@ COPY package*.json ./
 COPY yarn.lock ./
 
 # Install Python, Make, and G++ for Roaring Bitmap
-RUN apk add --no-cache g++ make python3
+# Add system dependencies for node-gyp
+RUN apt-get update && apt-get install -y python3 make g++ \
+    && ln -sf python3 /usr/bin/python
 
 # Install dependencies
 RUN yarn install --frozen-lockfile
