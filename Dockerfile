@@ -1,5 +1,5 @@
 # Multi-stage build for NestJS application
-FROM node:24-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -9,9 +9,7 @@ COPY package*.json ./
 COPY yarn.lock ./
 
 # Install Python, Make, and G++ for Roaring Bitmap
-# Add system dependencies for node-gyp
-RUN apt-get update && apt-get install -y g++ make python3 \
-    && ln -sf python3 /usr/bin/python
+RUN apk add --no-cache g++ make python3
 
 # Install dependencies
 RUN yarn install --frozen-lockfile
@@ -23,10 +21,13 @@ COPY . .
 RUN yarn build
 
 # Production stage
-FROM node:24-alpine AS production
+FROM node:22-alpine AS production
 
 # Set working directory
 WORKDIR /app
+
+# Install system dependencies for native modules (roaring packages)
+RUN apk add --no-cache g++ make python3
 
 # Copy package files
 COPY package*.json ./
