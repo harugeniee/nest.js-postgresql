@@ -10,7 +10,7 @@ COPY yarn.lock ./
 
 # Install Python, Make, and G++ for Roaring Bitmap
 # Add system dependencies for node-gyp
-RUN apt-get update && apt-get install -y python3 make g++ \
+RUN apt-get update && apt-get install -y g++ make python3 \
     && ln -sf python3 /usr/bin/python
 
 # Install dependencies
