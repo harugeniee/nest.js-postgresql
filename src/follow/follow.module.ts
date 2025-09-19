@@ -1,7 +1,6 @@
 import { Module, OnModuleInit, Inject } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { CacheModule } from '../shared/services/cache/cache.module';
 import { followConfig, FollowConfig } from '../config/follow.config';
 
 // Entities
@@ -36,7 +35,6 @@ import { FollowRebuildTask } from './tasks/follow.rebuild.task';
   imports: [
     ConfigModule.forFeature(followConfig),
     TypeOrmModule.forFeature([UserFollowBitset, UserFollowEdge]),
-    CacheModule,
   ],
   controllers: [FollowController],
   providers: [

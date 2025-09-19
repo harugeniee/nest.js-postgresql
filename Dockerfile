@@ -27,6 +27,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY yarn.lock ./
 
+# Install Python, Make, and G++ for Roaring Bitmap
+RUN apk add --no-cache python3 make g++
+
 # Install only production dependencies
 RUN yarn install --frozen-lockfile --production
 

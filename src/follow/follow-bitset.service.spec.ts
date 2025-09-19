@@ -185,15 +185,17 @@ describe('FollowBitsetService', () => {
         ...mockRoaringSet,
         toArray: jest.fn().mockReturnValue([456, 789, 101112]),
       };
-      
+
       // Override the mock for this specific test
-      (mockCacheService.getFollowingSet as jest.Mock).mockResolvedValueOnce(mockSet as RoaringSet);
+      (mockCacheService.getFollowingSet as jest.Mock).mockResolvedValueOnce(
+        mockSet as RoaringSet,
+      );
 
       const result = await service.getFollowingIds(userId, limit, cursor);
 
       // Debug: Check if cache service was called
       expect(mockCacheService.getFollowingSet).toHaveBeenCalledWith(userId);
-      
+
       // Debug: Check if mock set was returned
       expect(mockSet.toArray).toHaveBeenCalledWith();
 

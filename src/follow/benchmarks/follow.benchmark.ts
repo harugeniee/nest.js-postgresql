@@ -408,9 +408,7 @@ export class FollowBenchmark {
    */
   private async simulateTraditionalMutualFriends(): Promise<void> {
     // Simulate complex SQL query with JOINs
-    await new Promise((resolve) =>
-      setTimeout(resolve, randomInt(20, 70)),
-    );
+    await new Promise((resolve) => setTimeout(resolve, randomInt(20, 70)));
   }
 
   /**
@@ -418,9 +416,7 @@ export class FollowBenchmark {
    */
   private async simulateTraditionalFollowingList(): Promise<void> {
     // Simulate SQL query with ORDER BY and LIMIT
-    await new Promise((resolve) =>
-      setTimeout(resolve, randomInt(10, 40)),
-    );
+    await new Promise((resolve) => setTimeout(resolve, randomInt(10, 40)));
   }
 
   /**
