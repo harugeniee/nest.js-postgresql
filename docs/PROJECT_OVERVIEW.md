@@ -1,8 +1,8 @@
-# 🚀 NestJS PostgreSQL Project Overview
+# 🚀 NestJS Social Media Platform - Complete Overview
 
 ## 📋 Project Summary
 
-This is a comprehensive, enterprise-grade NestJS application built with modern best practices, featuring PostgreSQL, Redis, RabbitMQ, and advanced security measures. The project implements a complete backend system with authentication, rate limiting, QR actions, file management, and real-time communication capabilities.
+This is a comprehensive, enterprise-grade **social media platform** built with NestJS, PostgreSQL, Redis, and RabbitMQ. The platform implements a complete social networking system similar to Medium, with advanced features including content creation, social interactions, real-time notifications, and sophisticated content management.
 
 ## 🏗️ Architecture Highlights
 
@@ -26,58 +26,66 @@ This is a comprehensive, enterprise-grade NestJS application built with modern b
 - **Message Queues**: Asynchronous processing with RabbitMQ
 - **Optimistic Locking**: Concurrent access control
 - **Snowflake IDs**: Distributed system-friendly unique identifiers
+- **Roaring Bitmap**: High-performance follow system
 
 ## 🎯 Core Features
 
-### 1. **Authentication & Authorization System**
-- **JWT-based Authentication**: Access and refresh token management
-- **OAuth Integration**: Social login support (Google, Facebook, GitHub)
-- **Role-based Access Control**: Admin, User roles with granular permissions
-- **Session Management**: User session tracking and device management
-- **WebSocket Authentication**: Real-time communication security
+### 1. **Content Management System**
+- **Article Creation**: Rich text editor with markdown/HTML support
+- **Scheduled Publishing**: Time-based content publishing
+- **Content Status**: Draft, published, archived states
+- **Visibility Controls**: Public, unlisted, private content
+- **SEO Optimization**: Slug generation, meta descriptions
+- **Content Analytics**: View counts, engagement metrics
 
-### 2. **Hybrid Rate Limiting System**
-- **Legacy System**: Plan-based rate limiting with API keys
-- **Advanced System**: Policy-based rate limiting with multiple strategies
-- **Multiple Strategies**: Fixed Window, Sliding Window, Token Bucket
-- **IP Whitelisting**: Bypass rate limits for trusted IPs
-- **Admin Management**: Full CRUD operations for plans, API keys, policies
-- **Hot Reload**: Real-time policy updates without restart
-- **Redis Integration**: Distributed rate limiting with cache invalidation
+### 2. **Social Interaction Features**
+- **Follow System**: High-performance follow/unfollow with roaring bitmap
+- **Reactions**: Like, dislike, bookmark, clap reactions
+- **Comments System**: Nested comments with threading
+- **Bookmarks**: Save and organize content
+- **Tags**: Content categorization and discovery
+- **Stickers**: Emoji and sticker reactions
 
-### 3. **QR Actions Feature**
-- **PKCE Security**: Proof Key for Code Exchange implementation
-- **Real-time Updates**: WebSocket-based status notifications
-- **Action Framework**: Pluggable action system for different operations
-- **Supported Actions**: Login, Add Friend, Join Organization, Device Pairing
-- **Redis State Management**: Ephemeral ticket and grant storage
-- **Multi-language Support**: Internationalized error messages
+### 3. **Advanced Notification System**
+- **Multi-channel Notifications**: Email, push, in-app
+- **Notification Preferences**: User-customizable settings
+- **Real-time Updates**: WebSocket-based live notifications
+- **Broadcast Notifications**: System-wide announcements
+- **Notification Queuing**: RabbitMQ-based async processing
 
-### 4. **File Management System**
-- **File Upload**: Support for multiple file types
-- **Storage Integration**: Flexible storage backend support
-- **File Validation**: MIME type and size validation
-- **Metadata Management**: Comprehensive file metadata tracking
-- **Security**: File access control and validation
+### 4. **Content Discovery & Search**
+- **Tag System**: Content categorization and filtering
+- **Search Functionality**: Full-text search across content
+- **Trending Content**: Algorithm-based content discovery
+- **News Feed**: Personalized content feed
+- **Content Recommendations**: AI-powered suggestions
 
-### 5. **User Management**
-- **User Registration**: Email/password and OAuth registration
-- **Profile Management**: User profile updates and management
-- **Device Management**: Device token management for push notifications
-- **Session Tracking**: User session management and monitoring
-- **Verification System**: Email and phone verification support
+### 5. **User Management & Authentication**
+- **Multi-provider Auth**: Email/password, OAuth, Firebase
+- **User Profiles**: Comprehensive user profiles
+- **Session Management**: Device tracking and management
+- **Role-based Access**: Admin, user, moderator roles
+- **Account Verification**: Email and phone verification
 
-### 6. **Background Job Processing**
-- **RabbitMQ Integration**: Message queue for background tasks
-- **Worker System**: Scalable background job processing
-- **Error Handling**: Robust error handling and retry mechanisms
-- **Monitoring**: Job status tracking and monitoring
+### 6. **Media Management**
+- **File Upload**: Multiple file type support
+- **Image Processing**: Automatic image optimization
+- **Storage Integration**: AWS S3, Cloudflare R2 support
+- **Media Metadata**: Comprehensive file information
+- **CDN Integration**: Fast content delivery
 
-### 7. **Internationalization (i18n)**
-- **Multi-language Support**: English and Vietnamese translations
-- **Dynamic Language Switching**: Runtime language switching
-- **Comprehensive Coverage**: All user-facing messages translated
-- **Fallback System**: Graceful fallback to default language
+### 7. **Content Moderation**
+- **Reporting System**: User-generated content reports
+- **Moderation Tools**: Admin content management
+- **Content Flagging**: Automated content flagging
+- **Audit Trail**: Complete content history tracking
+
+### 8. **Advanced Features**
+- **QR Actions**: Secure QR-based actions (login, add friend, etc.)
+- **Rate Limiting**: Hybrid rate limiting system
+- **Internationalization**: Multi-language support (EN/VI)
+- **Background Jobs**: RabbitMQ-based async processing
+- **Real-time Communication**: WebSocket support
 
 ## 🛠️ Technology Stack
 
@@ -102,31 +110,110 @@ This is a comprehensive, enterprise-grade NestJS application built with modern b
 - **bcrypt**: Password hashing
 - **Helmet.js**: Security headers
 - **CORS**: Cross-origin resource sharing
+- **Firebase Auth**: Social authentication
 
 ### **Real-time Communication**
 - **WebSocket**: Real-time bidirectional communication
 - **Socket.IO**: WebSocket library with fallbacks
 - **Redis Adapter**: Scalable WebSocket communication
 
+### **File Storage**
+- **AWS S3**: Cloud storage
+- **Cloudflare R2**: Alternative cloud storage
+- **Local Storage**: Development storage
+
 ### **Development & Testing**
 - **Jest**: Testing framework
 - **ESLint**: Code linting
 - **Prettier**: Code formatting
-- **Husky**: Git hooks
+- **Docker**: Containerization
 
 ## 📁 Project Structure
 
 ```
 src/
+├── articles/              # Content Management
+│   ├── entities/         # Article entities
+│   ├── dto/             # Article DTOs
+│   ├── services/        # Publishing services
+│   └── articles.module.ts
 ├── auth/                 # Authentication & Authorization
-├── common/              # Shared utilities & cross-cutting concerns
-├── files/               # File management
-├── i18n/                # Internationalization
-├── qr/                  # QR Actions feature
-├── rate-limit/          # Rate limiting system
-├── shared/              # Shared services & configurations
-├── users/               # User management
-└── workers/             # Background job processing
+│   ├── guard/           # Authentication guards
+│   ├── dto/             # Auth DTOs
+│   ├── providers/       # Auth providers
+│   └── auth.module.ts
+├── bookmarks/            # Bookmark System
+│   ├── entities/        # Bookmark entities
+│   ├── dto/             # Bookmark DTOs
+│   └── bookmarks.module.ts
+├── comments/             # Comment System
+│   ├── entities/        # Comment entities
+│   ├── dto/             # Comment DTOs
+│   └── comments.module.ts
+├── follow/               # Follow System
+│   ├── entities/        # Follow entities
+│   ├── adapters/        # Roaring bitmap adapter
+│   ├── services/        # Follow services
+│   └── follow.module.ts
+├── media/                # Media Management
+│   ├── entities/        # Media entities
+│   ├── dto/             # Media DTOs
+│   └── media.module.ts
+├── notifications/        # Notification System
+│   ├── entities/        # Notification entities
+│   ├── dto/             # Notification DTOs
+│   └── notifications.module.ts
+├── qr/                   # QR Actions
+│   ├── actions/         # QR action implementations
+│   ├── entities/        # QR entities
+│   └── qr.module.ts
+├── rate-limit/           # Rate Limiting
+│   ├── entities/        # Rate limit entities
+│   ├── admin/           # Admin management
+│   └── rate-limit.module.ts
+├── reactions/            # Reaction System
+│   ├── entities/        # Reaction entities
+│   ├── dto/             # Reaction DTOs
+│   └── reactions.module.ts
+├── reports/              # Content Moderation
+│   ├── entities/        # Report entities
+│   ├── dto/             # Report DTOs
+│   └── reports.module.ts
+├── stickers/             # Sticker System
+│   ├── entities/        # Sticker entities
+│   ├── dto/             # Sticker DTOs
+│   └── stickers.module.ts
+├── tags/                 # Tag System
+│   ├── entities/        # Tag entities
+│   ├── dto/             # Tag DTOs
+│   └── tags.module.ts
+├── users/                # User Management
+│   ├── entities/        # User entities
+│   ├── dto/             # User DTOs
+│   ├── services/        # User services
+│   └── users.module.ts
+├── common/               # Shared utilities
+│   ├── decorators/      # Custom decorators
+│   ├── dto/             # Common DTOs
+│   ├── filters/         # Exception filters
+│   ├── gateways/        # WebSocket gateways
+│   ├── pipes/           # Validation pipes
+│   ├── repositories/    # Base repositories
+│   ├── services/        # Base services
+│   ├── subscribers/     # TypeORM subscribers
+│   └── utils/           # Utility functions
+├── shared/               # Shared services
+│   ├── config/          # Configuration
+│   ├── constants/       # Application constants
+│   ├── entities/        # Base entities
+│   ├── helpers/         # Helper functions
+│   ├── interceptors/    # Response interceptors
+│   └── services/        # Core services
+├── workers/              # Background Jobs
+│   └── worker.module.ts
+└── i18n/                 # Internationalization
+    ├── en/              # English translations
+    └── vi/              # Vietnamese translations
 ```
 
 ## 🚀 Key Components
@@ -139,23 +226,29 @@ All entities extend from `BaseEntityCustom` with:
 - **Version Control**: Optimistic locking support
 - **Audit Trail**: Comprehensive audit logging
 
-### **Cache Service**
-- **Multi-layer Caching**: Redis with fallback strategies
-- **Pattern-based Operations**: Safe key deletion with SCAN
-- **Atomic Operations**: Lua scripts for complex operations
-- **Distributed Locking**: Redis-based lock mechanism
+### **Follow System (Roaring Bitmap)**
+- **High Performance**: Bitmap-based follow relationships
+- **Scalable**: Handles millions of follows efficiently
+- **Real-time**: Instant follow/unfollow operations
+- **Analytics**: Follow count tracking and statistics
+
+### **Notification System**
+- **Multi-channel**: Email, push, in-app notifications
+- **Preferences**: User-customizable notification settings
+- **Queuing**: RabbitMQ-based async processing
+- **Real-time**: WebSocket live updates
+
+### **Content Management**
+- **Rich Editor**: Markdown and HTML support
+- **Scheduling**: Time-based content publishing
+- **SEO**: Automatic slug generation and meta tags
+- **Analytics**: Content performance tracking
 
 ### **Rate Limiting System**
 - **Hybrid Approach**: Both plan-based and policy-based systems
 - **Multiple Strategies**: Fixed window, sliding window, token bucket
 - **Admin Interface**: Full management capabilities
 - **Real-time Updates**: Hot reload of policies
-
-### **QR Actions System**
-- **PKCE Security**: Secure code exchange
-- **Real-time Updates**: WebSocket status notifications
-- **Action Framework**: Pluggable action system
-- **Redis Integration**: Ephemeral state management
 
 ## 🔧 Configuration Management
 
@@ -167,6 +260,8 @@ Comprehensive configuration through environment variables:
 - **JWT**: Authentication token settings
 - **Rate Limiting**: Rate limit configuration
 - **QR Actions**: QR system settings
+- **Storage**: AWS S3, Cloudflare R2 settings
+- **Firebase**: Authentication settings
 
 ### **Validation**
 - **Joi Schema**: Runtime environment validation
@@ -265,6 +360,7 @@ Comprehensive configuration through environment variables:
 - **Microservices**: Service decomposition
 - **Kubernetes**: Container orchestration
 - **Advanced Analytics**: Usage analytics and monitoring
+- **AI Integration**: Content recommendations and moderation
 
 ### **Performance Improvements**
 - **Query Optimization**: Advanced database tuning
@@ -275,12 +371,15 @@ Comprehensive configuration through environment variables:
 ## ✅ Current Status
 
 The project is **production-ready** with:
-- ✅ **Complete Authentication System**
-- ✅ **Hybrid Rate Limiting**
+- ✅ **Complete Social Media Platform**
+- ✅ **Content Management System**
+- ✅ **Social Interaction Features**
+- ✅ **Advanced Notification System**
+- ✅ **User Management & Authentication**
+- ✅ **Media Management**
+- ✅ **Content Moderation**
+- ✅ **Rate Limiting System**
 - ✅ **QR Actions Feature**
-- ✅ **File Management**
-- ✅ **User Management**
-- ✅ **Background Processing**
 - ✅ **Internationalization**
 - ✅ **Comprehensive Testing**
 - ✅ **Docker Support**
@@ -299,4 +398,4 @@ The application will be available at `http://localhost:3000` with full API docum
 
 ---
 
-**This project represents a modern, scalable, and secure backend solution built with industry best practices and ready for production deployment.**
+**This project represents a modern, scalable, and secure social media platform built with industry best practices and ready for production deployment.**
