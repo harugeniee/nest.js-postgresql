@@ -12,6 +12,7 @@ import { AuthPayload } from 'src/common/interface';
 import { AnalyticsService } from './analytics.service';
 import { TrackEventDto } from './dto/track-event.dto';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
+import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import {
   UserAnalyticsResponseDto,
   ContentPerformanceResponseDto,
@@ -47,7 +48,7 @@ export class AnalyticsController {
    * Get user analytics overview
    *
    * @param userId - ID of the user
-   * @param query - Query parameters including time range
+   * @param query - Query parameters including date range and filters
    * @returns User analytics data
    */
   @Get('users/:userId/overview')
@@ -56,7 +57,7 @@ export class AnalyticsController {
     @Param('userId') userId: string,
     @Query() query: AnalyticsQueryDto,
   ): Promise<UserAnalyticsResponseDto> {
-    return this.analyticsService.getUserAnalytics(userId, query.timeRange);
+    return this.analyticsService.getUserAnalytics(userId, query);
   }
 
   /**
@@ -64,7 +65,7 @@ export class AnalyticsController {
    *
    * @param subjectType - Type of content (article, comment, etc.)
    * @param subjectId - ID of the content
-   * @param query - Query parameters including time range
+   * @param query - Query parameters including date range
    * @returns Content performance data
    */
   @Get('content/:subjectType/:subjectId/performance')
@@ -77,7 +78,7 @@ export class AnalyticsController {
     return this.analyticsService.getContentPerformance(
       subjectType,
       subjectId,
-      query.timeRange,
+      query,
     );
   }
 
@@ -90,5 +91,86 @@ export class AnalyticsController {
   @Auth()
   async getPlatformOverview(): Promise<PlatformOverviewResponseDto> {
     return this.analyticsService.getPlatformOverview();
+  }
+
+  /**
+   * Get dashboard overview analytics
+   *
+   * @param query - Dashboard query parameters with advanced filtering
+   * @returns Comprehensive dashboard analytics data
+   */
+  @Get('dashboard/overview')
+  @Auth()
+  async getDashboardOverview(@Query() query: DashboardQueryDto) {
+    return this.analyticsService.getDashboardOverview(query);
+  }
+
+  /**
+   * Get analytics events with advanced filtering and pagination
+   *
+   * @param query - Analytics query parameters
+   * @returns Paginated analytics events
+   */
+  @Get('events')
+  @Auth()
+  async getAnalyticsEvents(@Query() query: AnalyticsQueryDto) {
+    return this.analyticsService.getAnalyticsEvents(query);
+  }
+
+  /**
+   * Get analytics trends over time
+   *
+   * @param query - Dashboard query parameters for trend analysis
+   * @returns Time series analytics data
+   */
+  @Get('dashboard/trends')
+  @Auth()
+  async getAnalyticsTrends(@Query() query: DashboardQueryDto) {
+    const dashboardData =
+      await this.analyticsService.getDashboardOverview(query);
+    return {
+      timeSeries: dashboardData.timeSeries,
+      totalEvents: dashboardData.totalEvents,
+      uniqueUsers: dashboardData.uniqueUsers,
+      granularity: query.granularity || 'day',
+    };
+  }
+
+  /**
+   * Get top performing content analytics
+   *
+   * @param query - Dashboard query parameters
+   * @returns Top content performance data
+   */
+  @Get('dashboard/top-content')
+  @Auth()
+  async getTopContent(@Query() query: DashboardQueryDto) {
+    const dashboardData =
+      await this.analyticsService.getDashboardOverview(query);
+    return {
+      topContent: dashboardData.topContent,
+      contentInteractions: dashboardData.contentInteractions,
+      subjectTypes: dashboardData.subjectTypes,
+    };
+  }
+
+  /**
+   * Get user engagement analytics
+   *
+   * @param query - Dashboard query parameters
+   * @returns User engagement metrics
+   */
+  @Get('dashboard/user-engagement')
+  @Auth()
+  async getUserEngagement(@Query() query: DashboardQueryDto) {
+    const dashboardData =
+      await this.analyticsService.getDashboardOverview(query);
+    return {
+      topUsers: dashboardData.topUsers,
+      uniqueUsers: dashboardData.uniqueUsers,
+      socialInteractions: dashboardData.socialInteractions,
+      engagementInteractions: dashboardData.engagementInteractions,
+      eventTypes: dashboardData.eventTypes,
+    };
   }
 }

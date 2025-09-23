@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsEvent } from './entities/analytics-event.entity';
 import { AnalyticsMetric } from './entities/analytics-metric.entity';
 import { TrackEventDto } from './dto/track-event.dto';
+import { AnalyticsQueryDto } from './dto/analytics-query.dto';
+import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { CacheService } from 'src/shared/services';
 
 describe('AnalyticsService', () => {
@@ -161,9 +162,16 @@ describe('AnalyticsService', () => {
   });
 
   describe('getUserAnalytics', () => {
-    it('should return user analytics for 30 days', async () => {
+    it('should return user analytics for date range', async () => {
       const userId = 'user123';
-      const timeRange = '30d';
+      const query: AnalyticsQueryDto = {
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-31'),
+        page: 1,
+        limit: 100,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
 
       const mockEvents = [
         {
@@ -191,7 +199,7 @@ describe('AnalyticsService', () => {
 
       mockAnalyticsEventRepository.find.mockResolvedValue(mockEvents);
 
-      const result = await service.getUserAnalytics(userId, timeRange);
+      const result = await service.getUserAnalytics(userId, query);
 
       expect(mockAnalyticsEventRepository.find).toHaveBeenCalledWith({
         where: {
@@ -201,7 +209,8 @@ describe('AnalyticsService', () => {
         order: {
           createdAt: 'DESC',
         },
-        take: 1000,
+        take: 100,
+        skip: 0,
       });
 
       expect(result).toEqual({
@@ -218,11 +227,18 @@ describe('AnalyticsService', () => {
 
     it('should return empty analytics for user with no events', async () => {
       const userId = 'user123';
-      const timeRange = '7d';
+      const query: AnalyticsQueryDto = {
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-07'),
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
 
       mockAnalyticsEventRepository.find.mockResolvedValue([]);
 
-      const result = await service.getUserAnalytics(userId, timeRange);
+      const result = await service.getUserAnalytics(userId, query);
 
       expect(result).toEqual({
         totalEvents: 0,
@@ -237,7 +253,14 @@ describe('AnalyticsService', () => {
     it('should return content performance metrics', async () => {
       const subjectType = 'article';
       const subjectId = '123456789';
-      const timeRange = '30d';
+      const query: AnalyticsQueryDto = {
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-31'),
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
 
       const mockMetrics = [
         {
@@ -279,7 +302,7 @@ describe('AnalyticsService', () => {
       const result = await service.getContentPerformance(
         subjectType,
         subjectId,
-        timeRange,
+        query,
       );
 
       expect(
@@ -298,9 +321,10 @@ describe('AnalyticsService', () => {
         },
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'metric.dateKey >= :startDate',
+        'metric.dateKey BETWEEN :fromDate AND :toDate',
         {
-          startDate: expect.any(String),
+          fromDate: '2024-01-01',
+          toDate: '2024-01-31',
         },
       );
 

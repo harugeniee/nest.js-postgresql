@@ -5,6 +5,7 @@ import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
 import { TrackEventDto } from './dto/track-event.dto';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
+import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { AuthPayload } from 'src/common/interface';
 import { CacheService } from 'src/shared/services';
 
@@ -16,6 +17,8 @@ describe('AnalyticsController', () => {
     getUserAnalytics: jest.fn(),
     getContentPerformance: jest.fn(),
     getPlatformOverview: jest.fn(),
+    getDashboardOverview: jest.fn(),
+    getAnalyticsEvents: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -149,10 +152,15 @@ describe('AnalyticsController', () => {
   });
 
   describe('getUserAnalytics', () => {
-    it('should return user analytics for specified time range', async () => {
+    it('should return user analytics for specified date range', async () => {
       const userId = 'user123';
       const query: AnalyticsQueryDto = {
-        timeRange: '7d',
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-07'),
+        page: 1,
+        limit: 100,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const mockAnalytics = {
@@ -173,14 +181,19 @@ describe('AnalyticsController', () => {
 
       expect(mockAnalyticsService.getUserAnalytics).toHaveBeenCalledWith(
         userId,
-        '7d',
+        query,
       );
       expect(result).toEqual(mockAnalytics);
     });
 
-    it('should return user analytics with default time range', async () => {
+    it('should return user analytics with default date range', async () => {
       const userId = 'user123';
-      const query: AnalyticsQueryDto = { timeRange: '30d' };
+      const query: AnalyticsQueryDto = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
 
       const mockAnalytics = {
         totalEvents: 50,
@@ -200,7 +213,7 @@ describe('AnalyticsController', () => {
 
       expect(mockAnalyticsService.getUserAnalytics).toHaveBeenCalledWith(
         userId,
-        '30d',
+        query,
       );
       expect(result).toEqual(mockAnalytics);
     });
@@ -211,7 +224,12 @@ describe('AnalyticsController', () => {
       const subjectType = 'article';
       const subjectId = '123456789';
       const query: AnalyticsQueryDto = {
-        timeRange: '30d',
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-31'),
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const mockPerformance = {
@@ -234,16 +252,21 @@ describe('AnalyticsController', () => {
       expect(mockAnalyticsService.getContentPerformance).toHaveBeenCalledWith(
         subjectType,
         subjectId,
-        '30d',
+        query,
       );
       expect(result).toEqual(mockPerformance);
     });
 
-    it('should return content performance with different time range', async () => {
+    it('should return content performance with different date range', async () => {
       const subjectType = 'comment';
       const subjectId = '987654321';
       const query: AnalyticsQueryDto = {
-        timeRange: '7d',
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-07'),
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
       };
 
       const mockPerformance = {
@@ -266,7 +289,7 @@ describe('AnalyticsController', () => {
       expect(mockAnalyticsService.getContentPerformance).toHaveBeenCalledWith(
         subjectType,
         subjectId,
-        '7d',
+        query,
       );
       expect(result).toEqual(mockPerformance);
     });
