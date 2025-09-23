@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, Between, In } from 'typeorm';
+import { Repository, MoreThan, Between, In, FindOptionsWhere } from 'typeorm';
 import { BaseService } from 'src/common/services/base.service';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { AnalyticsEvent } from './entities/analytics-event.entity';
@@ -9,9 +9,6 @@ import { TrackEventDto } from './dto/track-event.dto';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { CacheService } from 'src/shared/services';
-import { AnalyticsWidgetsService } from './services/analytics-widgets.service';
-import { RealTimeAnalyticsService } from './services/real-time-analytics.service';
-import { AnalyticsExportService } from './services/analytics-export.service';
 
 /**
  * Analytics Service
@@ -27,9 +24,6 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
     @InjectRepository(AnalyticsMetric)
     private readonly analyticsMetricRepository: Repository<AnalyticsMetric>,
     cacheService: CacheService,
-    private readonly analyticsWidgetsService: AnalyticsWidgetsService,
-    private readonly realTimeAnalyticsService: RealTimeAnalyticsService,
-    private readonly analyticsExportService: AnalyticsExportService,
   ) {
     super(
       new TypeOrmBaseRepository<AnalyticsEvent>(analyticsEventRepository),
@@ -131,7 +125,7 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
    * @returns User analytics data
    */
   async getUserAnalytics(userId: string, query: AnalyticsQueryDto) {
-    const whereConditions: any = { userId };
+    const whereConditions: FindOptionsWhere<AnalyticsEvent> = { userId };
 
     // Apply date range filtering
     if (query.fromDate || query.toDate) {
@@ -303,7 +297,7 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
    * @returns Dashboard overview data
    */
   async getDashboardOverview(query: DashboardQueryDto) {
-    const whereConditions: any = {};
+    const whereConditions: FindOptionsWhere<AnalyticsEvent> = {};
 
     // Apply date range filtering
     if (query.fromDate || query.toDate) {
@@ -341,11 +335,6 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       whereConditions.userId = In(query.userIds);
     }
 
-    // Handle anonymous events
-    if (!query.includeAnonymous) {
-      whereConditions.userId = MoreThan(0); // Exclude null userIds
-    }
-
     const events = await this.analyticsEventRepository.find({
       where: whereConditions,
       order: {
@@ -364,7 +353,7 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
    * @returns Filtered analytics events
    */
   async getAnalyticsEvents(query: AnalyticsQueryDto) {
-    const whereConditions: any = {};
+    const whereConditions: FindOptionsWhere<AnalyticsEvent> = {};
 
     // Apply date range filtering
     if (query.fromDate || query.toDate) {
@@ -619,89 +608,5 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       ...aggregated,
       uniqueUsers: aggregated.uniqueUsers.size,
     };
-  }
-
-  /**
-   * Get analytics widgets data
-   */
-  async getAnalyticsWidgets(widgetType: string, query: any) {
-    switch (widgetType) {
-      case 'user_activity':
-        return this.analyticsWidgetsService.getUserActivityDashboard(query);
-      case 'content_performance':
-        return this.analyticsWidgetsService.getContentPerformanceDashboard(
-          query,
-        );
-      case 'engagement_metrics':
-        return this.analyticsWidgetsService.getEngagementMetricsDashboard(
-          query,
-        );
-      case 'traffic_sources':
-        return this.analyticsWidgetsService.getTrafficSourcesDashboard(query);
-      case 'geographic_data':
-        return this.analyticsWidgetsService.getGeographicDataDashboard(query);
-      case 'conversion_funnel':
-        return this.analyticsWidgetsService.getConversionFunnelDashboard(query);
-      case 'retention_analysis':
-        return this.analyticsWidgetsService.getRetentionAnalysisDashboard(
-          query,
-        );
-      case 'revenue_metrics':
-        return this.analyticsWidgetsService.getRevenueMetricsDashboard(query);
-      default:
-        throw new Error(`Unknown widget type: ${widgetType}`);
-    }
-  }
-
-  /**
-   * Get real-time analytics data
-   */
-  async getRealTimeAnalytics(query: any) {
-    return this.realTimeAnalyticsService.getRealTimeAnalytics(query);
-  }
-
-  /**
-   * Start real-time analytics streaming
-   */
-  startRealTimeStreaming(connectionId: string, query: any) {
-    return this.realTimeAnalyticsService.startRealTimeStreaming(
-      connectionId,
-      query,
-    );
-  }
-
-  /**
-   * Stop real-time analytics streaming
-   */
-  stopRealTimeStreaming(connectionId: string) {
-    return this.realTimeAnalyticsService.stopRealTimeStreaming(connectionId);
-  }
-
-  /**
-   * Export analytics data
-   */
-  async exportAnalyticsData(query: any) {
-    return this.analyticsExportService.exportAnalyticsData(query);
-  }
-
-  /**
-   * Process live event for real-time updates
-   */
-  async processLiveEvent(event: AnalyticsEvent) {
-    return this.realTimeAnalyticsService.processLiveEvent(event);
-  }
-
-  /**
-   * Get real-time metrics summary
-   */
-  async getRealTimeMetricsSummary() {
-    return this.realTimeAnalyticsService.getRealTimeMetricsSummary();
-  }
-
-  /**
-   * Get connection statistics for real-time analytics
-   */
-  getRealTimeConnectionStats() {
-    return this.realTimeAnalyticsService.getConnectionStats();
   }
 }
