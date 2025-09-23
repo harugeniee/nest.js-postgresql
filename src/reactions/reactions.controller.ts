@@ -8,6 +8,7 @@ import {
   Request,
   HttpStatus,
   HttpException,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ReactionsService } from './reactions.service';
 import { CreateOrSetReactionDto } from './dto/create-reaction.dto';
@@ -15,6 +16,8 @@ import { QueryReactionsDto } from './dto/query-reactions.dto';
 import { BatchCountsDto } from './dto/batch-counts.dto';
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 
 @Controller('reactions')
 export class ReactionsController {
@@ -22,6 +25,8 @@ export class ReactionsController {
 
   @Post()
   @Auth()
+  @TrackEvent('reaction_set', 'engagement', 'reaction')
+  @UseInterceptors(AnalyticsInterceptor)
   async createOrSetReaction(
     @Request() req: Request & { user: AuthPayload },
     @Body() dto: CreateOrSetReactionDto,

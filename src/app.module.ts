@@ -43,6 +43,7 @@ import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { FollowModule } from './follow/follow.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { FollowModule } from './follow/follow.module';
     TagsModule,
     NotificationsModule,
     FollowModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
