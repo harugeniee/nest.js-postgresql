@@ -40,17 +40,17 @@ export class AnalyticsInterceptor implements NestInterceptor {
                   eventType: trackEventData.eventType,
                   eventCategory: trackEventData.eventCategory,
                   subjectType: trackEventData.subjectType,
-                  subjectId: request.params?.id || response?.id,
+                  subjectId: request?.params?.id || response?.id,
                   eventData: {
-                    method: request.method || 'UNKNOWN',
-                    url: request.url || 'UNKNOWN',
-                    userAgent: request.headers?.['user-agent'] || 'UNKNOWN',
-                    ipAddress: request.ip || 'UNKNOWN',
+                    method: request?.method || 'UNKNOWN',
+                    url: request?.url || 'UNKNOWN',
+                    userAgent: request?.headers?.['user-agent'] || 'UNKNOWN',
+                    ipAddress: request?.ip || 'UNKNOWN',
                     responseStatus: response?.status || 200,
                   },
                 },
-                request.user?.uid,
-                request.sessionId || request.headers?.['x-session-id'],
+                request?.user?.uid,
+                request?.sessionId || request?.headers?.['x-session-id'],
               )
               .catch((error) => {
                 console.error('Analytics tracking error:', error);

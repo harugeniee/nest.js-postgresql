@@ -5,6 +5,8 @@ import { ArticlesService } from './articles.service';
 import { Article } from './entities/article.entity';
 import { ScheduledPublishingService } from './services/scheduled-publishing.service';
 import { CacheService } from 'src/shared/services';
+import { AnalyticsService } from 'src/analytics/analytics.service';
+import { Reflector } from '@nestjs/core';
 
 describe('ArticlesController', () => {
   let controller: ArticlesController;
@@ -64,6 +66,21 @@ describe('ArticlesController', () => {
             delete: jest.fn(),
             deleteKeysByPattern: jest.fn(),
             getTtl: jest.fn(),
+          },
+        },
+        {
+          provide: AnalyticsService,
+          useValue: {
+            trackEvent: jest.fn().mockResolvedValue({}),
+            getUserAnalytics: jest.fn().mockResolvedValue({}),
+            getContentPerformance: jest.fn().mockResolvedValue({}),
+            getPlatformOverview: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: Reflector,
+          useValue: {
+            get: jest.fn(),
           },
         },
       ],

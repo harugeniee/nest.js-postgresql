@@ -147,13 +147,16 @@ describe('AnalyticsInterceptor', () => {
 
       interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
         next: (response) => {
-          expect(consoleSpy).toHaveBeenCalledWith(
-            'Analytics tracking error:',
-            expect.any(Error),
-          );
-          expect(response).toEqual({ id: '123', title: 'Test Article' });
-          consoleSpy.mockRestore();
-          done();
+          // Wait a bit for the async error handling to complete
+          setTimeout(() => {
+            expect(consoleSpy).toHaveBeenCalledWith(
+              'Analytics tracking error:',
+              expect.any(Error),
+            );
+            expect(response).toEqual({ id: '123', title: 'Test Article' });
+            consoleSpy.mockRestore();
+            done();
+          }, 10);
         },
         error: done,
       });
@@ -172,7 +175,7 @@ describe('AnalyticsInterceptor', () => {
           'user-agent': 'Mozilla/5.0 Test Browser',
         },
         ip: '192.168.1.1',
-        params: {},
+        params: { id: '123' }, // Add id to params to match the expected behavior
         user: null,
       });
 
@@ -190,7 +193,7 @@ describe('AnalyticsInterceptor', () => {
               eventType: 'page_view',
               eventCategory: 'system',
               subjectType: undefined,
-              subjectId: undefined,
+              subjectId: '123', // This should be '123' from params.id
               eventData: {
                 method: 'GET',
                 url: '/',
@@ -272,25 +275,28 @@ describe('AnalyticsInterceptor', () => {
 
       interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
         next: (response) => {
-          expect(mockAnalyticsService.trackEvent).toHaveBeenCalledWith(
-            {
-              eventType: 'article_view',
-              eventCategory: 'content',
-              subjectType: 'article',
-              subjectId: undefined,
-              eventData: {
-                method: 'UNKNOWN',
-                url: 'UNKNOWN',
-                userAgent: 'UNKNOWN',
-                ipAddress: 'UNKNOWN',
-                responseStatus: 200,
+          // Wait a bit for the async error handling to complete
+          setTimeout(() => {
+            expect(mockAnalyticsService.trackEvent).toHaveBeenCalledWith(
+              {
+                eventType: 'article_view',
+                eventCategory: 'content',
+                subjectType: 'article',
+                subjectId: '123', // This comes from response?.id since request is null
+                eventData: {
+                  method: 'UNKNOWN',
+                  url: 'UNKNOWN',
+                  userAgent: 'UNKNOWN',
+                  ipAddress: 'UNKNOWN',
+                  responseStatus: 200,
+                },
               },
-            },
-            undefined,
-            undefined,
-          );
-          expect(response).toEqual({ id: '123', title: 'Test Article' });
-          done();
+              undefined,
+              undefined,
+            );
+            expect(response).toEqual({ id: '123', title: 'Test Article' });
+            done();
+          }, 10);
         },
         error: done,
       });

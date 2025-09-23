@@ -10,6 +10,8 @@ import { JwtAccessTokenGuard } from 'src/auth/guard';
 import { JwtService } from '@nestjs/jwt';
 import { CacheService } from 'src/shared/services';
 import { ConfigService } from '@nestjs/config';
+import { AnalyticsService } from 'src/analytics/analytics.service';
+import { Reflector } from '@nestjs/core';
 
 describe('CommentsController', () => {
   let controller: CommentsController;
@@ -83,6 +85,21 @@ describe('CommentsController', () => {
         },
         {
           provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
+        {
+          provide: AnalyticsService,
+          useValue: {
+            trackEvent: jest.fn().mockResolvedValue({}),
+            getUserAnalytics: jest.fn().mockResolvedValue({}),
+            getContentPerformance: jest.fn().mockResolvedValue({}),
+            getPlatformOverview: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: Reflector,
           useValue: {
             get: jest.fn(),
           },

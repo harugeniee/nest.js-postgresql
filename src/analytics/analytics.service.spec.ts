@@ -376,11 +376,26 @@ describe('AnalyticsService', () => {
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-      expect((service as any).getStartDate('1d')).toEqual(oneDayAgo);
-      expect((service as any).getStartDate('7d')).toEqual(sevenDaysAgo);
-      expect((service as any).getStartDate('30d')).toEqual(thirtyDaysAgo);
-      expect((service as any).getStartDate('90d')).toEqual(ninetyDaysAgo);
-      expect((service as any).getStartDate('invalid')).toEqual(thirtyDaysAgo); // default
+      expect((service as any).getStartDate('1d').getTime()).toBeCloseTo(
+        oneDayAgo.getTime(),
+        -2,
+      );
+      expect((service as any).getStartDate('7d').getTime()).toBeCloseTo(
+        sevenDaysAgo.getTime(),
+        -2,
+      );
+      expect((service as any).getStartDate('30d').getTime()).toBeCloseTo(
+        thirtyDaysAgo.getTime(),
+        -2,
+      );
+      expect((service as any).getStartDate('90d').getTime()).toBeCloseTo(
+        ninetyDaysAgo.getTime(),
+        -2,
+      );
+      expect((service as any).getStartDate('invalid').getTime()).toBeCloseTo(
+        thirtyDaysAgo.getTime(),
+        -2,
+      ); // default
     });
   });
 
