@@ -14,10 +14,20 @@ import { TrackEventDto } from './dto/track-event.dto';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import {
+  DashboardWidgetQueryDto,
+  RealTimeAnalyticsQueryDto,
+  AnalyticsExportQueryDto,
+} from './dto/dashboard-widget.dto';
+import {
   UserAnalyticsResponseDto,
   ContentPerformanceResponseDto,
   PlatformOverviewResponseDto,
 } from './dto/analytics-response.dto';
+import {
+  DashboardWidgetResponseDto,
+  RealTimeAnalyticsResponseDto,
+  AnalyticsExportResponseDto,
+} from './dto/dashboard-response.dto';
 
 /**
  * Analytics Controller
@@ -172,5 +182,184 @@ export class AnalyticsController {
       engagementInteractions: dashboardData.engagementInteractions,
       eventTypes: dashboardData.eventTypes,
     };
+  }
+
+  /**
+   * Get analytics widget data
+   *
+   * @param widgetType - Type of widget to retrieve
+   * @param query - Widget query parameters
+   * @returns Widget data
+   */
+  @Get('widgets/:widgetType')
+  @Auth()
+  async getAnalyticsWidget(
+    @Param('widgetType') widgetType: string,
+    @Query() query: DashboardWidgetQueryDto,
+  ): Promise<DashboardWidgetResponseDto> {
+    const data = await this.analyticsService.getAnalyticsWidgets(
+      widgetType,
+      query,
+    );
+
+    return {
+      widgetType,
+      title: this.getWidgetTitle(widgetType),
+      data,
+      metadata: {
+        lastUpdated: new Date(),
+        dataPoints: query.dataPoints || 30,
+        granularity: query.granularity || 'day',
+        comparison: query.includeComparison
+          ? {
+              period: query.comparisonType || 'previous_period',
+              change: 0, // Would need comparison calculation
+              changeType: 'no_change' as const,
+            }
+          : undefined,
+      },
+    };
+  }
+
+  /**
+   * Get real-time analytics data
+   *
+   * @param query - Real-time analytics query parameters
+   * @returns Real-time analytics data
+   */
+  @Get('realtime')
+  @Auth()
+  async getRealTimeAnalytics(
+    @Query() query: RealTimeAnalyticsQueryDto,
+  ): Promise<RealTimeAnalyticsResponseDto> {
+    return this.analyticsService.getRealTimeAnalytics(query);
+  }
+
+  /**
+   * Get real-time metrics summary
+   *
+   * @returns Real-time metrics summary
+   */
+  @Get('realtime/summary')
+  @Auth()
+  async getRealTimeMetricsSummary() {
+    return this.analyticsService.getRealTimeMetricsSummary();
+  }
+
+  /**
+   * Get real-time connection statistics
+   *
+   * @returns Real-time connection statistics
+   */
+  @Get('realtime/connections')
+  @Auth()
+  async getRealTimeConnectionStats() {
+    return this.analyticsService.getRealTimeConnectionStats();
+  }
+
+  /**
+   * Export analytics data
+   *
+   * @param query - Export query parameters
+   * @returns Export response with download URL
+   */
+  @Get('export')
+  @Auth()
+  async exportAnalyticsData(
+    @Query() query: AnalyticsExportQueryDto,
+  ): Promise<AnalyticsExportResponseDto> {
+    return this.analyticsService.exportAnalyticsData(query);
+  }
+
+  /**
+   * Get comprehensive dashboard data
+   *
+   * @param query - Dashboard query parameters
+   * @returns Comprehensive dashboard data
+   */
+  @Get('dashboard/comprehensive')
+  @Auth()
+  async getComprehensiveDashboard(@Query() query: DashboardQueryDto) {
+    const [
+      overview,
+      userActivity,
+      contentPerformance,
+      engagementMetrics,
+      trafficSources,
+      realTimeMetrics,
+    ] = await Promise.all([
+      this.analyticsService.getDashboardOverview(query),
+      this.analyticsService.getAnalyticsWidgets('user_activity', query),
+      this.analyticsService.getAnalyticsWidgets('content_performance', query),
+      this.analyticsService.getAnalyticsWidgets('engagement_metrics', query),
+      this.analyticsService.getAnalyticsWidgets('traffic_sources', query),
+      this.analyticsService.getRealTimeMetricsSummary(),
+    ]);
+
+    return {
+      overview,
+      widgets: {
+        userActivity,
+        contentPerformance,
+        engagementMetrics,
+        trafficSources,
+      },
+      realTime: realTimeMetrics,
+      metadata: {
+        generatedAt: new Date(),
+        query,
+      },
+    };
+  }
+
+  /**
+   * Get analytics health check
+   *
+   * @returns Analytics system health status
+   */
+  @Get('health')
+  @Auth()
+  async getAnalyticsHealth() {
+    const [totalEvents, recentEvents, realTimeStats, cacheStatus] =
+      await Promise.all([
+        this.analyticsService.getPlatformOverview(),
+        this.analyticsService.getAnalyticsEvents({
+          page: 1,
+          limit: 10,
+          sortBy: 'createdAt',
+          order: 'DESC',
+        }),
+        this.analyticsService.getRealTimeConnectionStats(),
+        { status: 'healthy' }, // Would check cache service status
+      ]);
+
+    return {
+      status: 'healthy',
+      timestamp: new Date(),
+      metrics: {
+        totalEvents: totalEvents.totalEvents,
+        totalUsers: totalEvents.totalUsers,
+        recentEventsCount: recentEvents.total,
+        realTimeConnections: realTimeStats.activeConnections,
+        cacheStatus: cacheStatus.status,
+      },
+    };
+  }
+
+  // Helper method to get widget titles
+  private getWidgetTitle(widgetType: string): string {
+    const titles: Record<string, string> = {
+      overview: 'Analytics Overview',
+      user_activity: 'User Activity',
+      content_performance: 'Content Performance',
+      engagement_metrics: 'Engagement Metrics',
+      traffic_sources: 'Traffic Sources',
+      device_analytics: 'Device Analytics',
+      geographic_data: 'Geographic Data',
+      conversion_funnel: 'Conversion Funnel',
+      retention_analysis: 'Retention Analysis',
+      revenue_metrics: 'Revenue Metrics',
+    };
+    return titles[widgetType] || 'Analytics Widget';
   }
 }

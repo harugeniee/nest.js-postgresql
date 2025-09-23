@@ -7,6 +7,9 @@ import { TrackEventDto } from './dto/track-event.dto';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { CacheService } from 'src/shared/services';
+import { AnalyticsWidgetsService } from './services/analytics-widgets.service';
+import { RealTimeAnalyticsService } from './services/real-time-analytics.service';
+import { AnalyticsExportService } from './services/analytics-export.service';
 
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
@@ -67,6 +70,36 @@ describe('AnalyticsService', () => {
         {
           provide: CacheService,
           useValue: mockCacheService,
+        },
+        {
+          provide: AnalyticsWidgetsService,
+          useValue: {
+            getUserActivityDashboard: jest.fn(),
+            getContentPerformanceDashboard: jest.fn(),
+            getEngagementMetricsDashboard: jest.fn(),
+            getTrafficSourcesDashboard: jest.fn(),
+            getGeographicDataDashboard: jest.fn(),
+            getConversionFunnelDashboard: jest.fn(),
+            getRetentionAnalysisDashboard: jest.fn(),
+            getRevenueMetricsDashboard: jest.fn(),
+          },
+        },
+        {
+          provide: RealTimeAnalyticsService,
+          useValue: {
+            getRealTimeAnalytics: jest.fn(),
+            startRealTimeStreaming: jest.fn(),
+            stopRealTimeStreaming: jest.fn(),
+            processLiveEvent: jest.fn(),
+            getRealTimeMetricsSummary: jest.fn(),
+            getConnectionStats: jest.fn(),
+          },
+        },
+        {
+          provide: AnalyticsExportService,
+          useValue: {
+            exportAnalyticsData: jest.fn(),
+          },
         },
       ],
     }).compile();
