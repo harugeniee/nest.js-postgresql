@@ -34,25 +34,27 @@ export class AnalyticsInterceptor implements NestInterceptor {
         tap((response) => {
           try {
             // Track the event with basic information
-            void this.analyticsService.trackEvent(
-              {
-                eventType: (trackEventData as any).eventType,
-                eventCategory: (trackEventData as any).eventCategory,
-                subjectType: (trackEventData as any).subjectType,
-                subjectId: (request as any).params?.id || (response as any)?.id,
-                eventData: {
-                  method: (request as any).method || 'UNKNOWN',
-                  url: (request as any).url || 'UNKNOWN',
-                  userAgent:
-                    (request as any).headers?.['user-agent'] || 'UNKNOWN',
-                  ipAddress: (request as any).ip || 'UNKNOWN',
-                  responseStatus: (response as any)?.status || 200,
+            this.analyticsService
+              .trackEvent(
+                {
+                  eventType: trackEventData.eventType,
+                  eventCategory: trackEventData.eventCategory,
+                  subjectType: trackEventData.subjectType,
+                  subjectId: request.params?.id || response?.id,
+                  eventData: {
+                    method: request.method || 'UNKNOWN',
+                    url: request.url || 'UNKNOWN',
+                    userAgent: request.headers?.['user-agent'] || 'UNKNOWN',
+                    ipAddress: request.ip || 'UNKNOWN',
+                    responseStatus: response?.status || 200,
+                  },
                 },
-              },
-              (request as any).user?.uid,
-              (request as any).sessionId ||
-                (request as any).headers?.['x-session-id'],
-            );
+                request.user?.uid,
+                request.sessionId || request.headers?.['x-session-id'],
+              )
+              .catch((error) => {
+                console.error('Analytics tracking error:', error);
+              });
           } catch (error) {
             console.error('Analytics tracking error:', error);
           }
