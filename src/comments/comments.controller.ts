@@ -10,6 +10,7 @@ import {
   Request,
   HttpStatus,
   HttpException,
+  UseInterceptors,
 } from '@nestjs/common';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
@@ -19,6 +20,8 @@ import { BatchCommentsDto } from './dto/batch-comments.dto';
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 
 @Controller('comments')
 export class CommentsController {
@@ -30,6 +33,8 @@ export class CommentsController {
    */
   @Post()
   @Auth()
+  @TrackEvent('comment_create', 'engagement', 'comment')
+  @UseInterceptors(AnalyticsInterceptor)
   async createComment(
     @Request() req: Request & { user: AuthPayload },
     @Body() dto: CreateCommentDto,

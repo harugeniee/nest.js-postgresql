@@ -2,6 +2,7 @@ import { Module, OnModuleInit, Inject } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { followConfig, FollowConfig } from '../config/follow.config';
+import { AnalyticsModule } from 'src/analytics/analytics.module';
 
 // Entities
 import { UserFollowBitset } from './entities/user-follow-bitset.entity';
@@ -35,6 +36,7 @@ import { FollowRebuildTask } from './tasks/follow.rebuild.task';
   imports: [
     ConfigModule.forFeature(followConfig),
     TypeOrmModule.forFeature([UserFollowBitset, UserFollowEdge]),
+    AnalyticsModule,
   ],
   controllers: [FollowController],
   providers: [

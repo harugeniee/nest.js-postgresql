@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   HttpException,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,6 +23,8 @@ import {
 import { Auth } from '../common/decorators';
 import { AuthPayload } from '../common/interface';
 import { SnowflakeIdPipe } from '../common/pipes';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 import { FollowBitsetService } from './follow-bitset.service';
 import { FollowSuggestionsService } from './follow-suggestions.service';
 import { NewsFeedService } from './newsfeed.service';
@@ -62,6 +65,8 @@ export class FollowController {
   @Post(':targetUserId')
   @Auth()
   @HttpCode(HttpStatus.OK)
+  @TrackEvent('user_follow', 'social', 'user')
+  @UseInterceptors(AnalyticsInterceptor)
   @ApiOperation({ summary: 'Follow a user' })
   @ApiParam({ name: 'targetUserId', description: 'ID of the user to follow' })
   @ApiResponse({ status: 200, description: 'Successfully followed user' })
@@ -96,6 +101,8 @@ export class FollowController {
   @Delete(':targetUserId')
   @Auth()
   @HttpCode(HttpStatus.OK)
+  @TrackEvent('user_unfollow', 'social', 'user')
+  @UseInterceptors(AnalyticsInterceptor)
   @ApiOperation({ summary: 'Unfollow a user' })
   @ApiParam({ name: 'targetUserId', description: 'ID of the user to unfollow' })
   @ApiResponse({ status: 200, description: 'Successfully unfollowed user' })
