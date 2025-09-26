@@ -44,6 +44,7 @@ import { WorkerModule } from './workers/worker.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { FollowModule } from './follow/follow.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { ShareModule } from './share/share.module';
 
 @Module({
   imports: [
@@ -110,6 +111,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     NotificationsModule,
     FollowModule,
     AnalyticsModule,
+    ShareModule,
   ],
   controllers: [AppController],
   providers: [AppService],
