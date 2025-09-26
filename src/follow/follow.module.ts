@@ -1,7 +1,7 @@
 import { Module, OnModuleInit, Inject } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { followConfig, FollowConfig } from '../config/follow.config';
+import { followConfig, FollowConfig } from '../shared/config/follow.config';
 import { AnalyticsModule } from 'src/analytics/analytics.module';
 
 // Entities

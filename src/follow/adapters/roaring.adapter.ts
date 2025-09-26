@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FollowConfig } from '../../config/follow.config';
+import { FollowConfig } from '../../shared/config/follow.config';
 
 /**
  * RoaringSet interface for bitmap operations
