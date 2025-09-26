@@ -125,11 +125,7 @@ export class ShareAttributionService extends BaseService<ShareAttribution> {
       where: { shareId },
     });
 
-    const totalVisits = await this.shareAttributionRepository
-      .createQueryBuilder('attribution')
-      .select('SUM(attribution.totalVisits)', 'total')
-      .where('attribution.shareId = :shareId', { shareId })
-      .getRawOne();
+    const totalVisits = await this.getTotalVisits(shareId);
 
     const recentAttributions = await this.shareAttributionRepository.find({
       where: { shareId },
@@ -140,7 +136,7 @@ export class ShareAttributionService extends BaseService<ShareAttribution> {
 
     return {
       totalAttributions,
-      totalVisits: parseInt(totalVisits.total) || 0,
+      totalVisits,
       recentAttributions,
     };
   }
@@ -156,31 +152,13 @@ export class ShareAttributionService extends BaseService<ShareAttribution> {
       where: { shareId, attributed: true },
     });
 
-    const totalConversionValue = await this.shareConversionRepository
-      .createQueryBuilder('conversion')
-      .select('COALESCE(SUM(conversion.convValue), 0)', 'total')
-      .where('conversion.shareId = :shareId', { shareId })
-      .andWhere('conversion.attributed = true')
-      .getRawOne();
-
-    const conversionsByType = await this.shareConversionRepository
-      .createQueryBuilder('conversion')
-      .select('conversion.convType', 'type')
-      .addSelect('COUNT(*)', 'count')
-      .addSelect('COALESCE(SUM(conversion.convValue), 0)', 'value')
-      .where('conversion.shareId = :shareId', { shareId })
-      .andWhere('conversion.attributed = true')
-      .groupBy('conversion.convType')
-      .getRawMany();
+    const totalConversionValue = await this.getTotalConversionValue(shareId);
+    const conversionsByType = await this.getConversionsByType(shareId);
 
     return {
       totalConversions,
-      totalConversionValue: parseFloat(totalConversionValue.total) || 0,
-      conversionsByType: conversionsByType.map((c) => ({
-        type: c.type,
-        count: parseInt(c.count),
-        value: parseFloat(c.value),
-      })),
+      totalConversionValue,
+      conversionsByType,
     };
   }
 
@@ -210,5 +188,77 @@ export class ShareAttributionService extends BaseService<ShareAttribution> {
       .delete()
       .where('occurredAt < :cutoffDate', { cutoffDate })
       .execute();
+  }
+
+  /**
+   * Get total visits for a share link using repository sum method
+   *
+   * @param shareId - Share link ID
+   * @returns Total visits count
+   */
+  private async getTotalVisits(shareId: string): Promise<number> {
+    // Use QueryBuilder for SUM operation
+    const result: { total: string } | undefined =
+      await this.shareAttributionRepository
+        .createQueryBuilder('attribution')
+        .select('SUM(attribution.totalVisits)', 'total')
+        .where('attribution.shareId = :shareId', { shareId })
+        .getRawOne();
+
+    return parseInt(result?.total || '0') || 0;
+  }
+
+  /**
+   * Get total conversion value for a share link using repository sum method
+   *
+   * @param shareId - Share link ID
+   * @returns Total conversion value
+   */
+  private async getTotalConversionValue(shareId: string): Promise<number> {
+    // Use QueryBuilder for SUM operation
+    const result: { total: string } | undefined =
+      await this.shareConversionRepository
+        .createQueryBuilder('conversion')
+        .select('COALESCE(SUM(conversion.convValue), 0)', 'total')
+        .where('conversion.shareId = :shareId', { shareId })
+        .andWhere('conversion.attributed = true')
+        .getRawOne();
+
+    return parseFloat(result?.total || '0') || 0;
+  }
+
+  /**
+   * Get conversions grouped by type using queryBuilder
+   * This requires GROUP BY which cannot be done with simple repository methods
+   *
+   * @param shareId - Share link ID
+   * @returns Conversions grouped by type
+   */
+  private async getConversionsByType(shareId: string): Promise<
+    Array<{
+      type: string;
+      count: number;
+      value: number;
+    }>
+  > {
+    const conversionsByType: Array<{
+      type: string;
+      count: string;
+      value: string;
+    }> = await this.shareConversionRepository
+      .createQueryBuilder('conversion')
+      .select('conversion.convType', 'type')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('COALESCE(SUM(conversion.convValue), 0)', 'value')
+      .where('conversion.shareId = :shareId', { shareId })
+      .andWhere('conversion.attributed = true')
+      .groupBy('conversion.convType')
+      .getRawMany();
+
+    return conversionsByType.map((c) => ({
+      type: c.type,
+      count: parseInt(c.count),
+      value: parseFloat(c.value),
+    }));
   }
 }

@@ -23,6 +23,7 @@ describe('ShareAttributionService', () => {
     findOne: jest.fn(),
     find: jest.fn(),
     count: jest.fn(),
+    sum: jest.fn(),
     createQueryBuilder: jest.fn(),
     metadata: {
       columns: [],
