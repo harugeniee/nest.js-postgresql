@@ -1,31 +1,31 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
-import { RabbitMQService } from 'src/shared/services';
 import { JOB_NAME } from 'src/shared/constants';
+import { RabbitMQService } from 'src/shared/services';
+import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 
-import { ShareLink } from './entities/share-link.entity';
-import { ShareSession } from './entities/share-session.entity';
-import { ShareClick } from './entities/share-click.entity';
-import { ShareAttribution } from './entities/share-attribution.entity';
-import { ShareConversion } from './entities/share-conversion.entity';
+import { Article } from 'src/articles/entities/article.entity';
+import { BookmarkFolder } from 'src/bookmarks/entities/bookmark-folder.entity';
+import { Comment } from 'src/comments/entities/comment.entity';
+import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
+import { BaseService } from 'src/common/services/base.service';
+import { Media } from 'src/media/entities/media.entity';
+import { SHARE_CONSTANTS, ShareContentType } from 'src/shared/constants';
+import { CacheService } from 'src/shared/services';
+import { StickerPack } from 'src/stickers/entities/sticker-pack.entity';
+import { User } from 'src/users/entities/user.entity';
 import { CreateShareLinkDto } from './dto/create-share-link.dto';
 import {
   ShareAttributionDto,
   ShareConversionDto,
 } from './dto/share-attribution.dto';
-import { SHARE_CONSTANTS, ShareContentType } from 'src/shared/constants';
-import { BaseService } from 'src/common/services/base.service';
-import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
-import { CacheService } from 'src/shared/services';
-import { Article } from 'src/articles/entities/article.entity';
-import { User } from 'src/users/entities/user.entity';
-import { Media } from 'src/media/entities/media.entity';
-import { Comment } from 'src/comments/entities/comment.entity';
-import { BookmarkFolder } from 'src/bookmarks/entities/bookmark-folder.entity';
-import { StickerPack } from 'src/stickers/entities/sticker-pack.entity';
+import { ShareAttribution } from './entities/share-attribution.entity';
+import { ShareClick } from './entities/share-click.entity';
+import { ShareConversion } from './entities/share-conversion.entity';
+import { ShareLink } from './entities/share-link.entity';
+import { ShareSession } from './entities/share-session.entity';
 
 /**
  * Main share service for handling share link operations
@@ -215,7 +215,7 @@ export class ShareService extends BaseService<ShareLink> {
   /**
    * Resolve QR ticket content
    */
-  private async resolveQrTicket(contentId: string): Promise<null> {
+  private async resolveQrTicket(_contentId: string): Promise<null> {
     return null; // TODO: Implement when QR ticket entity is available
   }
 
