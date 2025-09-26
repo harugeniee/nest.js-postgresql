@@ -14,6 +14,7 @@ import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
  */
 @Entity({ name: 'share_clicks' })
 @Index(['shareId', 'ts'])
+@Index(['ts'])
 @Index(['sessionId'])
 @Index(['event'])
 @Index(['isCountable'])
@@ -55,7 +56,6 @@ export class ShareClick extends BaseEntityCustom {
    * Click timestamp
    * Indexed for time-based queries
    */
-  @Index()
   @Column({
     type: 'timestamp',
     nullable: false,

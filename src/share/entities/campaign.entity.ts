@@ -12,6 +12,9 @@ import { ShareLink } from 'src/share/entities/share-link.entity';
  */
 @Entity({ name: 'campaigns' })
 @Index(['name'], { unique: true })
+@Index(['startDate'])
+@Index(['endDate'])
+@Index(['isActive'])
 export class Campaign extends BaseEntityCustom {
   /**
    * Campaign name
@@ -39,7 +42,6 @@ export class Campaign extends BaseEntityCustom {
    * Campaign start date
    * Can be null for ongoing campaigns
    */
-  @Index()
   @Column({
     type: 'timestamp',
     nullable: true,
@@ -51,7 +53,6 @@ export class Campaign extends BaseEntityCustom {
    * Campaign end date
    * Can be null for ongoing campaigns
    */
-  @Index()
   @Column({
     type: 'timestamp',
     nullable: true,

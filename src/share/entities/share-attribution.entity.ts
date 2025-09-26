@@ -53,7 +53,6 @@ export class ShareAttribution extends BaseEntityCustom {
    * First visit timestamp
    * When the user first visited through this share link
    */
-  @Index()
   @Column({
     type: 'timestamp',
     nullable: false,
@@ -65,7 +64,6 @@ export class ShareAttribution extends BaseEntityCustom {
    * Last visit timestamp
    * When the user last visited through this share link
    */
-  @Index()
   @Column({
     type: 'timestamp',
     nullable: false,

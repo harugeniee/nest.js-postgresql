@@ -79,7 +79,6 @@ export class ShareConversion extends BaseEntityCustom {
    * When the conversion occurred
    * Indexed for time-based queries
    */
-  @Index()
   @Column({
     type: 'timestamp',
     nullable: false,

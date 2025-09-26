@@ -35,7 +35,6 @@ export class ShareAggDaily extends BaseEntityCustom {
    * Date for this aggregation (YYYY-MM-DD)
    * Indexed for time-based queries
    */
-  @Index()
   @Column({
     type: 'date',
     nullable: false,
