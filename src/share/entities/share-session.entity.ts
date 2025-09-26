@@ -56,7 +56,6 @@ export class ShareSession extends BaseEntityCustom {
    * Session expiration date
    * Sessions expire after 7 days for attribution purposes
    */
-  @Index()
   @Column({
     type: 'timestamp',
     nullable: false,

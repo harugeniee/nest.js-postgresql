@@ -9,7 +9,7 @@ import { Transform } from 'class-transformer';
 import {
   SHARE_CONSTANTS,
   ShareContentType,
-} from '../constants/share.constants';
+} from '../../shared/constants/share.constants';
 
 export class CreateShareLinkDto {
   /**

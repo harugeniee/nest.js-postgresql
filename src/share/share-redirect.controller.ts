@@ -17,7 +17,7 @@ import {
   ShareAttributionDto,
   ShareConversionDto,
 } from './dto/share-attribution.dto';
-import { SHARE_CONSTANTS } from './constants/share.constants';
+import { SHARE_CONSTANTS } from 'src/shared/constants';
 import { ShareLink } from './entities/share-link.entity';
 import { ShareSession } from './entities/share-session.entity';
 

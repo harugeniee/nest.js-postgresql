@@ -11,3 +11,4 @@ export * from './sticker.constants';
 export * from './report.constants';
 export * from './bookmark.constants';
 export * from './notification.constants';
+export * from './share.constants';

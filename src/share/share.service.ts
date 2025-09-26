@@ -13,7 +13,7 @@ import {
   ShareAttributionDto,
   ShareConversionDto,
 } from './dto/share-attribution.dto';
-import { SHARE_CONSTANTS, ShareContentType } from './constants/share.constants';
+import { SHARE_CONSTANTS, ShareContentType } from 'src/shared/constants';
 import { BaseService } from 'src/common/services/base.service';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { CacheService } from 'src/shared/services';
