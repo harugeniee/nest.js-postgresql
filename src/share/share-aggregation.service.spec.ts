@@ -29,6 +29,30 @@ describe('ShareAggregationService', () => {
     },
   };
 
+  const mockShareClickRepository = {
+    create: jest.fn(),
+    save: jest.fn(),
+    findOne: jest.fn(),
+    find: jest.fn(),
+    count: jest.fn(),
+    createQueryBuilder: jest.fn(),
+    metadata: {
+      columns: [],
+    },
+  };
+
+  const mockShareConversionRepository = {
+    create: jest.fn(),
+    save: jest.fn(),
+    findOne: jest.fn(),
+    find: jest.fn(),
+    count: jest.fn(),
+    createQueryBuilder: jest.fn(),
+    metadata: {
+      columns: [],
+    },
+  };
+
   const mockCacheService = {
     get: jest.fn(),
     set: jest.fn(),
@@ -38,6 +62,9 @@ describe('ShareAggregationService', () => {
   };
 
   beforeEach(async () => {
+    // Reset all mocks before each test
+    jest.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ShareAggregationService,
@@ -51,11 +78,11 @@ describe('ShareAggregationService', () => {
         },
         {
           provide: getRepositoryToken(ShareClick),
-          useValue: mockRepository,
+          useValue: mockShareClickRepository,
         },
         {
           provide: getRepositoryToken(ShareConversion),
-          useValue: mockRepository,
+          useValue: mockShareConversionRepository,
         },
         {
           provide: CacheService,
@@ -139,32 +166,26 @@ describe('ShareAggregationService', () => {
         convValue: 20.0,
       };
 
-      // Mock repository methods
-      jest.spyOn(shareClickRepository, 'count').mockResolvedValue(10);
-      jest.spyOn(shareConversionRepository, 'count').mockResolvedValue(2);
+      // Mock repository methods with proper return values
+      mockShareClickRepository.count.mockResolvedValue(10);
+      mockShareConversionRepository.count.mockResolvedValue(2);
 
-      jest.spyOn(shareClickRepository, 'createQueryBuilder').mockReturnValue({
+      mockShareClickRepository.createQueryBuilder.mockReturnValue({
         select: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getRawOne: jest.fn().mockResolvedValue({ count: '5' }),
       } as any);
 
-      jest
-        .spyOn(shareConversionRepository, 'createQueryBuilder')
-        .mockReturnValue({
-          select: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getRawOne: jest.fn().mockResolvedValue({ total: '20.0' }),
-        } as any);
+      mockShareConversionRepository.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue({ total: '20.0' }),
+      } as any);
 
-      jest
-        .spyOn(shareAggDailyRepository, 'create')
-        .mockReturnValue(mockAggregation as any);
-      jest
-        .spyOn(shareAggDailyRepository, 'save')
-        .mockResolvedValue(mockAggregation as any);
+      mockRepository.create.mockReturnValue(mockAggregation as any);
+      mockRepository.save.mockResolvedValue(mockAggregation as any);
 
       // Call the private method
       await (service as any).createAggregation(
@@ -174,7 +195,7 @@ describe('ShareAggregationService', () => {
         dayString,
       );
 
-      expect(shareAggDailyRepository.create).toHaveBeenCalledWith({
+      expect(mockRepository.create).toHaveBeenCalledWith({
         shareId,
         day: dayString,
         clicks: 10,
@@ -182,7 +203,7 @@ describe('ShareAggregationService', () => {
         convs: 2,
         convValue: 20.0,
       });
-      expect(shareAggDailyRepository.save).toHaveBeenCalledWith(
+      expect(mockRepository.save).toHaveBeenCalledWith(
         mockAggregation,
       );
     });
