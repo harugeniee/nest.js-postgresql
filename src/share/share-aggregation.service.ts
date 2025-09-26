@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -22,6 +22,8 @@ import { CacheService } from 'src/shared/services';
  */
 @Injectable()
 export class ShareAggregationService extends BaseService<ShareAggDaily> {
+  private readonly logger = new Logger(ShareAggregationService.name);
+
   constructor(
     @InjectRepository(ShareAggDaily)
     private readonly shareAggDailyRepository: Repository<ShareAggDaily>,
@@ -65,17 +67,17 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    console.log(
+    this.logger.log(
       `Running daily aggregation for ${yesterday.toISOString().split('T')[0]}`,
     );
 
     try {
       await this.aggregateDay(yesterday, today);
-      console.log(
+      this.logger.log(
         `Daily aggregation completed for ${yesterday.toISOString().split('T')[0]}`,
       );
     } catch (error) {
-      console.error(
+      this.logger.error(
         `Daily aggregation failed for ${yesterday.toISOString().split('T')[0]}:`,
         error,
       );
@@ -341,7 +343,7 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
       .where('day < :cutoffDate', { cutoffDate: cutoffString })
       .execute();
 
-    console.log(`Cleaned up ${result.affected} old aggregation records`);
+    this.logger.log(`Cleaned up ${result.affected} old aggregation records`);
   }
 
   /**
@@ -358,6 +360,6 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
       .where('ts < :cutoffDate', { cutoffDate })
       .execute();
 
-    console.log(`Cleaned up ${result.affected} old click records`);
+    this.logger.log(`Cleaned up ${result.affected} old click records`);
   }
 }
