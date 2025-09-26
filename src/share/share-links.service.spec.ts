@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { HttpException } from '@nestjs/common';
 
 import { ShareLinksService } from './share-links.service';
 import { ShareLink } from './entities/share-link.entity';
@@ -257,7 +258,7 @@ describe('ShareLinksService', () => {
 
       await expect(
         service.getShareLinkMetrics(code, metricsDto),
-      ).rejects.toThrow('Share link not found');
+      ).rejects.toThrow(HttpException);
     });
   });
 });

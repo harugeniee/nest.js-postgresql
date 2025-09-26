@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BaseService } from 'src/common/services/base.service';
@@ -114,7 +114,10 @@ export class ShareLinksService extends BaseService<ShareLink> {
     });
 
     if (!shareLink) {
-      throw new Error('Share link not found');
+      throw new HttpException(
+        { messageKey: 'share.SHARE_LINK_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     const fromDate = metricsDto.from

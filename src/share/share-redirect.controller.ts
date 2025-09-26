@@ -53,12 +53,18 @@ export class ShareRedirectController {
     // Get share link
     const shareLink = await this.shareService.getShareLinkByCode(code);
     if (!shareLink) {
-      throw new HttpException('Share link not found', HttpStatus.NOT_FOUND);
+      throw new HttpException(
+        { messageKey: 'share.SHARE_LINK_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     // Check if share link is active
     if (!shareLink.isActive) {
-      throw new HttpException('Share link is inactive', HttpStatus.GONE);
+      throw new HttpException(
+        { messageKey: 'share.SHARE_LINK_INACTIVE' },
+        HttpStatus.GONE,
+      );
     }
 
     // Get or create session
@@ -139,7 +145,10 @@ export class ShareRedirectController {
       attributionData.sessionToken,
     );
     if (!session) {
-      throw new HttpException('Invalid session token', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        { messageKey: 'share.SHARE_LINK_SESSION_TOKEN_INVALID' },
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     await this.shareAttributionService.recordAttribution({
@@ -162,7 +171,10 @@ export class ShareRedirectController {
       conversionData.sessionToken,
     );
     if (!session) {
-      throw new HttpException('Invalid session token', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        { messageKey: 'share.SHARE_LINK_SESSION_TOKEN_INVALID' },
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     await this.shareAttributionService.recordConversion({

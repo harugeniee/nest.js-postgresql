@@ -152,9 +152,7 @@ describe('ShareRedirectController', () => {
           mockResponse as Response,
           mockRequest as Request,
         ),
-      ).rejects.toThrow(
-        new HttpException('Share link not found', HttpStatus.NOT_FOUND),
-      );
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw 410 if share link is inactive', async () => {
@@ -173,9 +171,7 @@ describe('ShareRedirectController', () => {
           mockResponse as Response,
           mockRequest as Request,
         ),
-      ).rejects.toThrow(
-        new HttpException('Share link is inactive', HttpStatus.GONE),
-      );
+      ).rejects.toThrow(HttpException);
     });
 
     it('should detect prefetch requests', async () => {
@@ -316,9 +312,7 @@ describe('ShareRedirectController', () => {
 
       await expect(
         controller.recordAttribution(attributionData),
-      ).rejects.toThrow(
-        new HttpException('Invalid session token', HttpStatus.BAD_REQUEST),
-      );
+      ).rejects.toThrow(HttpException);
     });
   });
 
@@ -361,7 +355,7 @@ describe('ShareRedirectController', () => {
       mockShareService.getSessionByToken.mockResolvedValue(null);
 
       await expect(controller.recordConversion(conversionData)).rejects.toThrow(
-        new HttpException('Invalid session token', HttpStatus.BAD_REQUEST),
+        HttpException,
       );
     });
   });

@@ -288,7 +288,10 @@ export class ShareService extends BaseService<ShareLink> {
   ): Promise<ShareAttribution> {
     const session = await this.getSessionByToken(attributionData.sessionToken);
     if (!session) {
-      throw new HttpException('Invalid session token', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        { messageKey: 'share.SHARE_LINK_SESSION_TOKEN_INVALID' },
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // Check if attribution already exists
@@ -329,7 +332,10 @@ export class ShareService extends BaseService<ShareLink> {
   ): Promise<ShareConversion> {
     const session = await this.getSessionByToken(conversionData.sessionToken);
     if (!session) {
-      throw new HttpException('Invalid session token', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        { messageKey: 'share.SHARE_LINK_SESSION_TOKEN_INVALID' },
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // Check if conversion is within attribution window (7 days)
@@ -373,7 +379,7 @@ export class ShareService extends BaseService<ShareLink> {
 
     if (!isUnique) {
       throw new HttpException(
-        'Failed to generate unique code',
+        { messageKey: 'share.SHARE_LINK_CODE_GENERATION_FAILED' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
