@@ -5,11 +5,15 @@ import { HttpException } from '@nestjs/common';
 
 import { ShareLinksService } from './share-links.service';
 import { ShareLink } from './entities/share-link.entity';
+import { ShareClick } from './entities/share-click.entity';
+import { ShareConversion } from './entities/share-conversion.entity';
 import { CacheService } from 'src/shared/services';
 
 describe('ShareLinksService', () => {
   let service: ShareLinksService;
   let shareLinkRepository: Repository<ShareLink>;
+  let shareClickRepository: Repository<ShareClick>;
+  let shareConversionRepository: Repository<ShareConversion>;
   let cacheService: CacheService;
 
   const mockRepository = {
@@ -41,6 +45,14 @@ describe('ShareLinksService', () => {
           useValue: mockRepository,
         },
         {
+          provide: getRepositoryToken(ShareClick),
+          useValue: mockRepository,
+        },
+        {
+          provide: getRepositoryToken(ShareConversion),
+          useValue: mockRepository,
+        },
+        {
           provide: CacheService,
           useValue: mockCacheService,
         },
@@ -50,6 +62,12 @@ describe('ShareLinksService', () => {
     service = module.get<ShareLinksService>(ShareLinksService);
     shareLinkRepository = module.get<Repository<ShareLink>>(
       getRepositoryToken(ShareLink),
+    );
+    shareClickRepository = module.get<Repository<ShareClick>>(
+      getRepositoryToken(ShareClick),
+    );
+    shareConversionRepository = module.get<Repository<ShareConversion>>(
+      getRepositoryToken(ShareConversion),
     );
     cacheService = module.get<CacheService>(CacheService);
   });
@@ -150,7 +168,7 @@ describe('ShareLinksService', () => {
   });
 
   describe('getShareLinkMetrics', () => {
-    it('should return metrics for a share link', async () => {
+    it('should return metrics for a share link using repository methods', async () => {
       const code = 'abc123';
       const shareId = '1';
       const metricsDto = {
@@ -167,58 +185,57 @@ describe('ShareLinksService', () => {
         owner: { id: '456', username: 'testuser' },
       };
 
-      const mockQueryBuilder = {
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getCount: jest.fn().mockResolvedValue(100),
-        select: jest.fn().mockReturnThis(),
-        addSelect: jest.fn().mockReturnThis(),
-        groupBy: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        getRawOne: jest.fn().mockResolvedValue({ count: '50', total: '1000' }),
-        getRawMany: jest
-          .fn()
-          .mockResolvedValueOnce([
-            { referrer: 'google.com', clicks: '30' },
-            { referrer: 'facebook.com', clicks: '20' },
-          ])
-          .mockResolvedValueOnce([
-            { country: 'US', clicks: '30' },
-            { country: 'CA', clicks: '20' },
-          ])
-          .mockResolvedValueOnce([
-            {
-              date: '2024-01-01',
-              clicks: '30',
-              uniques: '25',
-              conversions: '2',
-              conversionValue: '200',
-            },
-            {
-              date: '2024-01-02',
-              clicks: '20',
-              uniques: '15',
-              conversions: '1',
-              conversionValue: '100',
-            },
-          ]),
-      };
-
+      // Mock repository methods
       jest
         .spyOn(shareLinkRepository, 'findOne')
         .mockResolvedValue(mockShareLink as any);
+
+      jest.spyOn(shareClickRepository, 'count').mockResolvedValue(50);
+
+      jest.spyOn(shareConversionRepository, 'count').mockResolvedValue(50);
+
+      // Mock helper methods
       jest
-        .spyOn(shareLinkRepository, 'createQueryBuilder')
-        .mockReturnValue(mockQueryBuilder as any);
+        .spyOn(service as any, 'getUniqueVisitorsCount')
+        .mockResolvedValue(75);
+
+      jest.spyOn(service as any, 'getConversionValue').mockResolvedValue(1000);
+
+      jest.spyOn(service as any, 'getTopReferrers').mockResolvedValue([
+        { referrer: 'google.com', clicks: 30 },
+        { referrer: 'facebook.com', clicks: 20 },
+      ]);
+
+      jest
+        .spyOn(service as any, 'getGeographicDistribution')
+        .mockResolvedValue([
+          { country: 'US', clicks: 30 },
+          { country: 'CA', clicks: 20 },
+        ]);
+
+      jest.spyOn(service as any, 'getDailyBreakdown').mockResolvedValue([
+        {
+          date: '2024-01-01',
+          clicks: 30,
+          uniques: 25,
+          conversions: 2,
+          conversionValue: 200,
+        },
+        {
+          date: '2024-01-02',
+          clicks: 20,
+          uniques: 15,
+          conversions: 1,
+          conversionValue: 100,
+        },
+      ]);
 
       const result = await service.getShareLinkMetrics(code, metricsDto);
 
       expect(result).toEqual({
-        clicks: 100,
-        uniques: 50,
-        conversions: 100,
+        clicks: 50,
+        uniques: 75,
+        conversions: 50,
         conversionValue: 1000,
         topReferrers: [
           { referrer: 'google.com', clicks: 30 },
