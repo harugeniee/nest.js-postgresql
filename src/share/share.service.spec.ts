@@ -9,6 +9,7 @@ import { ShareClick } from './entities/share-click.entity';
 import { ShareAttribution } from './entities/share-attribution.entity';
 import { ShareConversion } from './entities/share-conversion.entity';
 import { CreateShareLinkDto } from './dto/create-share-link.dto';
+import { CacheService } from 'src/shared/services';
 
 describe('ShareService', () => {
   let service: ShareService;
@@ -17,6 +18,7 @@ describe('ShareService', () => {
   let shareClickRepository: Repository<ShareClick>;
   let shareAttributionRepository: Repository<ShareAttribution>;
   let shareConversionRepository: Repository<ShareConversion>;
+  let cacheService: CacheService;
 
   const mockRepository = {
     create: jest.fn(),
@@ -24,6 +26,21 @@ describe('ShareService', () => {
     findOne: jest.fn(),
     find: jest.fn(),
     count: jest.fn(),
+    createQueryBuilder: jest.fn(),
+    manager: {
+      findOne: jest.fn(),
+    },
+    metadata: {
+      columns: [],
+    },
+  };
+
+  const mockCacheService = {
+    get: jest.fn(),
+    set: jest.fn(),
+    delete: jest.fn(),
+    deleteKeysByPattern: jest.fn(),
+    getTtl: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -50,6 +67,10 @@ describe('ShareService', () => {
           provide: getRepositoryToken(ShareConversion),
           useValue: mockRepository,
         },
+        {
+          provide: CacheService,
+          useValue: mockCacheService,
+        },
       ],
     }).compile();
 
@@ -69,6 +90,7 @@ describe('ShareService', () => {
     shareConversionRepository = module.get<Repository<ShareConversion>>(
       getRepositoryToken(ShareConversion),
     );
+    cacheService = module.get<CacheService>(CacheService);
   });
 
   it('should be defined', () => {
@@ -95,51 +117,72 @@ describe('ShareService', () => {
         updatedAt: new Date(),
       };
 
+      // Mock the generateUniqueCode method
       jest
-        .spyOn(shareLinkRepository, 'create')
-        .mockReturnValue(mockShareLink as any);
-      jest
-        .spyOn(shareLinkRepository, 'save')
-        .mockResolvedValue(mockShareLink as any);
+        .spyOn(service as any, 'generateUniqueCode')
+        .mockResolvedValue('abc123');
+
+      // Mock the BaseService create method
+      jest.spyOn(service, 'create').mockResolvedValue(mockShareLink as any);
 
       const result = await service.createShareLink(createShareLinkDto);
 
       expect(result).toEqual(mockShareLink);
-      expect(shareLinkRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining(createShareLinkDto),
-      );
-      expect(shareLinkRepository.save).toHaveBeenCalledWith(mockShareLink);
+      expect(service.create).toHaveBeenCalledWith({
+        ...createShareLinkDto,
+        code: 'abc123',
+      });
     });
   });
 
   describe('getShareLinkByCode', () => {
-    it('should return share link by code', async () => {
+    it('should return share link by code with resolved content', async () => {
       const code = 'abc123';
       const mockShareLink = {
         id: '1',
         code,
-        postId: '123',
+        contentType: 'article',
+        contentId: '123',
         ownerUserId: '456',
         isActive: true,
+        content: null,
       };
 
+      const mockArticle = {
+        id: '123',
+        title: 'Test Article',
+        slug: 'test-article',
+        user: { id: '456', username: 'testuser' },
+      };
+
+      // Mock the BaseService findOne method
+      jest.spyOn(service, 'findOne').mockResolvedValue(mockShareLink as any);
+
+      // Mock the resolveContent method
       jest
-        .spyOn(shareLinkRepository, 'findOne')
-        .mockResolvedValue(mockShareLink as any);
+        .spyOn(service as any, 'resolveContent')
+        .mockResolvedValue(mockArticle);
 
       const result = await service.getShareLinkByCode(code);
 
-      expect(result).toEqual(mockShareLink);
-      expect(shareLinkRepository.findOne).toHaveBeenCalledWith({
-        where: { code, isActive: true },
-        relations: ['post', 'owner', 'channel', 'campaign'],
+      expect(result).toEqual({
+        ...mockShareLink,
+        content: mockArticle,
       });
+      expect(service.findOne).toHaveBeenCalledWith(
+        { code, isActive: true },
+        { relations: ['owner', 'channel', 'campaign'] },
+      );
+      expect((service as any).resolveContent).toHaveBeenCalledWith(
+        'article',
+        '123',
+      );
     });
 
     it('should return null if share link not found', async () => {
       const code = 'nonexistent';
 
-      jest.spyOn(shareLinkRepository, 'findOne').mockResolvedValue(null);
+      jest.spyOn(service, 'findOne').mockResolvedValue(null);
 
       const result = await service.getShareLinkByCode(code);
 

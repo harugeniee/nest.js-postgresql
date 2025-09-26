@@ -13,7 +13,7 @@ describe('ShareLinksController', () => {
 
   const mockShareLinksService = {
     createShareLink: jest.fn(),
-    getShareLinksForPost: jest.fn(),
+    getShareLinksForContent: jest.fn(),
     getShareLinkMetrics: jest.fn(),
   };
 

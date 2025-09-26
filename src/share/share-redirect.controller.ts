@@ -60,7 +60,7 @@ export class ShareRedirectController {
 
     // Get or create session
     let sessionToken = req.cookies?.sid;
-    let session = null;
+    let session: any = null;
 
     if (sessionToken) {
       session = await this.shareService.getSessionByToken(sessionToken);
@@ -92,7 +92,8 @@ export class ShareRedirectController {
     const isBot = this.shareService.isBot(userAgent);
 
     // Check for self-click (owner == viewer)
-    const isSelfClick = req.user && req.user.id === shareLink.ownerUserId;
+    const isSelfClick =
+      (req as any).user && (req as any).user.id === shareLink.ownerUserId;
 
     // Determine if click is countable
     const isCountable = !isBot && !isPrefetch && !isSelfClick;

@@ -18,6 +18,9 @@ describe('ShareLinksService', () => {
     find: jest.fn(),
     count: jest.fn(),
     createQueryBuilder: jest.fn(),
+    metadata: {
+      columns: [],
+    },
   };
 
   const mockCacheService = {
@@ -55,9 +58,9 @@ describe('ShareLinksService', () => {
   });
 
   describe('createShareLink', () => {
-    it('should create a share link', async () => {
+    it('should create a share link using BaseService', async () => {
       const createShareLinkDto = {
-        contentType: 'article',
+        contentType: 'article' as const,
         contentId: '123',
         ownerUserId: '456',
         channelId: '789',
@@ -119,7 +122,9 @@ describe('ShareLinksService', () => {
       jest
         .spyOn(shareLinkRepository, 'find')
         .mockResolvedValue(mockShareLinks as any);
-      jest.spyOn(service, 'getShareLinkSummary').mockResolvedValue(mockSummary);
+      jest
+        .spyOn(service as any, 'getShareLinkSummary')
+        .mockResolvedValue(mockSummary);
 
       const result = await service.getShareLinksForContent(
         contentType,
@@ -158,6 +163,7 @@ describe('ShareLinksService', () => {
         contentType: 'article',
         contentId: '123',
         ownerUserId: '456',
+        owner: { id: '456', username: 'testuser' },
       };
 
       const mockQueryBuilder = {
@@ -171,10 +177,32 @@ describe('ShareLinksService', () => {
         orderBy: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
         getRawOne: jest.fn().mockResolvedValue({ count: '50', total: '1000' }),
-        getRawMany: jest.fn().mockResolvedValue([
-          { referrer: 'google.com', clicks: '30' },
-          { referrer: 'facebook.com', clicks: '20' },
-        ]),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValueOnce([
+            { referrer: 'google.com', clicks: '30' },
+            { referrer: 'facebook.com', clicks: '20' },
+          ])
+          .mockResolvedValueOnce([
+            { country: 'US', clicks: '30' },
+            { country: 'CA', clicks: '20' },
+          ])
+          .mockResolvedValueOnce([
+            {
+              date: '2024-01-01',
+              clicks: '30',
+              uniques: '25',
+              conversions: '2',
+              conversionValue: '200',
+            },
+            {
+              date: '2024-01-02',
+              clicks: '20',
+              uniques: '15',
+              conversions: '1',
+              conversionValue: '100',
+            },
+          ]),
       };
 
       jest
@@ -182,7 +210,7 @@ describe('ShareLinksService', () => {
         .mockResolvedValue(mockShareLink as any);
       jest
         .spyOn(shareLinkRepository, 'createQueryBuilder')
-        .mockReturnValue(mockQueryBuilder);
+        .mockReturnValue(mockQueryBuilder as any);
 
       const result = await service.getShareLinkMetrics(code, metricsDto);
 
@@ -196,12 +224,24 @@ describe('ShareLinksService', () => {
           { referrer: 'facebook.com', clicks: 20 },
         ],
         geoDistribution: [
-          { referrer: 'google.com', clicks: 30 },
-          { referrer: 'facebook.com', clicks: 20 },
+          { country: 'US', clicks: 30 },
+          { country: 'CA', clicks: 20 },
         ],
         dailyBreakdown: [
-          { referrer: 'google.com', clicks: 30 },
-          { referrer: 'facebook.com', clicks: 20 },
+          {
+            date: '2024-01-01',
+            clicks: 30,
+            uniques: 25,
+            conversions: 2,
+            conversionValue: 200,
+          },
+          {
+            date: '2024-01-02',
+            clicks: 20,
+            uniques: 15,
+            conversions: 1,
+            conversionValue: 100,
+          },
         ],
       });
     });
