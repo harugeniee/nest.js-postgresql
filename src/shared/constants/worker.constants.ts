@@ -20,4 +20,8 @@ export const JOB_NAME = {
   REPORT_DISMISSED: 'report_dismissed',
   REPORT_ESCALATED: 'report_escalated',
   REPORT_MERGED: 'report_merged',
+  // Share events
+  SHARE_CREATED: 'share_created',
+  SHARE_DELETED: 'share_deleted',
+  SHARE_COUNT_UPDATE: 'share_count_update',
 } as const;

@@ -47,19 +47,17 @@ export class R2Service {
     // Get R2 configuration with proper typing
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const config = this.configService.getOrThrow('r2');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     this.config = config as R2Config;
 
     // Initialize S3 client for R2
     this.s3Client = new S3Client({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       region: this.config.region,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
       endpoint: `https://${this.config.accountId}.r2.cloudflarestorage.com`,
       credentials: {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         accessKeyId: this.config.accessKeyId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
         secretAccessKey: this.config.secretAccessKey,
       },
     });
@@ -79,12 +77,11 @@ export class R2Service {
   ): Promise<UploadResult> {
     try {
       const {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         folder = this.config.folders.media,
         filename,
         contentType = 'application/octet-stream',
         metadata = {},
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
         cacheControl = this.config.cacheControl,
         expires,
       } = options;
@@ -97,12 +94,11 @@ export class R2Service {
 
       // Prepare upload parameters
       const uploadParams = {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         Bucket: this.config.bucketName,
         Key: key,
         Body: file,
         ContentType: contentType,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         CacheControl: cacheControl,
         Metadata: {
           ...metadata,
@@ -175,7 +171,6 @@ export class R2Service {
   async downloadFile(key: string): Promise<Readable> {
     try {
       const command = new GetObjectCommand({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         Bucket: this.config.bucketName,
         Key: key,
       });
@@ -200,7 +195,6 @@ export class R2Service {
   async deleteFile(key: string): Promise<void> {
     try {
       const command = new DeleteObjectCommand({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         Bucket: this.config.bucketName,
         Key: key,
       });
@@ -246,7 +240,6 @@ export class R2Service {
   async getFileMetadata(key: string): Promise<any> {
     try {
       const command = new HeadObjectCommand({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         Bucket: this.config.bucketName,
         Key: key,
       });
@@ -283,14 +276,12 @@ export class R2Service {
   ): Promise<string> {
     try {
       const {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         expiresIn = this.config.presignedUrlExpiry,
         contentType = 'application/octet-stream',
         contentLength,
       } = options;
 
       const command = new PutObjectCommand({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         Bucket: this.config.bucketName,
         Key: key,
         ContentType: contentType,
@@ -298,7 +289,6 @@ export class R2Service {
       });
 
       const presignedUrl = await getSignedUrl(this.s3Client, command, {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         expiresIn,
       });
 
@@ -325,12 +315,11 @@ export class R2Service {
    */
   async generatePresignedDownloadUrl(
     key: string,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
     expiresIn: number = this.config.presignedUrlExpiry,
   ): Promise<string> {
     try {
       const command = new GetObjectCommand({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         Bucket: this.config.bucketName,
         Key: key,
       });
@@ -366,7 +355,6 @@ export class R2Service {
   ): Promise<string[]> {
     try {
       const command = new ListObjectsV2Command({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         Bucket: this.config.bucketName,
         Prefix: prefix,
         MaxKeys: maxKeys,
@@ -417,20 +405,16 @@ export class R2Service {
    * @returns Public URL
    */
   generatePublicUrl(key: string): string {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (this.config.cdnEnabled && this.config.cdnUrl) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       return `${this.config.cdnUrl}/${key}`;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (this.config.publicUrl) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       return `${this.config.publicUrl}/${key}`;
     }
 
     // Fallback to R2.dev URL
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
     return `https://${this.config.bucketName}.${this.config.accountId}.r2.cloudflarestorage.com/${key}`;
   }
 
@@ -447,7 +431,6 @@ export class R2Service {
     const nameWithoutExt = filename?.split('.')[0];
     const ext = filename?.split('.').pop();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     return `${this.config.folders.thumbnails}/${folder}/${nameWithoutExt}_${size}.${ext}`;
   }
 
@@ -463,7 +446,6 @@ export class R2Service {
     const nameWithoutExt = filename?.split('.')[0];
     const ext = filename?.split('.').pop();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     return `${this.config.folders.previews}/${folder}/${nameWithoutExt}_preview.${ext}`;
   }
 }

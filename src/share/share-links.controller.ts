@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
-import { ShareLinksService } from './share-links.service';
-import { ShareService } from './share.service';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { SnowflakeIdPipe } from 'src/common/pipes';
 import { CreateShareLinkDto } from './dto/create-share-link.dto';
 import { ShareMetricsDto } from './dto/share-metrics.dto';
-import { SnowflakeIdPipe } from 'src/common/pipes';
+import { ShareLinksService } from './share-links.service';
+import { ShareService } from './share.service';
 
 /**
  * Share links controller for managing share links
@@ -79,5 +79,25 @@ export class ShareLinksController {
     @Query() metricsDto: ShareMetricsDto,
   ) {
     return await this.shareLinksService.getShareLinkMetrics(code, metricsDto);
+  }
+
+  /**
+   * Get share count for specific content
+   *
+   * @param contentType - Type of content
+   * @param contentId - Content ID
+   * @returns Number of shares for the content
+   */
+  @Get('count/:contentType/:contentId')
+  async getShareCount(
+    @Param('contentType') contentType: string,
+    @Param('contentId', new SnowflakeIdPipe()) contentId: string,
+  ) {
+    const count = await this.shareService.getShareCount(contentType, contentId);
+    return {
+      contentType,
+      contentId,
+      shareCount: count,
+    };
   }
 }

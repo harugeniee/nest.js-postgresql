@@ -123,12 +123,9 @@ export class RoaringBitmapAdapter implements RoaringAdapter {
  * RoaringWasmSet - Implementation using roaring-wasm
  */
 class RoaringWasmSet implements RoaringSet {
-  private readonly set: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  private readonly set: any;
 
-  constructor(
-    roaring: any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    data?: Buffer | Uint8Array,
-  ) {
+  constructor(roaring: any, data?: Buffer | Uint8Array) {
     if (data) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       this.set = new roaring.RoaringBitmap32(data);
@@ -209,12 +206,9 @@ class RoaringWasmSet implements RoaringSet {
  * RoaringBitmapSet - Implementation using roaring package
  */
 class RoaringBitmapSet implements RoaringSet {
-  private readonly set: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  private readonly set: any;
 
-  constructor(
-    roaring: any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    data?: Buffer | Uint8Array,
-  ) {
+  constructor(roaring: any, data?: Buffer | Uint8Array) {
     if (data) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       this.set = roaring.RoaringBitmap32.deserialize(data);
