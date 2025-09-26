@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import { UserFollowBitset } from '../entities/user-follow-bitset.entity';
 import { UserFollowEdge } from '../entities/user-follow-edge.entity';
 import { FollowBitsetService } from '../follow-bitset.service';
@@ -98,7 +98,7 @@ export class FollowRebuildTask {
    * Clean up old edge records
    * Runs daily at 2 AM
    */
-  @Cron('0 2 * * *')
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async cleanupOldEdges(): Promise<void> {
     try {
       this.logger.log('🧹 Starting edge cleanup task');
@@ -109,7 +109,7 @@ export class FollowRebuildTask {
 
       const result = await this.edgeRepo.delete({
         status: 'deleted',
-        deletedAt: { $lt: cutoffDate } as any,
+        deletedAt: LessThan(cutoffDate),
       });
 
       this.logger.log(`✅ Cleaned up ${result.affected || 0} old edge records`);
@@ -122,7 +122,7 @@ export class FollowRebuildTask {
    * Validate bitset consistency
    * Runs daily at 3 AM
    */
-  @Cron('0 3 * * *')
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async validateConsistency(): Promise<void> {
     try {
       this.logger.log('🔍 Starting consistency validation task');
@@ -298,9 +298,7 @@ export class FollowRebuildTask {
         this.bitsetRepo.count(),
         this.bitsetRepo.count({
           where: {
-            lastRebuildAt: {
-              $lt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-            } as any,
+            lastRebuildAt: LessThan(new Date(Date.now() - 24 * 60 * 60 * 1000)),
           },
         }),
         this.bitsetRepo
@@ -312,7 +310,7 @@ export class FollowRebuildTask {
       return {
         totalBitsets,
         needsRebuild,
-        lastRebuild: lastRebuild?.lastRebuild || null,
+        lastRebuild: lastRebuild?.lastRebuild as Date | null,
         avgRebuildTime: 0, // Would need to track this
       };
     } catch (error) {

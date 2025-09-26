@@ -258,9 +258,11 @@ export class ScheduledPublishingService extends BaseService<Article> {
   @Cron(CronExpression.EVERY_MINUTE)
   async publishScheduledArticles(): Promise<void> {
     try {
+      this.logger.log('Publishing scheduled articles');
       const readyArticles = await this.getReadyToPublishArticles();
 
       if (readyArticles.length === 0) {
+        this.logger.log('No articles ready for publication');
         return;
       }
 

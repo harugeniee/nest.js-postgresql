@@ -8,3 +8,4 @@ export * from './oauth.config';
 export * from './r2.config';
 export * from './sticker.config';
 export * from './firebase.config';
+export * from './follow.config';
