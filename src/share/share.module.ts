@@ -19,9 +19,6 @@ import { ShareAttribution } from './entities/share-attribution.entity';
 import { ShareConversion } from './entities/share-conversion.entity';
 import { ShareAggDaily } from './entities/share-agg-daily.entity';
 
-// Shared services
-import { CacheModule } from 'src/shared/services';
-
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -35,7 +32,6 @@ import { CacheModule } from 'src/shared/services';
       ShareAggDaily,
     ]),
     ScheduleModule,
-    CacheModule,
   ],
   controllers: [ShareLinksController, ShareRedirectController],
   providers: [
