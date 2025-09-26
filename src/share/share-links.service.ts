@@ -74,7 +74,7 @@ export class ShareLinksService extends BaseService<ShareLink> {
   async getShareLinksForContent(
     contentType: string,
     contentId: string,
-  ): Promise<Array<ShareLink & { summary: any }>> {
+  ): Promise<Array<ShareLink & { summary: Record<string, unknown> }>> {
     const shareLinks = await this.shareLinkRepository.find({
       where: { contentType, contentId, isActive: true },
       relations: ['owner', 'channel', 'campaign'],
@@ -84,8 +84,13 @@ export class ShareLinksService extends BaseService<ShareLink> {
     // Get summary metrics for each share link
     const shareLinksWithMetrics = await Promise.all(
       shareLinks.map(async (shareLink) => {
-        const summary = await this.getShareLinkSummary(shareLink.id);
-        return { ...shareLink, summary } as ShareLink & { summary: any };
+        const summary: Record<string, unknown> = await this.getShareLinkSummary(
+          shareLink.id,
+        );
+        return {
+          ...shareLink,
+          summary,
+        } as ShareLink & { summary: Record<string, unknown> };
       }),
     );
 
@@ -128,15 +133,16 @@ export class ShareLinksService extends BaseService<ShareLink> {
       .getCount();
 
     // Get unique visitors
-    const uniques = await this.shareLinkRepository
-      .createQueryBuilder('shareLink')
-      .leftJoin('shareLink.clicks', 'click')
-      .select('COUNT(DISTINCT click.ipHash)', 'count')
-      .where('shareLink.id = :shareId', { shareId: shareLink.id })
-      .andWhere('click.isCountable = true')
-      .andWhere('click.ts >= :fromDate', { fromDate })
-      .andWhere('click.ts <= :toDate', { toDate })
-      .getRawOne();
+    const uniquesResult: { count: string } | undefined =
+      await this.shareLinkRepository
+        .createQueryBuilder('shareLink')
+        .leftJoin('shareLink.clicks', 'click')
+        .select('COUNT(DISTINCT click.ipHash)', 'count')
+        .where('shareLink.id = :shareId', { shareId: shareLink.id })
+        .andWhere('click.isCountable = true')
+        .andWhere('click.ts >= :fromDate', { fromDate })
+        .andWhere('click.ts <= :toDate', { toDate })
+        .getRawOne();
 
     // Get conversions
     const conversions = await this.shareLinkRepository
@@ -149,15 +155,16 @@ export class ShareLinksService extends BaseService<ShareLink> {
       .getCount();
 
     // Get conversion value
-    const conversionValue = await this.shareLinkRepository
-      .createQueryBuilder('shareLink')
-      .leftJoin('shareLink.conversions', 'conversion')
-      .select('COALESCE(SUM(conversion.convValue), 0)', 'total')
-      .where('shareLink.id = :shareId', { shareId: shareLink.id })
-      .andWhere('conversion.attributed = true')
-      .andWhere('conversion.occurredAt >= :fromDate', { fromDate })
-      .andWhere('conversion.occurredAt <= :toDate', { toDate })
-      .getRawOne();
+    const conversionValueResult: { total: string } | undefined =
+      await this.shareLinkRepository
+        .createQueryBuilder('shareLink')
+        .leftJoin('shareLink.conversions', 'conversion')
+        .select('COALESCE(SUM(conversion.convValue), 0)', 'total')
+        .where('shareLink.id = :shareId', { shareId: shareLink.id })
+        .andWhere('conversion.attributed = true')
+        .andWhere('conversion.occurredAt >= :fromDate', { fromDate })
+        .andWhere('conversion.occurredAt <= :toDate', { toDate })
+        .getRawOne();
 
     // Get top referrers
     const topReferrers = await this.shareLinkRepository
@@ -211,24 +218,36 @@ export class ShareLinksService extends BaseService<ShareLink> {
 
     return {
       clicks,
-      uniques: parseInt(uniques.count) || 0,
+      uniques: parseInt(uniquesResult?.count || '0') || 0,
       conversions,
-      conversionValue: parseFloat(conversionValue.total) || 0,
-      topReferrers: topReferrers.map((r) => ({
-        referrer: r.referrer,
-        clicks: parseInt(r.clicks),
-      })),
-      geoDistribution: geoDistribution.map((g) => ({
-        country: g.country,
-        clicks: parseInt(g.clicks),
-      })),
-      dailyBreakdown: dailyBreakdown.map((d) => ({
-        date: d.date,
-        clicks: parseInt(d.clicks),
-        uniques: parseInt(d.uniques),
-        conversions: parseInt(d.conversions),
-        conversionValue: parseFloat(d.conversionValue),
-      })),
+      conversionValue: parseFloat(conversionValueResult?.total || '0') || 0,
+      topReferrers: topReferrers.map(
+        (r: { referrer: string; clicks: string }) => ({
+          referrer: String(r.referrer || ''),
+          clicks: parseInt(String(r.clicks || '0')),
+        }),
+      ),
+      geoDistribution: geoDistribution.map(
+        (g: { country: string; clicks: string }) => ({
+          country: String(g.country || ''),
+          clicks: parseInt(String(g.clicks || '0')),
+        }),
+      ),
+      dailyBreakdown: dailyBreakdown.map(
+        (d: {
+          date: string;
+          clicks: string;
+          uniques: string;
+          conversions: string;
+          conversionValue: string;
+        }) => ({
+          date: String(d.date || ''),
+          clicks: parseInt(String(d.clicks || '0')),
+          uniques: parseInt(String(d.uniques || '0')),
+          conversions: parseInt(String(d.conversions || '0')),
+          conversionValue: parseFloat(String(d.conversionValue || '0')),
+        }),
+      ),
     };
   }
 
@@ -238,7 +257,9 @@ export class ShareLinksService extends BaseService<ShareLink> {
    * @param shareId - Share link ID
    * @returns Summary metrics
    */
-  private async getShareLinkSummary(shareId: string): Promise<any> {
+  private async getShareLinkSummary(
+    shareId: string,
+  ): Promise<Record<string, unknown>> {
     const today = new Date();
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
     const last7Days = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);

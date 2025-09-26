@@ -159,16 +159,17 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
     });
 
     // Get unique visitors count
-    const uniqueResult = await this.shareClickRepository
-      .createQueryBuilder('click')
-      .select('COUNT(DISTINCT click.ipHash)', 'count')
-      .where('click.shareId = :shareId', { shareId })
-      .andWhere('click.isCountable = true')
-      .andWhere('click.ts >= :startDate', { startDate })
-      .andWhere('click.ts < :endDate', { endDate })
-      .getRawOne();
+    const uniqueResult: { count: string } | undefined =
+      await this.shareClickRepository
+        .createQueryBuilder('click')
+        .select('COUNT(DISTINCT click.ipHash)', 'count')
+        .where('click.shareId = :shareId', { shareId })
+        .andWhere('click.isCountable = true')
+        .andWhere('click.ts >= :startDate', { startDate })
+        .andWhere('click.ts < :endDate', { endDate })
+        .getRawOne();
 
-    const uniques = parseInt(uniqueResult.count) || 0;
+    const uniques = parseInt(uniqueResult?.count || '0') || 0;
 
     // Get conversions count
     const conversions = await this.shareConversionRepository.count({
@@ -180,16 +181,18 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
     });
 
     // Get conversion value
-    const conversionValueResult = await this.shareConversionRepository
-      .createQueryBuilder('conversion')
-      .select('COALESCE(SUM(conversion.convValue), 0)', 'total')
-      .where('conversion.shareId = :shareId', { shareId })
-      .andWhere('conversion.attributed = true')
-      .andWhere('conversion.occurredAt >= :startDate', { startDate })
-      .andWhere('conversion.occurredAt < :endDate', { endDate })
-      .getRawOne();
+    const conversionValueResult: { total: string } | undefined =
+      await this.shareConversionRepository
+        .createQueryBuilder('conversion')
+        .select('COALESCE(SUM(conversion.convValue), 0)', 'total')
+        .where('conversion.shareId = :shareId', { shareId })
+        .andWhere('conversion.attributed = true')
+        .andWhere('conversion.occurredAt >= :startDate', { startDate })
+        .andWhere('conversion.occurredAt < :endDate', { endDate })
+        .getRawOne();
 
-    const conversionValue = parseFloat(conversionValueResult.total) || 0;
+    const conversionValue =
+      parseFloat(conversionValueResult?.total || '0') || 0;
 
     // Create aggregation record
     const aggregation = this.shareAggDailyRepository.create({
@@ -227,16 +230,17 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
       },
     });
 
-    const uniqueResult = await this.shareClickRepository
-      .createQueryBuilder('click')
-      .select('COUNT(DISTINCT click.ipHash)', 'count')
-      .where('click.shareId = :shareId', { shareId })
-      .andWhere('click.isCountable = true')
-      .andWhere('click.ts >= :startDate', { startDate })
-      .andWhere('click.ts < :endDate', { endDate })
-      .getRawOne();
+    const uniqueResult: { count: string } | undefined =
+      await this.shareClickRepository
+        .createQueryBuilder('click')
+        .select('COUNT(DISTINCT click.ipHash)', 'count')
+        .where('click.shareId = :shareId', { shareId })
+        .andWhere('click.isCountable = true')
+        .andWhere('click.ts >= :startDate', { startDate })
+        .andWhere('click.ts < :endDate', { endDate })
+        .getRawOne();
 
-    const uniques = parseInt(uniqueResult.count) || 0;
+    const uniques = parseInt(uniqueResult?.count || '0') || 0;
 
     const conversions = await this.shareConversionRepository.count({
       where: {
@@ -246,16 +250,18 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
       },
     });
 
-    const conversionValueResult = await this.shareConversionRepository
-      .createQueryBuilder('conversion')
-      .select('COALESCE(SUM(conversion.convValue), 0)', 'total')
-      .where('conversion.shareId = :shareId', { shareId })
-      .andWhere('conversion.attributed = true')
-      .andWhere('conversion.occurredAt >= :startDate', { startDate })
-      .andWhere('conversion.occurredAt < :endDate', { endDate })
-      .getRawOne();
+    const conversionValueResult: { total: string } | undefined =
+      await this.shareConversionRepository
+        .createQueryBuilder('conversion')
+        .select('COALESCE(SUM(conversion.convValue), 0)', 'total')
+        .where('conversion.shareId = :shareId', { shareId })
+        .andWhere('conversion.attributed = true')
+        .andWhere('conversion.occurredAt >= :startDate', { startDate })
+        .andWhere('conversion.occurredAt < :endDate', { endDate })
+        .getRawOne();
 
-    const conversionValue = parseFloat(conversionValueResult.total) || 0;
+    const conversionValue =
+      parseFloat(conversionValueResult?.total || '0') || 0;
 
     // Update aggregation
     aggregation.clicks = clicks;

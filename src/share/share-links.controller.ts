@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { ShareLinksService } from './share-links.service';
 import { ShareService } from './share.service';
 import { CreateShareLinkDto } from './dto/create-share-link.dto';
@@ -49,11 +40,11 @@ export class ShareLinksController {
    * @returns Array of share links with summary metrics
    */
   @Get('content/:contentType/:contentId')
-  async getShareLinksForContent(
+  getShareLinksForContent(
     @Param('contentType') contentType: string,
     @Param('contentId', new SnowflakeIdPipe()) contentId: string,
   ) {
-    return await this.shareLinksService.getShareLinksForContent(
+    return this.shareLinksService.getShareLinksForContent(
       contentType,
       contentId,
     );
