@@ -95,8 +95,7 @@ export class ShareRedirectController {
     const isBot = this.shareService.isBot(userAgent);
 
     // Check for self-click (owner == viewer)
-    const isSelfClick =
-      req.user && req.user.uid === shareLink.userId;
+    const isSelfClick = req.user && req.user.uid === shareLink.userId;
 
     // Determine if click is countable
     const isCountable = !isBot && !isPrefetch && !isSelfClick;
