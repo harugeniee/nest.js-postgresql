@@ -171,7 +171,7 @@ describe('ShareService', () => {
       });
       expect(service.findOne).toHaveBeenCalledWith(
         { code, isActive: true },
-        { relations: ['owner', 'channel', 'campaign'] },
+        { relations: ['user', 'channel', 'campaign'] },
       );
       expect((service as any).resolveContent).toHaveBeenCalledWith(
         'article',

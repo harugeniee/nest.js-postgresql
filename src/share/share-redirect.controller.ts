@@ -10,6 +10,7 @@ import {
   Body,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
+import { AuthPayload } from 'src/common/interface';
 import { ShareService } from './share.service';
 import { ShareAttributionService } from './share-attribution.service';
 import {
@@ -47,7 +48,7 @@ export class ShareRedirectController {
   async redirect(
     @Param('code') code: string,
     @Res() res: Response,
-    @Req() req: Request,
+    @Req() req: Request & { user?: AuthPayload },
   ) {
     // Get share link
     const shareLink = await this.shareService.getShareLinkByCode(code);
@@ -95,7 +96,7 @@ export class ShareRedirectController {
 
     // Check for self-click (owner == viewer)
     const isSelfClick =
-      (req as Request).user && (req as Request).user.id === shareLink.userId;
+      req.user && req.user.uid === shareLink.userId;
 
     // Determine if click is countable
     const isCountable = !isBot && !isPrefetch && !isSelfClick;
@@ -196,11 +197,11 @@ export class ShareRedirectController {
 
     switch (shareLink.contentType) {
       case SHARE_CONSTANTS.CONTENT_TYPES.ARTICLE:
-        targetUrl = `${baseUrl}/articles/${shareLink.content?.slug as string}`;
+        targetUrl = `${baseUrl}/articles/${(shareLink.content as any)?.slug}`;
         break;
 
       case SHARE_CONSTANTS.CONTENT_TYPES.USER:
-        targetUrl = `${baseUrl}/users/${shareLink.content?.username as string}`;
+        targetUrl = `${baseUrl}/users/${(shareLink.content as any)?.username}`;
         break;
 
       case SHARE_CONSTANTS.CONTENT_TYPES.MEDIA:
@@ -209,7 +210,7 @@ export class ShareRedirectController {
 
       case SHARE_CONSTANTS.CONTENT_TYPES.COMMENT:
         // Redirect to the article containing the comment
-        targetUrl = `${baseUrl}/articles/${shareLink.content?.slug}#comment-${shareLink.contentId}`;
+        targetUrl = `${baseUrl}/articles/${(shareLink.content as any)?.slug}#comment-${shareLink.contentId}`;
         break;
 
       case SHARE_CONSTANTS.CONTENT_TYPES.BOOKMARK_FOLDER:

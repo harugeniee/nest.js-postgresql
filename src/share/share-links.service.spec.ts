@@ -142,7 +142,7 @@ describe('ShareLinksService', () => {
       });
       expect(shareLinkRepository.find).toHaveBeenCalledWith({
         where: { contentType, contentId, isActive: true },
-        relations: ['owner', 'channel', 'campaign'],
+        relations: ['user', 'channel', 'campaign'],
         order: { createdAt: 'DESC' },
       });
     });
