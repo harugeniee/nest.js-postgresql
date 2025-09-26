@@ -17,6 +17,8 @@ import {
   ShareConversionDto,
 } from './dto/share-attribution.dto';
 import { SHARE_CONSTANTS } from './constants/share.constants';
+import { ShareLink } from './entities/share-link.entity';
+import { ShareSession } from './entities/share-session.entity';
 
 /**
  * Share redirect controller for handling short link redirects
@@ -60,7 +62,7 @@ export class ShareRedirectController {
 
     // Get or create session
     let sessionToken = req.cookies?.sid;
-    let session: any = null;
+    let session: ShareSession | null = null;
 
     if (sessionToken) {
       session = await this.shareService.getSessionByToken(sessionToken);
@@ -93,7 +95,7 @@ export class ShareRedirectController {
 
     // Check for self-click (owner == viewer)
     const isSelfClick =
-      (req as any).user && (req as any).user.id === shareLink.ownerUserId;
+      (req as Request).user && (req as Request).user.id === shareLink.userId;
 
     // Determine if click is countable
     const isCountable = !isBot && !isPrefetch && !isSelfClick;
@@ -179,7 +181,7 @@ export class ShareRedirectController {
    * @returns Redirect URL with UTM parameters
    */
   private async buildRedirectUrl(
-    shareLink: any,
+    shareLink: ShareLink,
     code: string,
   ): Promise<string> {
     const baseUrl = process.env.APP_URL || 'http://localhost:3000';
@@ -194,11 +196,11 @@ export class ShareRedirectController {
 
     switch (shareLink.contentType) {
       case SHARE_CONSTANTS.CONTENT_TYPES.ARTICLE:
-        targetUrl = `${baseUrl}/articles/${shareLink.content?.slug}`;
+        targetUrl = `${baseUrl}/articles/${shareLink.content?.slug as string}`;
         break;
 
       case SHARE_CONSTANTS.CONTENT_TYPES.USER:
-        targetUrl = `${baseUrl}/users/${shareLink.content?.username}`;
+        targetUrl = `${baseUrl}/users/${shareLink.content?.username as string}`;
         break;
 
       case SHARE_CONSTANTS.CONTENT_TYPES.MEDIA:
@@ -207,7 +209,7 @@ export class ShareRedirectController {
 
       case SHARE_CONSTANTS.CONTENT_TYPES.COMMENT:
         // Redirect to the article containing the comment
-        targetUrl = `${baseUrl}/articles/${shareLink.content?.article?.slug}#comment-${shareLink.contentId}`;
+        targetUrl = `${baseUrl}/articles/${shareLink.content?.slug}#comment-${shareLink.contentId}`;
         break;
 
       case SHARE_CONSTANTS.CONTENT_TYPES.BOOKMARK_FOLDER:

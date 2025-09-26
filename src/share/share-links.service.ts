@@ -39,7 +39,7 @@ export class ShareLinksService extends BaseService<ShareLink> {
         },
         defaultSearchField: 'code',
         relationsWhitelist: {
-          owner: true,
+          user: true,
           channel: true,
           campaign: true,
         },
@@ -77,7 +77,7 @@ export class ShareLinksService extends BaseService<ShareLink> {
   ): Promise<Array<ShareLink & { summary: Record<string, unknown> }>> {
     const shareLinks = await this.shareLinkRepository.find({
       where: { contentType, contentId, isActive: true },
-      relations: ['owner', 'channel', 'campaign'],
+      relations: ['user', 'channel', 'campaign'],
       order: { createdAt: 'DESC' },
     });
 
@@ -110,7 +110,7 @@ export class ShareLinksService extends BaseService<ShareLink> {
   ): Promise<ShareMetricsResponseDto> {
     const shareLink = await this.shareLinkRepository.findOne({
       where: { code },
-      relations: ['owner'],
+      relations: ['user'],
     });
 
     if (!shareLink) {

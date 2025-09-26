@@ -17,6 +17,12 @@ import { SHARE_CONSTANTS, ShareContentType } from './constants/share.constants';
 import { BaseService } from 'src/common/services/base.service';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { CacheService } from 'src/shared/services';
+import { Article } from 'src/articles/entities/article.entity';
+import { User } from 'src/users/entities/user.entity';
+import { Media } from 'src/media/entities/media.entity';
+import { Comment } from 'src/comments/entities/comment.entity';
+import { BookmarkFolder } from 'src/bookmarks/entities/bookmark-folder.entity';
+import { StickerPack } from 'src/stickers/entities/sticker-pack.entity';
 
 /**
  * Main share service for handling share link operations
@@ -54,7 +60,7 @@ export class ShareService extends BaseService<ShareLink> {
         },
         defaultSearchField: 'code',
         relationsWhitelist: {
-          owner: true,
+          user: true,
           channel: true,
           campaign: true,
         },
@@ -90,7 +96,7 @@ export class ShareService extends BaseService<ShareLink> {
   async getShareLinkByCode(code: string): Promise<ShareLink | null> {
     const shareLink = await this.findOne(
       { code, isActive: true },
-      { relations: ['owner', 'channel', 'campaign'] },
+      { relations: ['user', 'channel', 'campaign'] },
     );
 
     if (!shareLink) {
@@ -116,7 +122,9 @@ export class ShareService extends BaseService<ShareLink> {
   private async resolveContent(
     contentType: ShareContentType,
     contentId: string,
-  ): Promise<any> {
+  ): Promise<
+    User | Article | Media | Comment | BookmarkFolder | StickerPack | null
+  > {
     switch (contentType) {
       case SHARE_CONSTANTS.CONTENT_TYPES.ARTICLE:
         return await this.resolveArticle(contentId);
@@ -140,9 +148,7 @@ export class ShareService extends BaseService<ShareLink> {
   /**
    * Resolve article content
    */
-  private async resolveArticle(contentId: string): Promise<any> {
-    // Import Article entity dynamically to avoid circular dependency
-    const { Article } = await import('src/articles/entities/article.entity');
+  private async resolveArticle(contentId: string): Promise<Article | null> {
     return await this.shareLinkRepository.manager.findOne(Article, {
       where: { id: contentId },
       relations: ['user'],
@@ -152,8 +158,7 @@ export class ShareService extends BaseService<ShareLink> {
   /**
    * Resolve user content
    */
-  private async resolveUser(contentId: string): Promise<any> {
-    const { User } = await import('src/users/entities/user.entity');
+  private async resolveUser(contentId: string): Promise<User | null> {
     return await this.shareLinkRepository.manager.findOne(User, {
       where: { id: contentId },
     });
@@ -162,8 +167,7 @@ export class ShareService extends BaseService<ShareLink> {
   /**
    * Resolve media content
    */
-  private async resolveMedia(contentId: string): Promise<any> {
-    const { Media } = await import('src/media/entities/media.entity');
+  private async resolveMedia(contentId: string): Promise<Media | null> {
     return await this.shareLinkRepository.manager.findOne(Media, {
       where: { id: contentId },
     });
@@ -172,8 +176,7 @@ export class ShareService extends BaseService<ShareLink> {
   /**
    * Resolve comment content
    */
-  private async resolveComment(contentId: string): Promise<any> {
-    const { Comment } = await import('src/comments/entities/comment.entity');
+  private async resolveComment(contentId: string): Promise<Comment | null> {
     return await this.shareLinkRepository.manager.findOne(Comment, {
       where: { id: contentId },
       relations: ['user', 'article'],
@@ -183,10 +186,9 @@ export class ShareService extends BaseService<ShareLink> {
   /**
    * Resolve bookmark folder content
    */
-  private async resolveBookmarkFolder(contentId: string): Promise<any> {
-    const { BookmarkFolder } = await import(
-      'src/bookmarks/entities/bookmark-folder.entity'
-    );
+  private async resolveBookmarkFolder(
+    contentId: string,
+  ): Promise<BookmarkFolder | null> {
     return await this.shareLinkRepository.manager.findOne(BookmarkFolder, {
       where: { id: contentId },
       relations: ['user'],
@@ -196,10 +198,9 @@ export class ShareService extends BaseService<ShareLink> {
   /**
    * Resolve sticker pack content
    */
-  private async resolveStickerPack(contentId: string): Promise<any> {
-    const { StickerPack } = await import(
-      'src/stickers/entities/sticker-pack.entity'
-    );
+  private async resolveStickerPack(
+    contentId: string,
+  ): Promise<StickerPack | null> {
     return await this.shareLinkRepository.manager.findOne(StickerPack, {
       where: { id: contentId },
     });
@@ -208,12 +209,7 @@ export class ShareService extends BaseService<ShareLink> {
   /**
    * Resolve QR ticket content
    */
-  private async resolveQrTicket(contentId: string): Promise<any> {
-    // const { QrTicket } = await import('src/qr/entities/qr-ticket.entity');
-    // return await this.shareLinkRepository.manager.findOne(QrTicket, {
-    //   where: { id: contentId },
-    //   relations: ['user'],
-    // });
+  private async resolveQrTicket(contentId: string): Promise<null> {
     return null; // TODO: Implement when QR ticket entity is available
   }
 

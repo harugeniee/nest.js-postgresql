@@ -16,6 +16,10 @@ import {
   ManyToOne,
   // OneToMany,
 } from 'typeorm';
+import { Media } from 'src/media/entities/media.entity';
+import { Comment } from 'src/comments/entities/comment.entity';
+import { BookmarkFolder } from 'src/bookmarks/entities/bookmark-folder.entity';
+import { StickerPack } from 'src/stickers/entities/sticker-pack.entity';
 
 /**
  * Share link entity for tracking shared content
@@ -28,7 +32,7 @@ import {
  */
 @Entity({ name: 'share_links' })
 @Index(['code'], { unique: true })
-@Index(['contentType', 'contentId', 'ownerUserId'])
+@Index(['contentType', 'contentId', 'userId'])
 @Index(['channelId'])
 @Index(['campaignId'])
 @Index(['isActive'])
@@ -73,7 +77,14 @@ export class ShareLink extends BaseEntityCustom {
    * Polymorphic relationship to different content types
    * This will be populated based on contentType
    */
-  content?: Article | User;
+  content?:
+    | Article
+    | User
+    | Media
+    | Comment
+    | BookmarkFolder
+    | StickerPack
+    | null;
 
   /**
    * Foreign key reference to the user who created this share link
@@ -84,11 +95,11 @@ export class ShareLink extends BaseEntityCustom {
     nullable: false,
     comment: 'Foreign key reference to users.id',
   })
-  ownerUserId: string;
+  userId: string;
 
   @ManyToOne(() => User, { nullable: false })
-  @JoinColumn({ name: 'ownerUserId', referencedColumnName: 'id' })
-  owner: User;
+  @JoinColumn({ name: 'userId', referencedColumnName: 'id' })
+  user: User;
 
   /**
    * Optional foreign key reference to share channel

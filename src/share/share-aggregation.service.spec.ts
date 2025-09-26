@@ -203,9 +203,7 @@ describe('ShareAggregationService', () => {
         convs: 2,
         convValue: 20.0,
       });
-      expect(mockRepository.save).toHaveBeenCalledWith(
-        mockAggregation,
-      );
+      expect(mockRepository.save).toHaveBeenCalledWith(mockAggregation);
     });
   });
 
