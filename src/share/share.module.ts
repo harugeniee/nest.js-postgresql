@@ -19,6 +19,9 @@ import { ShareAttribution } from './entities/share-attribution.entity';
 import { ShareConversion } from './entities/share-conversion.entity';
 import { ShareAggDaily } from './entities/share-agg-daily.entity';
 
+// Shared services
+import { RabbitmqModule } from 'src/shared/services';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -32,6 +35,7 @@ import { ShareAggDaily } from './entities/share-agg-daily.entity';
       ShareAggDaily,
     ]),
     ScheduleModule,
+    RabbitmqModule,
   ],
   controllers: [ShareLinksController, ShareRedirectController],
   providers: [

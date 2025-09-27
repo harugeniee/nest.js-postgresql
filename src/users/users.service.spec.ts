@@ -259,9 +259,7 @@ describe('UsersService', () => {
   describe('findSessionById', () => {
     it('should find active session by id', async () => {
       const sessionId = 'session123';
-      const mockUserSessionsService = module.get(
-        UserSessionsService,
-      ) as jest.Mocked<UserSessionsService>;
+      const mockUserSessionsService = module.get(UserSessionsService);
       mockUserSessionsService.findOne.mockResolvedValue(
         mockUserSession as UserSession,
       );
@@ -277,9 +275,7 @@ describe('UsersService', () => {
 
     it('should return null if session not found', async () => {
       const sessionId = 'nonexistent';
-      const mockUserSessionsService = module.get(
-        UserSessionsService,
-      ) as jest.Mocked<UserSessionsService>;
+      const mockUserSessionsService = module.get(UserSessionsService);
       mockUserSessionsService.findOne.mockResolvedValue(null);
 
       const result = await service.findSessionById(sessionId);

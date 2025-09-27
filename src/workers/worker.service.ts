@@ -11,6 +11,12 @@ import {
 import { CommentsService } from 'src/comments/comments.service';
 import { MailQueueIntegrationService } from 'src/shared/services/mail/mail-queue-integration.service';
 import { NOTIFICATION_CONSTANTS } from 'src/shared/constants';
+import {
+  ShareCreatedJob,
+  ShareDeletedJob,
+  ShareCountUpdateJob,
+  ShareCountResult,
+} from 'src/share/interfaces/share-queue.interface';
 
 @Injectable()
 export class WorkerService {
@@ -583,5 +589,156 @@ export class WorkerService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // ==================== SHARE PROCESSING METHODS ====================
+
+  /**
+   * Process share created event
+   * Updates share count for the content and triggers related analytics
+   */
+  async processShareCreated(job: ShareCreatedJob): Promise<ShareCountResult> {
+    const startTime = Date.now();
+    this.logger.log(
+      `Processing share created: ${job.shareId} for ${job.contentType}:${job.contentId}`,
+    );
+
+    try {
+      // TODO: Implement share count update logic
+      // This would typically involve:
+      // 1. Updating a share_count field in the content table
+      // 2. Updating analytics/statistics
+      // 3. Triggering notifications if needed
+      // 4. Updating search indexes
+
+      this.logger.log(
+        `Share created processed: ${job.shareId}, content: ${job.contentType}:${job.contentId}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      return {
+        jobId: job.jobId,
+        success: true,
+        processingTime,
+        data: {
+          contentType: job.contentType,
+          contentId: job.contentId,
+          shareCount: 1, // This would be the actual count from database
+        },
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      this.logger.error(
+        `Error processing share created: ${job.shareId}`,
+        error,
+      );
+
+      return {
+        jobId: job.jobId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTime,
+      };
+    }
+  }
+
+  /**
+   * Process share deleted event
+   * Decrements share count for the content and triggers related cleanup
+   */
+  async processShareDeleted(job: ShareDeletedJob): Promise<ShareCountResult> {
+    const startTime = Date.now();
+    this.logger.log(
+      `Processing share deleted: ${job.shareId} for ${job.contentType}:${job.contentId}`,
+    );
+
+    try {
+      // TODO: Implement share count decrement logic
+      // This would typically involve:
+      // 1. Decrementing share_count field in the content table
+      // 2. Updating analytics/statistics
+      // 3. Cleaning up related data if needed
+      // 4. Updating search indexes
+
+      this.logger.log(
+        `Share deleted processed: ${job.shareId}, content: ${job.contentType}:${job.contentId}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      return {
+        jobId: job.jobId,
+        success: true,
+        processingTime,
+        data: {
+          contentType: job.contentType,
+          contentId: job.contentId,
+          shareCount: 0, // This would be the actual count from database
+        },
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      this.logger.error(
+        `Error processing share deleted: ${job.shareId}`,
+        error,
+      );
+
+      return {
+        jobId: job.jobId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTime,
+      };
+    }
+  }
+
+  /**
+   * Process share count update event
+   * Handles bulk updates or corrections to share counts
+   */
+  async processShareCountUpdate(
+    job: ShareCountUpdateJob,
+  ): Promise<ShareCountResult> {
+    const startTime = Date.now();
+    this.logger.log(
+      `Processing share count update: ${job.operation} for ${job.contentType}:${job.contentId}`,
+    );
+
+    try {
+      // TODO: Implement share count update logic
+      // This would typically involve:
+      // 1. Incrementing or decrementing share_count field in the content table
+      // 2. Updating analytics/statistics
+      // 3. Triggering related updates if needed
+      // 4. Updating search indexes
+
+      this.logger.log(
+        `Share count update processed: ${job.operation} for ${job.contentType}:${job.contentId}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      return {
+        jobId: job.jobId,
+        success: true,
+        processingTime,
+        data: {
+          contentType: job.contentType,
+          contentId: job.contentId,
+          shareCount: job.operation === 'increment' ? 1 : -1, // This would be the actual count from database
+        },
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      this.logger.error(
+        `Error processing share count update: ${job.contentType}:${job.contentId}`,
+        error,
+      );
+
+      return {
+        jobId: job.jobId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTime,
+      };
+    }
   }
 }

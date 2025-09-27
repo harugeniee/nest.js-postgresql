@@ -1,28 +1,31 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
+import { JOB_NAME } from 'src/shared/constants';
+import { RabbitMQService } from 'src/shared/services';
+import { Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 
-import { ShareLink } from './entities/share-link.entity';
-import { ShareSession } from './entities/share-session.entity';
-import { ShareClick } from './entities/share-click.entity';
-import { ShareAttribution } from './entities/share-attribution.entity';
-import { ShareConversion } from './entities/share-conversion.entity';
+import { Article } from 'src/articles/entities/article.entity';
+import { BookmarkFolder } from 'src/bookmarks/entities/bookmark-folder.entity';
+import { Comment } from 'src/comments/entities/comment.entity';
+import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
+import { BaseService } from 'src/common/services/base.service';
+import { Media } from 'src/media/entities/media.entity';
+import { SHARE_CONSTANTS, ShareContentType } from 'src/shared/constants';
+import { CacheService } from 'src/shared/services';
+import { StickerPack } from 'src/stickers/entities/sticker-pack.entity';
+import { User } from 'src/users/entities/user.entity';
 import { CreateShareLinkDto } from './dto/create-share-link.dto';
 import {
   ShareAttributionDto,
   ShareConversionDto,
 } from './dto/share-attribution.dto';
-import { SHARE_CONSTANTS, ShareContentType } from 'src/shared/constants';
-import { BaseService } from 'src/common/services/base.service';
-import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
-import { CacheService } from 'src/shared/services';
-import { Article } from 'src/articles/entities/article.entity';
-import { User } from 'src/users/entities/user.entity';
-import { Media } from 'src/media/entities/media.entity';
-import { Comment } from 'src/comments/entities/comment.entity';
-import { BookmarkFolder } from 'src/bookmarks/entities/bookmark-folder.entity';
-import { StickerPack } from 'src/stickers/entities/sticker-pack.entity';
+import { ShareAttribution } from './entities/share-attribution.entity';
+import { ShareClick } from './entities/share-click.entity';
+import { ShareConversion } from './entities/share-conversion.entity';
+import { ShareLink } from './entities/share-link.entity';
+import { ShareSession } from './entities/share-session.entity';
 
 /**
  * Main share service for handling share link operations
@@ -35,6 +38,8 @@ import { StickerPack } from 'src/stickers/entities/sticker-pack.entity';
  */
 @Injectable()
 export class ShareService extends BaseService<ShareLink> {
+  private deletedShareLink: ShareLink | null = null;
+
   constructor(
     @InjectRepository(ShareLink)
     private readonly shareLinkRepository: Repository<ShareLink>,
@@ -47,6 +52,7 @@ export class ShareService extends BaseService<ShareLink> {
     @InjectRepository(ShareConversion)
     private readonly shareConversionRepository: Repository<ShareConversion>,
     cacheService: CacheService,
+    private readonly rabbitMQService: RabbitMQService,
   ) {
     super(
       new TypeOrmBaseRepository<ShareLink>(shareLinkRepository),
@@ -209,7 +215,7 @@ export class ShareService extends BaseService<ShareLink> {
   /**
    * Resolve QR ticket content
    */
-  private async resolveQrTicket(contentId: string): Promise<null> {
+  private async resolveQrTicket(_contentId: string): Promise<null> {
     return null; // TODO: Implement when QR ticket entity is available
   }
 
@@ -459,5 +465,168 @@ export class ShareService extends BaseService<ShareLink> {
     ];
 
     return botPatterns.some((pattern) => pattern.test(userAgent));
+  }
+
+  /**
+   * Hook: Called after a share link is created
+   * Sends share created event to queue
+   *
+   * @param shareLink - Created share link
+   */
+  protected async afterCreate(shareLink: ShareLink): Promise<void> {
+    await super.afterCreate(shareLink);
+    await this.sendShareCreatedEvent(shareLink);
+  }
+
+  /**
+   * Hook: Called after a share link is updated
+   * Sends share count update event to queue if needed
+   *
+   * @param shareLink - Updated share link
+   */
+  protected async afterUpdate(shareLink: ShareLink): Promise<void> {
+    await super.afterUpdate(shareLink);
+    // Note: This hook will be called for any update
+    // In a real implementation, you might want to track what changed
+    // and only send events for relevant changes (like isActive status)
+  }
+
+  /**
+   * Hook: Called before a share link is deleted
+   * Store share link data for afterDelete hook
+   *
+   * @param shareLinkId - Share link ID to be deleted
+   */
+  protected async beforeDelete(shareLinkId: string): Promise<void> {
+    await super.beforeDelete(shareLinkId);
+    // Store share link data before deletion for afterDelete hook
+    this.deletedShareLink = await this.findOne({ id: shareLinkId });
+  }
+
+  /**
+   * Hook: Called after a share link is deleted
+   * Sends share deleted event to queue
+   *
+   * @param shareLinkId - Deleted share link ID
+   */
+  protected async afterDelete(shareLinkId: string): Promise<void> {
+    await super.afterDelete(shareLinkId);
+    // Send event using stored share link data
+    if (this.deletedShareLink) {
+      await this.sendShareDeletedEvent(this.deletedShareLink);
+      this.deletedShareLink = null; // Clean up
+    }
+  }
+
+  /**
+   * Send share created event to queue
+   *
+   * @param shareLink - Created share link
+   */
+  private async sendShareCreatedEvent(shareLink: ShareLink): Promise<void> {
+    try {
+      const job = {
+        jobId: uuidv4(),
+        shareId: shareLink.id,
+        contentType: shareLink.contentType,
+        contentId: shareLink.contentId,
+        userId: shareLink.userId,
+        channelId: shareLink.channelId,
+        campaignId: shareLink.campaignId,
+        timestamp: new Date().toISOString(),
+      };
+
+      await this.rabbitMQService.sendDataToRabbitMQAsync(
+        JOB_NAME.SHARE_CREATED,
+        job,
+      );
+    } catch (error) {
+      // Log error but don't throw to avoid breaking the main flow
+      console.error(
+        'Failed to send share created event to queue:',
+        String(error),
+      );
+    }
+  }
+
+  /**
+   * Send share deleted event to queue
+   *
+   * @param shareLink - Deleted share link
+   */
+  private async sendShareDeletedEvent(shareLink: ShareLink): Promise<void> {
+    try {
+      const job = {
+        jobId: uuidv4(),
+        shareId: shareLink.id,
+        contentType: shareLink.contentType,
+        contentId: shareLink.contentId,
+        userId: shareLink.userId,
+        timestamp: new Date().toISOString(),
+      };
+
+      await this.rabbitMQService.sendDataToRabbitMQAsync(
+        JOB_NAME.SHARE_DELETED,
+        job,
+      );
+    } catch (error) {
+      // Log error but don't throw to avoid breaking the main flow
+      console.error(
+        'Failed to send share deleted event to queue:',
+        String(error),
+      );
+    }
+  }
+
+  /**
+   * Send share count update event to queue
+   *
+   * @param contentType - Type of content
+   * @param contentId - Content ID
+   * @param operation - Increment or decrement
+   */
+  private async sendShareCountUpdateEvent(
+    contentType: string,
+    contentId: string,
+    operation: 'increment' | 'decrement',
+  ): Promise<void> {
+    try {
+      const job = {
+        jobId: uuidv4(),
+        contentType,
+        contentId,
+        operation,
+        timestamp: new Date().toISOString(),
+      };
+
+      await this.rabbitMQService.sendDataToRabbitMQAsync(
+        JOB_NAME.SHARE_COUNT_UPDATE,
+        job,
+      );
+    } catch (error) {
+      // Log error but don't throw to avoid breaking the main flow
+      console.error(
+        'Failed to send share count update event to queue:',
+        String(error),
+      );
+    }
+  }
+
+  /**
+   * Get share count for specific content
+   * This method can be used to get the current share count
+   *
+   * @param contentType - Type of content
+   * @param contentId - Content ID
+   * @returns Number of shares for the content
+   */
+  async getShareCount(contentType: string, contentId: string): Promise<number> {
+    return await this.shareLinkRepository.count({
+      where: {
+        contentType,
+        contentId,
+        isActive: true,
+      },
+    });
   }
 }
