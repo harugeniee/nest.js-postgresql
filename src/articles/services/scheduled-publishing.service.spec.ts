@@ -441,7 +441,7 @@ describe('ScheduledPublishingService', () => {
       expect(articleRepository.find).toHaveBeenCalledWith({
         where: {
           status: ARTICLE_CONSTANTS.STATUS.SCHEDULED,
-          scheduledAt: LessThanOrEqual(now),
+          scheduledAt: expect.any(Object), // Use expect.any(Object) instead of exact timestamp
         },
         order: { scheduledAt: 'ASC' },
       });

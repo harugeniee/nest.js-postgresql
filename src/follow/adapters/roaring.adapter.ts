@@ -30,92 +30,68 @@ export interface RoaringAdapter {
 }
 
 /**
- * RoaringWasmAdapter - Uses roaring-wasm for high performance
+ * RoaringWasmAdapter - DISABLED - Uses roaring-wasm for high performance
+ * This adapter is disabled to avoid dependency issues
  */
 @Injectable()
 export class RoaringWasmAdapter implements RoaringAdapter {
   private readonly logger = new Logger(RoaringWasmAdapter.name);
-  private roaring: any = null;
   private isInitialized = false;
 
   constructor(private readonly configService: ConfigService) {}
 
   async init(): Promise<void> {
-    try {
-      // Dynamic import to handle WASM loading
-      const roaringWasm = await import('roaring-wasm');
-      this.roaring = roaringWasm;
-      this.isInitialized = true;
-      this.logger.log('✅ RoaringWasmAdapter initialized successfully');
-    } catch (error) {
-      this.logger.error('❌ Failed to initialize RoaringWasmAdapter:', error);
-      throw new Error(
-        'Failed to load roaring-wasm. Please ensure it is installed.',
-      );
-    }
+    this.logger.warn(
+      '❌ RoaringWasmAdapter is disabled - using fallback instead',
+    );
+    throw new Error(
+      'RoaringWasmAdapter is disabled to avoid dependency issues',
+    );
   }
 
   isReady(): boolean {
-    return this.isInitialized && this.roaring !== null;
+    return false;
   }
 
   newSet(): RoaringSet {
-    if (!this.isReady()) {
-      throw new Error('RoaringWasmAdapter not initialized');
-    }
-    return new RoaringWasmSet(this.roaring);
+    throw new Error('RoaringWasmAdapter is disabled');
   }
 
   fromSerialized(buf: Buffer | Uint8Array): RoaringSet {
-    if (!this.isReady()) {
-      throw new Error('RoaringWasmAdapter not initialized');
-    }
-    return new RoaringWasmSet(this.roaring, buf);
+    throw new Error('RoaringWasmAdapter is disabled');
   }
 }
 
 /**
- * RoaringBitmapAdapter - Using roaring package
+ * RoaringBitmapAdapter - DISABLED - Using roaring package
+ * This adapter is disabled to avoid dependency issues
  */
 @Injectable()
 export class RoaringBitmapAdapter implements RoaringAdapter {
   private readonly logger = new Logger(RoaringBitmapAdapter.name);
-  private roaring: any = null;
   private isInitialized = false;
 
   constructor(private readonly configService: ConfigService) {}
 
   async init(): Promise<void> {
-    try {
-      // Dynamic import to handle module loading
-      const roaringBitmap = await import('roaring');
-      this.roaring = roaringBitmap;
-      this.isInitialized = true;
-      this.logger.log('✅ RoaringBitmapAdapter initialized successfully');
-    } catch (error) {
-      this.logger.error('❌ Failed to initialize RoaringBitmapAdapter:', error);
-      throw new Error(
-        'Failed to load roaring package. Please ensure it is installed.',
-      );
-    }
+    this.logger.warn(
+      '❌ RoaringBitmapAdapter is disabled - using fallback instead',
+    );
+    throw new Error(
+      'RoaringBitmapAdapter is disabled to avoid dependency issues',
+    );
   }
 
   isReady(): boolean {
-    return this.isInitialized && this.roaring !== null;
+    return false;
   }
 
   newSet(): RoaringSet {
-    if (!this.isReady()) {
-      throw new Error('RoaringBitmapAdapter not initialized');
-    }
-    return new RoaringBitmapSet(this.roaring);
+    throw new Error('RoaringBitmapAdapter is disabled');
   }
 
   fromSerialized(buf: Buffer | Uint8Array): RoaringSet {
-    if (!this.isReady()) {
-      throw new Error('RoaringBitmapAdapter not initialized');
-    }
-    return new RoaringBitmapSet(this.roaring, buf);
+    throw new Error('RoaringBitmapAdapter is disabled');
   }
 }
 
@@ -425,6 +401,7 @@ export class RoaringFallbackAdapter implements RoaringAdapter {
 
 /**
  * RoaringAdapterFactory - Factory for creating roaring adapters
+ * Now always uses fallback adapter to avoid dependency issues
  */
 @Injectable()
 export class RoaringAdapterFactory {
@@ -434,50 +411,21 @@ export class RoaringAdapterFactory {
 
   async createAdapter(): Promise<RoaringAdapter> {
     const config = this.configService.get<FollowConfig>('follow');
-    const backend = config?.backend || 'roaring-wasm';
+    const backend = config?.backend || 'fallback';
 
     this.logger.log(`Creating roaring adapter with backend: ${backend}`);
 
+    // Always use fallback adapter to avoid dependency issues
+    this.logger.warn(
+      '⚠️ Using fallback Set implementation instead of roaring packages',
+    );
+
     try {
-      switch (backend) {
-        case 'roaring-wasm': {
-          const wasmAdapter = new RoaringWasmAdapter(this.configService);
-          await wasmAdapter.init();
-          return wasmAdapter;
-        }
-
-        case 'roaring-bitmap': {
-          const bitmapAdapter = new RoaringBitmapAdapter(this.configService);
-          await bitmapAdapter.init();
-          return bitmapAdapter;
-        }
-
-        default:
-          throw new Error(`Unknown roaring backend: ${String(backend)}`);
-      }
+      const fallbackAdapter = new RoaringFallbackAdapter(this.configService);
+      await fallbackAdapter.init();
+      return fallbackAdapter;
     } catch (error) {
-      this.logger.error(`Failed to create ${backend} adapter:`, error);
-
-      // Fallback to roaring bitmap if roaring-wasm fails
-      if (backend === 'roaring-wasm') {
-        this.logger.warn('Falling back to roaring bitmap adapter');
-        try {
-          const bitmapAdapter = new RoaringBitmapAdapter(this.configService);
-          await bitmapAdapter.init();
-          return bitmapAdapter;
-        } catch (fallbackError) {
-          this.logger.error(
-            'Roaring bitmap adapter also failed, using Set fallback:',
-            fallbackError,
-          );
-          const fallbackAdapter = new RoaringFallbackAdapter(
-            this.configService,
-          );
-          await fallbackAdapter.init();
-          return fallbackAdapter;
-        }
-      }
-
+      this.logger.error('Failed to create fallback adapter:', error);
       throw error;
     }
   }

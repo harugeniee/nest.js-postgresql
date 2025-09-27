@@ -43,7 +43,7 @@ import { FollowRebuildTask } from './tasks/follow.rebuild.task';
     // Adapter factory
     RoaringAdapterFactory,
     {
-      provide: 'ROARING_ADAPTER',
+      provide: 'BITSET_ADAPTER',
       useFactory: async (factory: RoaringAdapterFactory) => {
         return await factory.createAdapter();
       },
@@ -62,19 +62,19 @@ import { FollowRebuildTask } from './tasks/follow.rebuild.task';
     FollowCacheService,
     FollowSuggestionsService,
     NewsFeedService,
-    'ROARING_ADAPTER',
+    'BITSET_ADAPTER',
   ],
 })
 export class FollowModule implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
-    @Inject('ROARING_ADAPTER') private readonly roaringAdapter: RoaringAdapter,
+    @Inject('BITSET_ADAPTER') private readonly bitsetAdapter: RoaringAdapter,
   ) {}
 
   async onModuleInit() {
-    // Initialize roaring adapter
-    if (!this.roaringAdapter.isReady()) {
-      await this.roaringAdapter.init();
+    // Initialize bitset adapter
+    if (!this.bitsetAdapter.isReady()) {
+      await this.bitsetAdapter.init();
     }
 
     // Log configuration

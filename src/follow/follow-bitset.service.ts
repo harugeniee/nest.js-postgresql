@@ -29,7 +29,7 @@ export class FollowBitsetService {
     @InjectRepository(UserFollowEdge)
     private readonly edgeRepo: Repository<UserFollowEdge>,
     private readonly cacheService: FollowCacheService,
-    @Inject('ROARING_ADAPTER') private readonly roaringAdapter: RoaringAdapter,
+    @Inject('BITSET_ADAPTER') private readonly bitsetAdapter: RoaringAdapter,
   ) {}
 
   /**
@@ -63,7 +63,7 @@ export class FollowBitsetService {
       try {
         // Get or create following bitset
         let followingSet = await this.getFollowingSet(followerId);
-        followingSet ??= this.roaringAdapter.newSet();
+        followingSet ??= this.bitsetAdapter.newSet();
 
         const followeeIdNum = stringToNumberId(followeeId);
 
@@ -519,7 +519,7 @@ export class FollowBitsetService {
   ): Promise<{ success: boolean; count: number }> {
     try {
       const buffer = Buffer.from(data, 'base64');
-      const set = this.roaringAdapter.fromSerialized(buffer);
+      const set = this.bitsetAdapter.fromSerialized(buffer);
       const count = set.size();
 
       if (type === 'following') {
@@ -576,8 +576,8 @@ export class FollowBitsetService {
       });
 
       // Build bitsets
-      const followingSet = this.roaringAdapter.newSet();
-      const followersSet = this.roaringAdapter.newSet();
+      const followingSet = this.bitsetAdapter.newSet();
+      const followersSet = this.bitsetAdapter.newSet();
 
       for (const edge of edges) {
         if (edge.followerId === userId) {
@@ -636,7 +636,7 @@ export class FollowBitsetService {
     const bitset = await this.bitsetRepo.findOne({ where: { userId } });
     if (!bitset?.followingRb) return null;
 
-    const set = this.roaringAdapter.fromSerialized(bitset.followingRb);
+    const set = this.bitsetAdapter.fromSerialized(bitset.followingRb);
 
     // Cache the result
     await this.cacheService.saveFollowingSet(userId, set);
@@ -658,7 +658,7 @@ export class FollowBitsetService {
     const bitset = await this.bitsetRepo.findOne({ where: { userId } });
     if (!bitset?.followersRb) return null;
 
-    const set = this.roaringAdapter.fromSerialized(bitset.followersRb);
+    const set = this.bitsetAdapter.fromSerialized(bitset.followersRb);
 
     // Cache the result
     await this.cacheService.saveFollowersSet(userId, set);

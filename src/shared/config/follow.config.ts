@@ -2,7 +2,7 @@ import { registerAs } from '@nestjs/config';
 
 export interface FollowConfig {
   redisUrl: string;
-  backend: 'roaring-wasm' | 'roaring-bitmap';
+  backend: 'javascript' | 'fallback';
   persistIntervalSec: number;
   storageMode: 'bitset' | 'edges';
   maxFollowsPerSecond: number;
@@ -15,9 +15,8 @@ export const followConfig = registerAs(
   (): FollowConfig => ({
     redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
     backend:
-      (process.env.FOLLOW_BITSET_BACKEND as
-        | 'roaring-wasm'
-        | 'roaring-bitmap') || 'roaring-bitmap',
+      (process.env.FOLLOW_BITSET_BACKEND as 'javascript' | 'fallback') ||
+      'javascript',
     persistIntervalSec: parseInt(
       process.env.FOLLOW_BITSET_PERSIST_INTERVAL_SEC || '300',
       10,

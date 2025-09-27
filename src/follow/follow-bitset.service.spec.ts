@@ -77,7 +77,7 @@ describe('FollowBitsetService', () => {
           useValue: mockCacheService,
         },
         {
-          provide: 'ROARING_ADAPTER',
+          provide: 'BITSET_ADAPTER',
           useValue: mockRoaringAdapter,
         },
       ],
