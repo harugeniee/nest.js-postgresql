@@ -26,7 +26,7 @@ export class FollowSuggestionsService {
   constructor(
     private readonly followBitsetService: FollowBitsetService,
     private readonly cacheService: FollowCacheService,
-    @Inject('ROARING_ADAPTER') private readonly roaringAdapter: RoaringAdapter,
+    @Inject('BITSET_ADAPTER') private readonly roaringAdapter: RoaringAdapter,
   ) {}
 
   /**
