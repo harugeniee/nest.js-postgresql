@@ -1,0 +1,32 @@
+{
+  "CANNOT_FOLLOW_YOURSELF": "You cannot follow yourself",
+  "MISSING_REQUIRED_PARAMETERS": "Missing required parameters: followerId and followeeId are required",
+  "INVALID_BITSET_TYPE": "Invalid bitset type. Must be either 'following' or 'followers'",
+  "UNKNOWN_SUGGESTION_ALGORITHM": "Unknown suggestion algorithm",
+
+  "LOCK_ACQUISITION_FAILED": "Failed to acquire lock for operation. Please try again later",
+
+  "FOLLOW_OPERATION_FAILED": "Failed to follow user",
+  "UNFOLLOW_OPERATION_FAILED": "Failed to unfollow user",
+  "GET_FOLLOWING_FAILED": "Failed to get following list",
+  "GET_FOLLOWERS_FAILED": "Failed to get followers list",
+  "GET_MUTUAL_FRIENDS_FAILED": "Failed to get mutual friends",
+  "GET_FOLLOW_STATUS_FAILED": "Failed to get follow status",
+  "GET_COUNTERS_FAILED": "Failed to get follow counters",
+  "GET_SUGGESTIONS_FAILED": "Failed to get follow suggestions",
+
+  "BITSET_NOT_FOUND": "Bitset not found for user",
+  "EXPORT_BITSET_FAILED": "Failed to export bitset data",
+  "IMPORT_BITSET_FAILED": "Failed to import bitset data",
+  "REBUILD_BITSET_FAILED": "Failed to rebuild bitset from edges",
+
+  "GENERATE_FEED_FAILED": "Failed to generate news feed",
+
+  "FOLLOW_SUCCESS": "Successfully followed user",
+  "UNFOLLOW_SUCCESS": "Successfully unfollowed user",
+  "ALREADY_FOLLOWING": "Already following this user",
+  "NOT_FOLLOWING": "Not following this user",
+  "BITSET_EXPORTED": "Bitset data exported successfully",
+  "BITSET_IMPORTED": "Bitset data imported successfully",
+  "BITSET_REBUILT": "Bitset rebuilt successfully"
+}

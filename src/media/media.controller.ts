@@ -88,11 +88,10 @@ export class MediaController {
     @Body() presignedUploadDto: PresignedUploadDto,
   ) {
     return this.mediaService.generatePresignedUploadUrl(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
       presignedUploadDto.filename,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+
       presignedUploadDto.contentType,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+
       presignedUploadDto.contentLength,
     );
   }
@@ -104,12 +103,12 @@ export class MediaController {
   ) {
     const presignedUrl = await this.mediaService.generatePresignedDownloadUrl(
       id,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+
       query.expiresIn,
     );
     return {
       success: true,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
       data: { presignedUrl, expiresIn: query.expiresIn },
       messageKey: 'media.PRESIGNED_URL_SUCCESS',
     };

@@ -14,6 +14,11 @@ import {
   TemplateEmailQueueJob,
   OtpEmailQueueJob,
 } from 'src/shared/services/mail/mail-queue.interface';
+import {
+  ShareCreatedJob,
+  ShareDeletedJob,
+  ShareCountUpdateJob,
+} from 'src/share/interfaces/share-queue.interface';
 
 @Controller()
 export class WorkerController {
@@ -163,7 +168,7 @@ export class WorkerController {
       console.log('Comment created event received:', data);
       // Process comment created event here
       // You can add logic to send notifications, update analytics, etc.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
       await this.workerService.processCommentCreated(data);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -184,7 +189,7 @@ export class WorkerController {
       console.log('Comment updated event received:', data);
       // Process comment updated event here
       // You can add logic to send notifications, update analytics, etc.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
       await this.workerService.processCommentUpdated(data);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -205,7 +210,7 @@ export class WorkerController {
       console.log('Comment deleted event received:', data);
       // Process comment deleted event here
       // You can add logic to clean up related data, send notifications, etc.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
       await this.workerService.processCommentDeleted(data);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -226,13 +231,170 @@ export class WorkerController {
       console.log('Comment pinned event received:', data);
       // Process comment pinned event here
       // You can add logic to send notifications, update analytics, etc.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
       await this.workerService.processCommentPinned(data);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       channel.ack(originalMsg);
     } catch (error: unknown) {
       console.log('Error processing comment pinned event:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  // Notification job handlers
+  @MessagePattern('notification.send_email')
+  async handleNotificationEmail(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Notification email job received:', data);
+
+      await this.workerService.processNotificationEmail(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing notification email:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern('notification.send_push')
+  async handleNotificationPush(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Notification push job received:', data);
+
+      await this.workerService.processNotificationPush(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing notification push:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern('notification.send_in_app')
+  async handleNotificationInApp(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Notification in-app job received:', data);
+
+      await this.workerService.processNotificationInApp(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing notification in-app:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern('notification.batch_email')
+  async handleNotificationBatchEmail(
+    @Payload() data: any,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Notification batch email job received:', data);
+
+      await this.workerService.processNotificationBatchEmail(data);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing notification batch email:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  // ==================== SHARE PROCESSING METHODS ====================
+
+  @MessagePattern(JOB_NAME.SHARE_CREATED)
+  async handleShareCreated(
+    @Payload() job: ShareCreatedJob,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Share created job received:', job);
+
+      await this.workerService.processShareCreated(job);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing share created:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern(JOB_NAME.SHARE_DELETED)
+  async handleShareDeleted(
+    @Payload() job: ShareDeletedJob,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Share deleted job received:', job);
+
+      await this.workerService.processShareDeleted(job);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing share deleted:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern(JOB_NAME.SHARE_COUNT_UPDATE)
+  async handleShareCountUpdate(
+    @Payload() job: ShareCountUpdateJob,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      console.log('Share count update job received:', job);
+
+      await this.workerService.processShareCountUpdate(job);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing share count update:', error);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       channel.nack(originalMsg, false, true);
     }

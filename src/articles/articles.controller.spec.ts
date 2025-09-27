@@ -5,6 +5,8 @@ import { ArticlesService } from './articles.service';
 import { Article } from './entities/article.entity';
 import { ScheduledPublishingService } from './services/scheduled-publishing.service';
 import { CacheService } from 'src/shared/services';
+import { AnalyticsService } from 'src/analytics/analytics.service';
+import { Reflector } from '@nestjs/core';
 
 describe('ArticlesController', () => {
   let controller: ArticlesController;
@@ -66,6 +68,21 @@ describe('ArticlesController', () => {
             getTtl: jest.fn(),
           },
         },
+        {
+          provide: AnalyticsService,
+          useValue: {
+            trackEvent: jest.fn().mockResolvedValue({}),
+            getUserAnalytics: jest.fn().mockResolvedValue({}),
+            getContentPerformance: jest.fn().mockResolvedValue({}),
+            getPlatformOverview: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: Reflector,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -98,13 +115,15 @@ describe('ArticlesController', () => {
       };
 
       jest
-        .spyOn(articlesService, 'create')
+        .spyOn(articlesService, 'createArticle')
         .mockResolvedValue(mockArticle as Article);
 
       const result = await controller.create(createArticleDto);
 
       expect(result).toEqual(mockArticle);
-      expect(articlesService.create).toHaveBeenCalledWith(createArticleDto);
+      expect(articlesService.createArticle).toHaveBeenCalledWith(
+        createArticleDto,
+      );
     });
   });
 
@@ -174,13 +193,13 @@ describe('ArticlesController', () => {
       };
 
       jest
-        .spyOn(articlesService, 'update')
+        .spyOn(articlesService, 'updateArticle')
         .mockResolvedValue(mockUpdatedArticle as Article);
 
       const result = await controller.update(articleId, updateData);
 
       expect(result).toEqual(mockUpdatedArticle);
-      expect(articlesService.update).toHaveBeenCalledWith(
+      expect(articlesService.updateArticle).toHaveBeenCalledWith(
         articleId,
         updateData,
       );

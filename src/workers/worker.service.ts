@@ -9,6 +9,14 @@ import {
   MailQueueJobResult,
 } from 'src/shared/services/mail/mail-queue.interface';
 import { CommentsService } from 'src/comments/comments.service';
+import { MailQueueIntegrationService } from 'src/shared/services/mail/mail-queue-integration.service';
+import { NOTIFICATION_CONSTANTS } from 'src/shared/constants';
+import {
+  ShareCreatedJob,
+  ShareDeletedJob,
+  ShareCountUpdateJob,
+  ShareCountResult,
+} from 'src/share/interfaces/share-queue.interface';
 
 @Injectable()
 export class WorkerService {
@@ -17,6 +25,7 @@ export class WorkerService {
   constructor(
     private readonly mailService: MailService,
     private readonly commentsService: CommentsService,
+    private readonly mailQueueIntegrationService: MailQueueIntegrationService,
   ) {}
 
   testRABBIT(id: number) {
@@ -344,6 +353,392 @@ export class WorkerService {
         error,
       );
       throw error;
+    }
+  }
+
+  // ==================== NOTIFICATION PROCESSING METHODS ====================
+
+  /**
+   * Process notification email job
+   * Handles sending email notifications via queue
+   */
+  async processNotificationEmail(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing notification email: ${data.notificationId}`);
+
+    try {
+      // Extract notification data
+      const {
+        notificationId,
+        userId,
+        type,
+        title,
+        message,
+        actionUrl,
+        emailTemplate,
+        emailTemplateData,
+        metadata,
+      } = data;
+
+      // Get user email from metadata or user service
+      const userEmail = metadata?.userEmail || `user-${userId}@example.com`;
+      const userName = metadata?.userName || 'User';
+
+      // Prepare email template data
+      const templateData = {
+        appName: process.env.APP_NAME || 'NestJS App',
+        appUrl: process.env.APP_URL || 'http://localhost:3000',
+        supportEmail: process.env.MAIL_SUPPORT || process.env.MAIL_FROM,
+        companyName: process.env.COMPANY_NAME || 'Your Company',
+        companyAddress: process.env.COMPANY_ADDRESS || 'Your Address',
+        name: userName,
+        email: userEmail,
+        title,
+        message,
+        actionUrl,
+        ...emailTemplateData,
+      };
+
+      // Send email using template
+      const result =
+        await this.mailQueueIntegrationService.sendTemplateMailQueue(
+          emailTemplate || this.getDefaultEmailTemplate(type),
+          { email: userEmail, name: userName },
+          templateData,
+          {
+            subject: title,
+            priority: 'normal',
+          },
+          5, // priority
+        );
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Notification email processed: ${notificationId}, jobId: ${result.jobId}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing notification email: ${data.notificationId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process notification push job
+   * Handles sending push notifications
+   */
+  async processNotificationPush(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing notification push: ${data.notificationId}`);
+
+    try {
+      // Extract notification data
+      const {
+        notificationId,
+        userId,
+        type,
+        title,
+        message,
+        actionUrl,
+        pushData,
+        metadata,
+      } = data;
+
+      // TODO: Implement push notification service
+      // This would integrate with services like Firebase Cloud Messaging, OneSignal, etc.
+      this.logger.log(
+        `Push notification would be sent to user ${userId}: ${title}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Notification push processed: ${notificationId}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing notification push: ${data.notificationId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process notification in-app job
+   * Handles storing in-app notifications
+   */
+  async processNotificationInApp(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing notification in-app: ${data.notificationId}`);
+
+    try {
+      // Extract notification data
+      const {
+        notificationId,
+        userId,
+        type,
+        title,
+        message,
+        actionUrl,
+        metadata,
+      } = data;
+
+      // TODO: Implement in-app notification storage
+      // This would store the notification in the database for in-app display
+      this.logger.log(
+        `In-app notification stored for user ${userId}: ${title}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Notification in-app processed: ${notificationId}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing notification in-app: ${data.notificationId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process notification batch email job
+   * Handles sending multiple email notifications in batch
+   */
+  async processNotificationBatchEmail(data: any): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log(`Processing notification batch email: ${data.batchId}`);
+
+    try {
+      const { notifications, templateName, templateData } = data;
+
+      // Process notifications in batches
+      const batchSize = NOTIFICATION_CONSTANTS.BATCH_SIZE;
+      const batches = this.chunkArray(notifications, batchSize);
+
+      for (const batch of batches) {
+        const batchPromises = batch.map(async (notification: any) => {
+          try {
+            return await this.processNotificationEmail(notification);
+          } catch (error) {
+            this.logger.error(
+              `Failed to process notification in batch: ${notification.notificationId}`,
+              error,
+            );
+            return null;
+          }
+        });
+
+        await Promise.allSettled(batchPromises);
+
+        // Add delay between batches
+        if (batches.indexOf(batch) < batches.length - 1) {
+          await this.delay(1000);
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Notification batch email processed: ${data.batchId}, notifications: ${notifications.length}, time: ${processingTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error processing notification batch email: ${data.batchId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get default email template for notification type
+   */
+  private getDefaultEmailTemplate(type: string): string {
+    const templateMap: Record<string, string> = {
+      [NOTIFICATION_CONSTANTS.TYPES.ARTICLE_COMMENTED]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.COMMENT_NOTIFICATION,
+      [NOTIFICATION_CONSTANTS.TYPES.ARTICLE_LIKED]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.LIKE_NOTIFICATION,
+      [NOTIFICATION_CONSTANTS.TYPES.COMMENT_MENTIONED]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.MENTION_NOTIFICATION,
+      [NOTIFICATION_CONSTANTS.TYPES.ARTICLE_PUBLISHED]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.ARTICLE_PUBLISHED,
+      [NOTIFICATION_CONSTANTS.TYPES.SYSTEM_ANNOUNCEMENT]:
+        NOTIFICATION_CONSTANTS.EMAIL_TEMPLATES.SYSTEM_ANNOUNCEMENT,
+    };
+
+    return templateMap[type] || 'notification';
+  }
+
+  /**
+   * Utility function to chunk array
+   */
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+  }
+
+  /**
+   * Utility function to add delay
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // ==================== SHARE PROCESSING METHODS ====================
+
+  /**
+   * Process share created event
+   * Updates share count for the content and triggers related analytics
+   */
+  async processShareCreated(job: ShareCreatedJob): Promise<ShareCountResult> {
+    const startTime = Date.now();
+    this.logger.log(
+      `Processing share created: ${job.shareId} for ${job.contentType}:${job.contentId}`,
+    );
+
+    try {
+      // TODO: Implement share count update logic
+      // This would typically involve:
+      // 1. Updating a share_count field in the content table
+      // 2. Updating analytics/statistics
+      // 3. Triggering notifications if needed
+      // 4. Updating search indexes
+
+      this.logger.log(
+        `Share created processed: ${job.shareId}, content: ${job.contentType}:${job.contentId}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      return {
+        jobId: job.jobId,
+        success: true,
+        processingTime,
+        data: {
+          contentType: job.contentType,
+          contentId: job.contentId,
+          shareCount: 1, // This would be the actual count from database
+        },
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      this.logger.error(
+        `Error processing share created: ${job.shareId}`,
+        error,
+      );
+
+      return {
+        jobId: job.jobId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTime,
+      };
+    }
+  }
+
+  /**
+   * Process share deleted event
+   * Decrements share count for the content and triggers related cleanup
+   */
+  async processShareDeleted(job: ShareDeletedJob): Promise<ShareCountResult> {
+    const startTime = Date.now();
+    this.logger.log(
+      `Processing share deleted: ${job.shareId} for ${job.contentType}:${job.contentId}`,
+    );
+
+    try {
+      // TODO: Implement share count decrement logic
+      // This would typically involve:
+      // 1. Decrementing share_count field in the content table
+      // 2. Updating analytics/statistics
+      // 3. Cleaning up related data if needed
+      // 4. Updating search indexes
+
+      this.logger.log(
+        `Share deleted processed: ${job.shareId}, content: ${job.contentType}:${job.contentId}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      return {
+        jobId: job.jobId,
+        success: true,
+        processingTime,
+        data: {
+          contentType: job.contentType,
+          contentId: job.contentId,
+          shareCount: 0, // This would be the actual count from database
+        },
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      this.logger.error(
+        `Error processing share deleted: ${job.shareId}`,
+        error,
+      );
+
+      return {
+        jobId: job.jobId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTime,
+      };
+    }
+  }
+
+  /**
+   * Process share count update event
+   * Handles bulk updates or corrections to share counts
+   */
+  async processShareCountUpdate(
+    job: ShareCountUpdateJob,
+  ): Promise<ShareCountResult> {
+    const startTime = Date.now();
+    this.logger.log(
+      `Processing share count update: ${job.operation} for ${job.contentType}:${job.contentId}`,
+    );
+
+    try {
+      // TODO: Implement share count update logic
+      // This would typically involve:
+      // 1. Incrementing or decrementing share_count field in the content table
+      // 2. Updating analytics/statistics
+      // 3. Triggering related updates if needed
+      // 4. Updating search indexes
+
+      this.logger.log(
+        `Share count update processed: ${job.operation} for ${job.contentType}:${job.contentId}`,
+      );
+
+      const processingTime = Date.now() - startTime;
+      return {
+        jobId: job.jobId,
+        success: true,
+        processingTime,
+        data: {
+          contentType: job.contentType,
+          contentId: job.contentId,
+          shareCount: job.operation === 'increment' ? 1 : -1, // This would be the actual count from database
+        },
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      this.logger.error(
+        `Error processing share count update: ${job.contentType}:${job.contentId}`,
+        error,
+      );
+
+      return {
+        jobId: job.jobId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTime,
+      };
     }
   }
 }
