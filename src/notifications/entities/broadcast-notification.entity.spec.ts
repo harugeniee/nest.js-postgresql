@@ -127,7 +127,7 @@ describe('BroadcastNotification Entity', () => {
   });
 
   describe('real-time behavior', () => {
-    it('should correctly evaluate current time', () => {
+    it('should correctly evaluate current time', (done) => {
       broadcast.isActive = true;
       broadcast.expiresAt = new Date(Date.now() + 1000); // 1 second from now
 
@@ -136,10 +136,14 @@ describe('BroadcastNotification Entity', () => {
       expect(broadcast.isExpired()).toBe(false);
 
       // Wait for expiration
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         expect(broadcast.isCurrentlyActive()).toBe(false);
         expect(broadcast.isExpired()).toBe(true);
+        done(); // Tell Jest the test is complete
       }, 1100);
+
+      // Clean up timeout on test failure
+      timeoutId.unref();
     });
   });
 });
