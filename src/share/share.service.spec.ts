@@ -9,7 +9,7 @@ import { ShareClick } from './entities/share-click.entity';
 import { ShareAttribution } from './entities/share-attribution.entity';
 import { ShareConversion } from './entities/share-conversion.entity';
 import { CreateShareLinkDto } from './dto/create-share-link.dto';
-import { CacheService } from 'src/shared/services';
+import { CacheService, RabbitMQService } from 'src/shared/services';
 
 describe('ShareService', () => {
   let service: ShareService;
@@ -43,6 +43,11 @@ describe('ShareService', () => {
     getTtl: jest.fn(),
   };
 
+  const mockRabbitMQService = {
+    sendDataToRabbitMQAsync: jest.fn(),
+    getClient: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -70,6 +75,10 @@ describe('ShareService', () => {
         {
           provide: CacheService,
           useValue: mockCacheService,
+        },
+        {
+          provide: RabbitMQService,
+          useValue: mockRabbitMQService,
         },
       ],
     }).compile();
