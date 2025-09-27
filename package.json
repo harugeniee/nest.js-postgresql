@@ -118,6 +118,9 @@
     },
     "setupFilesAfterEnv": [
       "<rootDir>/../test/jest.setup.ts"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!(uuid)/)"
     ]
   }
 }
