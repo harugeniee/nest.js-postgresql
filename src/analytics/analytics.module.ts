@@ -6,6 +6,7 @@ import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsEvent } from './entities/analytics-event.entity';
 import { AnalyticsMetric } from './entities/analytics-metric.entity';
+import { AnalyticsMetricService } from './services/analytics-metric.service';
 
 /**
  * Analytics Module
@@ -19,7 +20,7 @@ import { AnalyticsMetric } from './entities/analytics-metric.entity';
     RabbitmqModule,
   ],
   controllers: [AnalyticsController],
-  providers: [AnalyticsService, AnalyticsInterceptor],
-  exports: [AnalyticsService, AnalyticsInterceptor],
+  providers: [AnalyticsService, AnalyticsInterceptor, AnalyticsMetricService],
+  exports: [AnalyticsService, AnalyticsInterceptor, AnalyticsMetricService],
 })
 export class AnalyticsModule {}

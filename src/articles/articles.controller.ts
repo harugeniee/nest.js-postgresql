@@ -7,8 +7,10 @@ import {
   Patch,
   Post,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
 import { Auth } from 'src/common/decorators';
 import { AdvancedPaginationDto } from 'src/common/dto/advanced-pagination.dto';
 import { SnowflakeIdPipe } from 'src/common/pipes';
@@ -17,6 +19,7 @@ import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 
 @Controller('articles')
+@UseInterceptors(AnalyticsInterceptor)
 export class ArticlesController {
   constructor(private readonly articlesService: ArticlesService) {}
 
@@ -34,15 +37,15 @@ export class ArticlesController {
   }
 
   @Get(':id')
+  @Auth()
   @TrackEvent('article_view', 'content', 'article')
-  // @UseInterceptors(AnalyticsInterceptor)
   findOne(@Param('id', new SnowflakeIdPipe()) id: string) {
     return this.articlesService.findById(id);
   }
 
   @Patch(':id')
-  @TrackEvent('article_update', 'content', 'article')
   @Auth()
+  @TrackEvent('article_update', 'content', 'article')
   update(
     @Param('id', new SnowflakeIdPipe()) id: string,
     @Body() updateArticleDto: UpdateArticleDto,
@@ -51,8 +54,8 @@ export class ArticlesController {
   }
 
   @Delete(':id')
-  @TrackEvent('article_delete', 'content', 'article')
   @Auth()
+  @TrackEvent('article_delete', 'content', 'article')
   remove(@Param('id', new SnowflakeIdPipe()) id: string) {
     return this.articlesService.remove(id);
   }

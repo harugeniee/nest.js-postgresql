@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services/base.service';
@@ -12,6 +12,7 @@ import { TrackEventDto } from './dto/track-event.dto';
 import { AnalyticsEvent } from './entities/analytics-event.entity';
 import { AnalyticsMetric } from './entities/analytics-metric.entity';
 import { AnalyticsQueueJob } from './interfaces/analytics-queue.interface';
+import { AnalyticsMetricService } from './services/analytics-metric.service';
 
 /**
  * Analytics Service
@@ -21,6 +22,7 @@ import { AnalyticsQueueJob } from './interfaces/analytics-queue.interface';
  */
 @Injectable()
 export class AnalyticsService extends BaseService<AnalyticsEvent> {
+  private readonly logger = new Logger(AnalyticsService.name);
   constructor(
     @InjectRepository(AnalyticsEvent)
     private readonly analyticsEventRepository: Repository<AnalyticsEvent>,
@@ -28,6 +30,8 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
     private readonly analyticsMetricRepository: Repository<AnalyticsMetric>,
     cacheService: CacheService,
     private readonly rabbitMQService: RabbitMQService,
+
+    private readonly analyticsMetricService: AnalyticsMetricService,
   ) {
     super(
       new TypeOrmBaseRepository<AnalyticsEvent>(analyticsEventRepository),
@@ -61,8 +65,8 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
     trackEventDto: TrackEventDto,
     userId?: string,
     sessionId?: string,
-  ) {
-    const event = this.create({
+  ): Promise<AnalyticsEvent> {
+    const event = await this.create({
       userId,
       eventType: trackEventDto.eventType,
       eventCategory: trackEventDto.eventCategory,
@@ -74,12 +78,16 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       sessionId,
     });
 
-    // const savedEvent = await this.analyticsEventRepository.save(event);
-
-    // Update metrics asynchronously to avoid blocking the main flow
-    void this.updateMetrics(trackEventDto);
-
     return event;
+  }
+
+  /**
+   * Hook: Called after a analytics event is created
+   * @param event - Created analytics event
+   */
+  protected async afterCreate(event: AnalyticsEvent): Promise<void> {
+    // Update metrics asynchronously to avoid blocking the main flow
+    void this.updateMetrics(event);
   }
 
   /**
@@ -145,28 +153,25 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       return;
 
     try {
-      const existingMetric = await this.analyticsMetricRepository.findOne({
-        where: {
-          metricType,
-          subjectType: trackEventDto.subjectType,
-          subjectId: trackEventDto.subjectId,
-          dateKey,
-        },
+      const existingMetric = await this.analyticsMetricService.findOne({
+        metricType,
+        subjectType: trackEventDto.subjectType,
+        subjectId: trackEventDto.subjectId,
+        dateKey,
       });
 
       if (existingMetric) {
-        await this.analyticsMetricRepository.update(existingMetric.id, {
+        await this.analyticsMetricService.update(existingMetric.id, {
           metricValue: existingMetric.metricValue + 1,
         });
       } else {
-        const metric = this.analyticsMetricRepository.create({
+        await this.analyticsMetricService.create({
           metricType,
           subjectType: trackEventDto.subjectType,
           subjectId: trackEventDto.subjectId,
           metricValue: 1,
           dateKey,
         });
-        await this.analyticsMetricRepository.save(metric);
       }
     } catch (error) {
       console.error('Error updating metrics:', error);

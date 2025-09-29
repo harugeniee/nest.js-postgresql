@@ -118,7 +118,7 @@ export class AnalyticsInterceptor implements NestInterceptor {
             eventData,
           },
           request?.user?.uid,
-          request?.sessionId || request?.headers?.['x-session-id'],
+          request?.user?.ssid,
           {
             method: request?.method || 'UNKNOWN',
             url: request?.url || 'UNKNOWN',
