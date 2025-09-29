@@ -1,14 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, Between, In, FindOptionsWhere } from 'typeorm';
-import { BaseService } from 'src/common/services/base.service';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
-import { AnalyticsEvent } from './entities/analytics-event.entity';
-import { AnalyticsMetric } from './entities/analytics-metric.entity';
-import { TrackEventDto } from './dto/track-event.dto';
+import { BaseService } from 'src/common/services/base.service';
+import { JOB_NAME } from 'src/shared/constants';
+import { globalSnowflake } from 'src/shared/libs/snowflake';
+import { CacheService, RabbitMQService } from 'src/shared/services';
+import { Between, FindOptionsWhere, In, MoreThan, Repository } from 'typeorm';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
-import { CacheService } from 'src/shared/services';
+import { TrackEventDto } from './dto/track-event.dto';
+import { AnalyticsEvent } from './entities/analytics-event.entity';
+import { AnalyticsMetric } from './entities/analytics-metric.entity';
+import { AnalyticsQueueJob } from './interfaces/analytics-queue.interface';
 
 /**
  * Analytics Service
@@ -24,6 +27,7 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
     @InjectRepository(AnalyticsMetric)
     private readonly analyticsMetricRepository: Repository<AnalyticsMetric>,
     cacheService: CacheService,
+    private readonly rabbitMQService: RabbitMQService,
   ) {
     super(
       new TypeOrmBaseRepository<AnalyticsEvent>(analyticsEventRepository),
@@ -46,7 +50,7 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
   }
 
   /**
-   * Track a single analytics event
+   * Track a single analytics event (synchronous - for backward compatibility)
    *
    * @param trackEventDto - Event data to track
    * @param userId - ID of the user who triggered the event
@@ -58,22 +62,74 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
     userId?: string,
     sessionId?: string,
   ) {
-    const event = this.analyticsEventRepository.create({
+    const event = this.create({
       userId,
       eventType: trackEventDto.eventType,
       eventCategory: trackEventDto.eventCategory,
       subjectType: trackEventDto.subjectType,
       subjectId: trackEventDto.subjectId,
       eventData: trackEventDto.eventData,
+      ipAddress: trackEventDto?.eventData?.['ipAddress'] as string | undefined,
+      userAgent: trackEventDto?.eventData?.['userAgent'] as string | undefined,
       sessionId,
     });
 
-    const savedEvent = await this.analyticsEventRepository.save(event);
+    // const savedEvent = await this.analyticsEventRepository.save(event);
 
     // Update metrics asynchronously to avoid blocking the main flow
     void this.updateMetrics(trackEventDto);
 
-    return savedEvent;
+    return event;
+  }
+
+  /**
+   * Track analytics event via queue (asynchronous - recommended for performance)
+   *
+   * @param trackEventDto - Event data to track
+   * @param userId - ID of the user who triggered the event
+   * @param sessionId - Session ID for tracking
+   * @param requestMetadata - Additional request metadata
+   * @returns Promise that resolves when job is queued
+   */
+  async trackEventAsync(
+    trackEventDto: TrackEventDto,
+    userId?: string,
+    sessionId?: string,
+    requestMetadata?: Record<string, any>,
+  ): Promise<boolean> {
+    const jobId = `analytics_${globalSnowflake.nextId().toString()}_${Date.now()}`;
+
+    const analyticsJob: AnalyticsQueueJob = {
+      jobId,
+      eventType: trackEventDto.eventType,
+      eventCategory: trackEventDto.eventCategory,
+      subjectType: trackEventDto.subjectType,
+      subjectId: trackEventDto.subjectId,
+      eventData: trackEventDto.eventData,
+      userId,
+      sessionId,
+      timestamp: new Date().toISOString(),
+      requestMetadata,
+    };
+
+    try {
+      // Send job to RabbitMQ queue for asynchronous processing
+      const success = this.rabbitMQService.sendDataToRabbitMQ(
+        JOB_NAME.ANALYTICS_TRACK,
+        analyticsJob,
+      );
+
+      if (success) {
+        console.log(`Analytics job queued successfully: ${jobId}`);
+      } else {
+        console.error(`Failed to queue analytics job: ${jobId}`);
+      }
+
+      return success;
+    } catch (error) {
+      console.error(`Error queuing analytics job: ${jobId}`, String(error));
+      return false;
+    }
   }
 
   /**
@@ -101,16 +157,16 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       if (existingMetric) {
         await this.analyticsMetricRepository.update(existingMetric.id, {
           metricValue: existingMetric.metricValue + 1,
-          updatedAt: new Date(),
         });
       } else {
-        await this.analyticsMetricRepository.save({
+        const metric = this.analyticsMetricRepository.create({
           metricType,
           subjectType: trackEventDto.subjectType,
           subjectId: trackEventDto.subjectId,
           metricValue: 1,
           dateKey,
         });
+        await this.analyticsMetricRepository.save(metric);
       }
     } catch (error) {
       console.error('Error updating metrics:', error);

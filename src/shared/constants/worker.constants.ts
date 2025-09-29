@@ -24,4 +24,6 @@ export const JOB_NAME = {
   SHARE_CREATED: 'share_created',
   SHARE_DELETED: 'share_deleted',
   SHARE_COUNT_UPDATE: 'share_count_update',
+  // Analytics events
+  ANALYTICS_TRACK: 'analytics_track',
 } as const;

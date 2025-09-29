@@ -6,5 +6,5 @@ edge-ip-version: "4"
 
 ingress:
   - hostname: api-zero-trust.calumma.cc
-    service: http://192.168.2.71:3000   
+    service: http://192.168.2.189:3000   
   - service: http_status:404
