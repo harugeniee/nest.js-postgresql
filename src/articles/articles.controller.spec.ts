@@ -1,19 +1,21 @@
+import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { AnalyticsService } from 'src/analytics/analytics.service';
+import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
+import { CacheService } from 'src/shared/services';
 import { ArticlesController } from './articles.controller';
 import { ArticlesService } from './articles.service';
+import { CreateArticleDto } from './dto/create-article.dto';
 import { Article } from './entities/article.entity';
 import { ScheduledPublishingService } from './services/scheduled-publishing.service';
-import { CacheService } from 'src/shared/services';
-import { AnalyticsService } from 'src/analytics/analytics.service';
-import { Reflector } from '@nestjs/core';
 
 describe('ArticlesController', () => {
   let controller: ArticlesController;
   let articlesService: ArticlesService;
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       controllers: [ArticlesController],
       providers: [
         ArticlesService,
@@ -84,7 +86,14 @@ describe('ArticlesController', () => {
           },
         },
       ],
-    }).compile();
+    });
+
+    const module: TestingModule = await moduleBuilder
+      .overrideGuard(JwtAccessTokenGuard)
+      .useValue({
+        canActivate: jest.fn().mockResolvedValue(true),
+      })
+      .compile();
 
     controller = module.get<ArticlesController>(ArticlesController);
     articlesService = module.get<ArticlesService>(ArticlesService);
@@ -100,15 +109,16 @@ describe('ArticlesController', () => {
 
   describe('create', () => {
     it('should create an article', async () => {
-      const createArticleDto = {
+      const createArticleDto: CreateArticleDto = {
         title: 'Test Article',
         content: 'Test content',
-        userId: 'user-123',
+        userId: 'should-be-overwritten',
       };
 
       const mockArticle = {
         id: 'article-123',
         ...createArticleDto,
+        userId: 'user-123',
         slug: 'test-article',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -118,11 +128,20 @@ describe('ArticlesController', () => {
         .spyOn(articlesService, 'createArticle')
         .mockResolvedValue(mockArticle as Article);
 
-      const result = await controller.create(createArticleDto);
+      const mockRequest = {
+        user: {
+          uid: 'user-123',
+        },
+      } as any;
+
+      const result = await controller.create(createArticleDto, mockRequest);
 
       expect(result).toEqual(mockArticle);
       expect(articlesService.createArticle).toHaveBeenCalledWith(
-        createArticleDto,
+        expect.objectContaining({
+          ...createArticleDto,
+          userId: 'user-123',
+        }),
       );
     });
   });
@@ -164,16 +183,14 @@ describe('ArticlesController', () => {
         title: 'Test Article',
         content: 'Test content',
         userId: 'user-123',
-      };
+      } as Article;
 
-      jest
-        .spyOn(articlesService, 'findOne')
-        .mockResolvedValue(mockArticle as unknown as Article);
+      jest.spyOn(articlesService, 'findById').mockResolvedValue(mockArticle);
 
       const result = await controller.findOne(articleId);
 
       expect(result).toEqual(mockArticle);
-      expect(articlesService.findOne).toHaveBeenCalledWith({ id: articleId });
+      expect(articlesService.findById).toHaveBeenCalledWith(articleId);
     });
   });
 

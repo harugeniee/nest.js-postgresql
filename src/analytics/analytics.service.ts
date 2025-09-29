@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, Between, In, FindOptionsWhere } from 'typeorm';
-import { BaseService } from 'src/common/services/base.service';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
-import { AnalyticsEvent } from './entities/analytics-event.entity';
-import { AnalyticsMetric } from './entities/analytics-metric.entity';
-import { TrackEventDto } from './dto/track-event.dto';
+import { BaseService } from 'src/common/services/base.service';
+import { ANALYTICS_CONSTANTS, JOB_NAME } from 'src/shared/constants';
+import { globalSnowflake } from 'src/shared/libs/snowflake';
+import { CacheService, RabbitMQService } from 'src/shared/services';
+import { Between, FindOptionsWhere, In, MoreThan, Repository } from 'typeorm';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
-import { CacheService } from 'src/shared/services';
+import { TrackEventDto } from './dto/track-event.dto';
+import { AnalyticsEvent } from './entities/analytics-event.entity';
+import { AnalyticsMetric } from './entities/analytics-metric.entity';
+import { AnalyticsQueueJob } from './interfaces/analytics-queue.interface';
+import { AnalyticsMetricService } from './services/analytics-metric.service';
 
 /**
  * Analytics Service
@@ -18,12 +22,16 @@ import { CacheService } from 'src/shared/services';
  */
 @Injectable()
 export class AnalyticsService extends BaseService<AnalyticsEvent> {
+  private readonly logger = new Logger(AnalyticsService.name);
   constructor(
     @InjectRepository(AnalyticsEvent)
     private readonly analyticsEventRepository: Repository<AnalyticsEvent>,
     @InjectRepository(AnalyticsMetric)
     private readonly analyticsMetricRepository: Repository<AnalyticsMetric>,
     cacheService: CacheService,
+    private readonly rabbitMQService: RabbitMQService,
+
+    private readonly analyticsMetricService: AnalyticsMetricService,
   ) {
     super(
       new TypeOrmBaseRepository<AnalyticsEvent>(analyticsEventRepository),
@@ -31,9 +39,9 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
         entityName: 'AnalyticsEvent',
         cache: {
           enabled: true,
-          prefix: 'analytics',
-          ttlSec: 300, // 5 minutes
-          swrSec: 60, // 1 minute
+          prefix: ANALYTICS_CONSTANTS.CACHE.PREFIX,
+          ttlSec: ANALYTICS_CONSTANTS.CACHE.TTL_SEC,
+          swrSec: ANALYTICS_CONSTANTS.CACHE.SWR_SEC,
         },
         defaultSearchField: 'eventType',
       },
@@ -46,7 +54,7 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
   }
 
   /**
-   * Track a single analytics event
+   * Track a single analytics event (synchronous - for backward compatibility)
    *
    * @param trackEventDto - Event data to track
    * @param userId - ID of the user who triggered the event
@@ -57,23 +65,79 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
     trackEventDto: TrackEventDto,
     userId?: string,
     sessionId?: string,
-  ) {
-    const event = this.analyticsEventRepository.create({
+  ): Promise<AnalyticsEvent> {
+    const event = await this.create({
       userId,
       eventType: trackEventDto.eventType,
       eventCategory: trackEventDto.eventCategory,
       subjectType: trackEventDto.subjectType,
       subjectId: trackEventDto.subjectId,
       eventData: trackEventDto.eventData,
+      ipAddress: trackEventDto?.eventData?.['ipAddress'] as string | undefined,
+      userAgent: trackEventDto?.eventData?.['userAgent'] as string | undefined,
       sessionId,
     });
 
-    const savedEvent = await this.analyticsEventRepository.save(event);
+    return event;
+  }
 
+  /**
+   * Hook: Called after a analytics event is created
+   * @param event - Created analytics event
+   */
+  protected async afterCreate(event: AnalyticsEvent): Promise<void> {
     // Update metrics asynchronously to avoid blocking the main flow
-    void this.updateMetrics(trackEventDto);
+    void this.updateMetrics(event);
+  }
 
-    return savedEvent;
+  /**
+   * Track analytics event via queue (asynchronous - recommended for performance)
+   *
+   * @param trackEventDto - Event data to track
+   * @param userId - ID of the user who triggered the event
+   * @param sessionId - Session ID for tracking
+   * @param requestMetadata - Additional request metadata
+   * @returns Promise that resolves when job is queued
+   */
+  async trackEventAsync(
+    trackEventDto: TrackEventDto,
+    userId?: string,
+    sessionId?: string,
+    requestMetadata?: Record<string, any>,
+  ): Promise<boolean> {
+    const jobId = `analytics_${globalSnowflake.nextId().toString()}_${Date.now()}`;
+
+    const analyticsJob: AnalyticsQueueJob = {
+      jobId,
+      eventType: trackEventDto.eventType,
+      eventCategory: trackEventDto.eventCategory,
+      subjectType: trackEventDto.subjectType,
+      subjectId: trackEventDto.subjectId,
+      eventData: trackEventDto.eventData,
+      userId,
+      sessionId,
+      timestamp: new Date().toISOString(),
+      requestMetadata,
+    };
+
+    try {
+      // Send job to RabbitMQ queue for asynchronous processing
+      const success = this.rabbitMQService.sendDataToRabbitMQ(
+        JOB_NAME.ANALYTICS_TRACK,
+        analyticsJob,
+      );
+
+      if (success) {
+        console.log(`Analytics job queued successfully: ${jobId}`);
+      } else {
+        console.error(`Failed to queue analytics job: ${jobId}`);
+      }
+
+      return success;
+    } catch (error) {
+      console.error(`Error queuing analytics job: ${jobId}`, String(error));
+      return false;
+    }
   }
 
   /**
@@ -81,30 +145,31 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
    *
    * @param trackEventDto - Event data to update metrics for
    */
-  private async updateMetrics(trackEventDto: TrackEventDto) {
+  private async updateMetrics(trackEventDto: TrackEventDto | AnalyticsEvent) {
+    this.logger.log(`Updating metrics for event: ${trackEventDto.eventType}`);
     const dateKey = new Date().toISOString().split('T')[0];
     const metricType = this.getMetricType(trackEventDto.eventType);
+    this.logger.log(
+      `Metric type: ${metricType}, Subject: ${trackEventDto.subjectType}:${trackEventDto.subjectId}`,
+    );
 
     if (!metricType || !trackEventDto.subjectType || !trackEventDto.subjectId)
       return;
 
     try {
-      const existingMetric = await this.analyticsMetricRepository.findOne({
-        where: {
-          metricType,
-          subjectType: trackEventDto.subjectType,
-          subjectId: trackEventDto.subjectId,
-          dateKey,
-        },
+      const existingMetric = await this.analyticsMetricService.findOne({
+        metricType,
+        subjectType: trackEventDto.subjectType,
+        subjectId: trackEventDto.subjectId,
+        dateKey,
       });
 
       if (existingMetric) {
-        await this.analyticsMetricRepository.update(existingMetric.id, {
+        await this.analyticsMetricService.update(existingMetric.id, {
           metricValue: existingMetric.metricValue + 1,
-          updatedAt: new Date(),
         });
       } else {
-        await this.analyticsMetricRepository.save({
+        await this.analyticsMetricService.create({
           metricType,
           subjectType: trackEventDto.subjectType,
           subjectId: trackEventDto.subjectId,
@@ -170,8 +235,10 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       order: {
         createdAt: 'DESC',
       },
-      take: query.limit || 1000,
-      skip: ((query.page || 1) - 1) * (query.limit || 1000),
+      take: query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT,
+      skip:
+        ((query.page || 1) - 1) *
+        (query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT),
     });
 
     return this.aggregateUserEvents(events);
@@ -250,22 +317,28 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
   /**
    * Get metric type from event type
    *
-   * @param eventType - Type of event
+   * @param eventType - Type of event (e.g., 'article_view', 'user_follow')
    * @returns Corresponding metric type
    */
   private getMetricType(eventType: string): string | null {
-    const metricMap: Record<string, string> = {
-      article_view: 'article_views',
-      article_like: 'article_likes',
-      article_comment: 'article_comments',
-      article_share: 'article_shares',
-      user_follow: 'user_follows',
-      user_unfollow: 'user_unfollows',
-      reaction_set: 'reaction_count',
-      bookmark_create: 'bookmark_count',
-      comment_create: 'comment_count',
-    };
-    return metricMap[eventType] || null;
+    // Parse event type format: {category}_{action}
+    const [category, action] = eventType.split('_');
+
+    if (!category || !action) {
+      return null;
+    }
+
+    // Get metric mapping for the category
+    const categoryMapping =
+      ANALYTICS_CONSTANTS.EVENT_METRIC_MAPPING[
+        category as keyof typeof ANALYTICS_CONSTANTS.EVENT_METRIC_MAPPING
+      ];
+    if (!categoryMapping) {
+      return null;
+    }
+
+    // Get metric type for the action
+    return categoryMapping[action as keyof typeof categoryMapping] || null;
   }
 
   /**
@@ -277,13 +350,13 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
   private getStartDate(timeRange: string): Date {
     const now = new Date();
     switch (timeRange) {
-      case '1d':
+      case ANALYTICS_CONSTANTS.TIME_RANGES.LAST_24_HOURS:
         return new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      case '7d':
+      case ANALYTICS_CONSTANTS.TIME_RANGES.LAST_7_DAYS:
         return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      case '30d':
+      case ANALYTICS_CONSTANTS.TIME_RANGES.LAST_30_DAYS:
         return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      case '90d':
+      case ANALYTICS_CONSTANTS.TIME_RANGES.LAST_90_DAYS:
         return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
       default:
         return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -340,7 +413,7 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       order: {
         createdAt: 'DESC',
       },
-      take: query.limit || 10000,
+      take: query.limit || ANALYTICS_CONSTANTS.PAGINATION.DASHBOARD_LIMIT,
     });
 
     return this.aggregateDashboardEvents(events, query);
@@ -403,16 +476,20 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       order: {
         [query.sortBy || 'createdAt']: query.order || 'DESC',
       },
-      take: query.limit || 100,
-      skip: ((query.page || 1) - 1) * (query.limit || 100),
+      take: query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT,
+      skip:
+        ((query.page || 1) - 1) *
+        (query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT),
     });
 
     return {
       events,
       total,
-      page: query.page || 1,
-      limit: query.limit || 100,
-      totalPages: Math.ceil(total / (query.limit || 100)),
+      page: query.page || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_PAGE,
+      limit: query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT,
+      totalPages: Math.ceil(
+        total / (query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT),
+      ),
     };
   }
 
@@ -435,17 +512,21 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
         (aggregated.eventTypes[event.eventType] || 0) + 1;
 
       if (
-        ['article_view', 'article_like', 'article_comment'].includes(
-          event.eventType,
-        )
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_VIEW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_LIKE,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_COMMENT,
+        ].includes(event.eventType as any)
       ) {
         aggregated.contentInteractions++;
       }
 
       if (
-        ['user_follow', 'user_unfollow', 'reaction_set'].includes(
-          event.eventType,
-        )
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.USER_FOLLOW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.USER_UNFOLLOW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.REACTION_SET,
+        ].includes(event.eventType as any)
       ) {
         aggregated.socialInteractions++;
       }
@@ -470,16 +551,16 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
 
     metrics.forEach((metric) => {
       switch (metric.metricType) {
-        case 'article_views':
+        case ANALYTICS_CONSTANTS.METRIC_TYPES.ARTICLE_VIEWS:
           aggregated.totalViews += metric.metricValue;
           break;
-        case 'article_likes':
+        case ANALYTICS_CONSTANTS.METRIC_TYPES.ARTICLE_LIKES:
           aggregated.totalLikes += metric.metricValue;
           break;
-        case 'article_comments':
+        case ANALYTICS_CONSTANTS.METRIC_TYPES.ARTICLE_COMMENTS:
           aggregated.totalComments += metric.metricValue;
           break;
-        case 'article_shares':
+        case ANALYTICS_CONSTANTS.METRIC_TYPES.ARTICLE_SHARES:
           aggregated.totalShares += metric.metricValue;
           break;
       }
@@ -546,17 +627,32 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
 
       // Categorize interactions
       if (
-        ['article_view', 'article_like', 'article_comment'].includes(
-          event.eventType,
-        )
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_VIEW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_LIKE,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_COMMENT,
+        ].includes(event.eventType as any)
       ) {
         aggregated.contentInteractions++;
-      } else if (['user_follow', 'user_unfollow'].includes(event.eventType)) {
+      } else if (
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.USER_FOLLOW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.USER_UNFOLLOW,
+        ].includes(event.eventType as any)
+      ) {
         aggregated.socialInteractions++;
-      } else if (['page_view', 'system_event'].includes(event.eventType)) {
+      } else if (
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.PAGE_VIEW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.SYSTEM_EVENT,
+        ].includes(event.eventType as any)
+      ) {
         aggregated.systemInteractions++;
       } else if (
-        ['reaction_set', 'bookmark_create'].includes(event.eventType)
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.REACTION_SET,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.BOOKMARK_CREATE,
+        ].includes(event.eventType as any)
       ) {
         aggregated.engagementInteractions++;
       }
@@ -566,16 +662,16 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       let timeKey: string;
 
       switch (query.granularity) {
-        case 'hour':
+        case ANALYTICS_CONSTANTS.TIME_GRANULARITY.HOUR:
           timeKey = eventDate.toISOString().slice(0, 13) + ':00:00';
           break;
-        case 'week': {
+        case ANALYTICS_CONSTANTS.TIME_GRANULARITY.WEEK: {
           const weekStart = new Date(eventDate);
           weekStart.setDate(eventDate.getDate() - eventDate.getDay());
           timeKey = weekStart.toISOString().split('T')[0];
           break;
         }
-        case 'month':
+        case ANALYTICS_CONSTANTS.TIME_GRANULARITY.MONTH:
           timeKey = eventDate.toISOString().slice(0, 7);
           break;
         default: // day

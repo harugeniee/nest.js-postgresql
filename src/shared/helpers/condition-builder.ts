@@ -15,6 +15,7 @@ export class ConditionBuilder {
   static build(
     data: Partial<AdvancedPaginationDto> = {},
     defaultField = 'name',
+    extraFilter?: FindOptionsWhere<any>,
   ) {
     let conditions: FindOptionsWhere<any> = {
       status: Not(USER_CONSTANTS.STATUS.REMOVED),
@@ -24,6 +25,9 @@ export class ConditionBuilder {
     conditions = this.addUserCondition(conditions, data.userId);
     conditions = this.addDateConditions(conditions, data);
     conditions = this.addSearchConditions(conditions, data, defaultField);
+    if (extraFilter) {
+      Object.assign(conditions, extraFilter);
+    }
     return conditions;
   }
 

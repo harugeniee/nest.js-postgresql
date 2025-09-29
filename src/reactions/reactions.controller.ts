@@ -1,23 +1,24 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Delete,
   Body,
+  Controller,
+  Delete,
+  Get,
+  HttpException,
+  HttpStatus,
+  Post,
   Query,
   Request,
-  HttpStatus,
-  HttpException,
   UseInterceptors,
 } from '@nestjs/common';
-import { ReactionsService } from './reactions.service';
-import { CreateOrSetReactionDto } from './dto/create-reaction.dto';
-import { QueryReactionsDto } from './dto/query-reactions.dto';
-import { BatchCountsDto } from './dto/batch-counts.dto';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
-import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
-import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
+import { BatchCountsDto } from './dto/batch-counts.dto';
+import { CreateOrSetReactionDto } from './dto/create-reaction.dto';
+import { QueryReactionsDto } from './dto/query-reactions.dto';
+import { ReactionsService } from './reactions.service';
 
 @Controller('reactions')
 export class ReactionsController {
@@ -25,7 +26,11 @@ export class ReactionsController {
 
   @Post()
   @Auth()
-  @TrackEvent('reaction_set', 'engagement', 'reaction')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.REACTION_SET,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.REACTION,
+  )
   @UseInterceptors(AnalyticsInterceptor)
   async createOrSetReaction(
     @Request() req: Request & { user: AuthPayload },

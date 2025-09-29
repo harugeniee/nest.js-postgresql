@@ -6,19 +6,20 @@ import {
   RmqContext,
 } from '@nestjs/microservices';
 
-import { JOB_NAME } from 'src/shared/constants';
-import { WorkerService } from './worker.service';
+import { AnalyticsQueueJob } from 'src/analytics/interfaces/analytics-queue.interface';
 import {
-  SingleEmailQueueJob,
-  BatchEmailQueueJob,
-  TemplateEmailQueueJob,
-  OtpEmailQueueJob,
-} from 'src/shared/services/mail/mail-queue.interface';
-import {
+  ShareCountUpdateJob,
   ShareCreatedJob,
   ShareDeletedJob,
-  ShareCountUpdateJob,
 } from 'src/share/interfaces/share-queue.interface';
+import { JOB_NAME } from 'src/shared/constants';
+import {
+  BatchEmailQueueJob,
+  OtpEmailQueueJob,
+  SingleEmailQueueJob,
+  TemplateEmailQueueJob,
+} from 'src/shared/services/mail/mail-queue.interface';
+import { WorkerService } from './worker.service';
 
 @Controller()
 export class WorkerController {
@@ -395,6 +396,33 @@ export class WorkerController {
       channel.ack(originalMsg);
     } catch (error: unknown) {
       console.log('Error processing share count update:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  // ==================== ANALYTICS PROCESSING METHODS ====================
+
+  @MessagePattern(JOB_NAME.ANALYTICS_TRACK)
+  async handleAnalyticsTrack(
+    @Payload() job: AnalyticsQueueJob,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      if (typeof job === 'string') {
+        job = JSON.parse(job as string) as AnalyticsQueueJob;
+      }
+      console.log('Analytics track job received:', job.jobId);
+
+      await this.workerService.processAnalyticsTrack(job);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing analytics track:', error);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       channel.nack(originalMsg, false, true);
     }

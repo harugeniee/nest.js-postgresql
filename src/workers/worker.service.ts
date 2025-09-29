@@ -1,22 +1,27 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MailService } from 'src/shared/services/mail/mail.service';
+import { AnalyticsService } from 'src/analytics/analytics.service';
+import {
+  AnalyticsQueueJob,
+  AnalyticsQueueJobResult,
+} from 'src/analytics/interfaces/analytics-queue.interface';
+import { CommentsService } from 'src/comments/comments.service';
 import { maskEmail } from 'src/common/utils';
 import {
-  SingleEmailQueueJob,
-  BatchEmailQueueJob,
-  TemplateEmailQueueJob,
-  OtpEmailQueueJob,
-  MailQueueJobResult,
-} from 'src/shared/services/mail/mail-queue.interface';
-import { CommentsService } from 'src/comments/comments.service';
-import { MailQueueIntegrationService } from 'src/shared/services/mail/mail-queue-integration.service';
-import { NOTIFICATION_CONSTANTS } from 'src/shared/constants';
-import {
+  ShareCountResult,
+  ShareCountUpdateJob,
   ShareCreatedJob,
   ShareDeletedJob,
-  ShareCountUpdateJob,
-  ShareCountResult,
 } from 'src/share/interfaces/share-queue.interface';
+import { NOTIFICATION_CONSTANTS } from 'src/shared/constants';
+import { MailQueueIntegrationService } from 'src/shared/services/mail/mail-queue-integration.service';
+import {
+  BatchEmailQueueJob,
+  MailQueueJobResult,
+  OtpEmailQueueJob,
+  SingleEmailQueueJob,
+  TemplateEmailQueueJob,
+} from 'src/shared/services/mail/mail-queue.interface';
+import { MailService } from 'src/shared/services/mail/mail.service';
 
 @Injectable()
 export class WorkerService {
@@ -26,6 +31,7 @@ export class WorkerService {
     private readonly mailService: MailService,
     private readonly commentsService: CommentsService,
     private readonly mailQueueIntegrationService: MailQueueIntegrationService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   testRABBIT(id: number) {
@@ -364,7 +370,7 @@ export class WorkerService {
    */
   async processNotificationEmail(data: any): Promise<void> {
     const startTime = Date.now();
-    this.logger.log(`Processing notification email: ${data.notificationId}`);
+    this.logger.log(`Processing notification email: ${data?.notificationId}`);
 
     try {
       // Extract notification data
@@ -431,7 +437,7 @@ export class WorkerService {
    */
   async processNotificationPush(data: any): Promise<void> {
     const startTime = Date.now();
-    this.logger.log(`Processing notification push: ${data.notificationId}`);
+    this.logger.log(`Processing notification push: ${data?.notificationId}`);
 
     try {
       // Extract notification data
@@ -471,7 +477,7 @@ export class WorkerService {
    */
   async processNotificationInApp(data: any): Promise<void> {
     const startTime = Date.now();
-    this.logger.log(`Processing notification in-app: ${data.notificationId}`);
+    this.logger.log(`Processing notification in-app: ${data?.notificationId}`);
 
     try {
       // Extract notification data
@@ -510,7 +516,7 @@ export class WorkerService {
    */
   async processNotificationBatchEmail(data: any): Promise<void> {
     const startTime = Date.now();
-    this.logger.log(`Processing notification batch email: ${data.batchId}`);
+    this.logger.log(`Processing notification batch email: ${data?.batchId}`);
 
     try {
       const { notifications, templateName, templateData } = data;
@@ -542,11 +548,11 @@ export class WorkerService {
 
       const processingTime = Date.now() - startTime;
       this.logger.log(
-        `Notification batch email processed: ${data.batchId}, notifications: ${notifications.length}, time: ${processingTime}ms`,
+        `Notification batch email processed: ${data?.batchId}, notifications: ${notifications?.length}, time: ${processingTime}ms`,
       );
     } catch (error) {
       this.logger.error(
-        `Error processing notification batch email: ${data.batchId}`,
+        `Error processing notification batch email: ${data?.batchId}`,
         error,
       );
       throw error;
@@ -732,6 +738,61 @@ export class WorkerService {
         `Error processing share count update: ${job.contentType}:${job.contentId}`,
         error,
       );
+
+      return {
+        jobId: job.jobId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTime,
+      };
+    }
+  }
+
+  // ==================== ANALYTICS PROCESSING METHODS ====================
+
+  /**
+   * Process analytics track job
+   * Handles analytics event tracking and metrics updates
+   */
+  async processAnalyticsTrack(
+    job: AnalyticsQueueJob,
+  ): Promise<AnalyticsQueueJobResult> {
+    const startTime = Date.now();
+    this.logger.log(`Processing analytics track job: ${job.jobId}`);
+    try {
+      // Create TrackEventDto from job data
+      const trackEventDto = {
+        eventType: job.eventType,
+        eventCategory: job.eventCategory,
+        subjectType: job.subjectType,
+        subjectId: job.subjectId,
+        eventData: job.eventData,
+      };
+
+      // Track the event synchronously (this will also update metrics)
+      const savedEvent = await this.analyticsService.trackEvent(
+        trackEventDto,
+        job.userId,
+        job.sessionId,
+      );
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Analytics track job completed: ${job.jobId}, eventId: ${savedEvent.id}, time: ${processingTime}ms`,
+      );
+
+      return {
+        jobId: job.jobId,
+        success: true,
+        processingTime,
+        data: {
+          eventId: savedEvent.id,
+          metricsUpdated: true,
+        },
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      this.logger.error(`Analytics track job failed: ${job.jobId}`, error);
 
       return {
         jobId: job.jobId,

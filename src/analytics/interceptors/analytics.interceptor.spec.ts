@@ -1,16 +1,17 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ExecutionContext, CallHandler } from '@nestjs/common';
+import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { Test, TestingModule } from '@nestjs/testing';
 import { of } from 'rxjs';
-import { AnalyticsInterceptor } from './analytics.interceptor';
 import { AnalyticsService } from '../analytics.service';
 import { TRACK_EVENT_KEY } from '../decorators/track-event.decorator';
+import { AnalyticsInterceptor } from './analytics.interceptor';
 
 describe('AnalyticsInterceptor', () => {
   let interceptor: AnalyticsInterceptor;
 
   const mockAnalyticsService = {
     trackEvent: jest.fn(),
+    trackEventAsync: jest.fn().mockResolvedValue(true),
   };
 
   const mockReflector = {
@@ -57,7 +58,7 @@ describe('AnalyticsInterceptor', () => {
         },
         ip: '192.168.1.1',
         params: { id: '123' },
-        user: { uid: 'user123' },
+        user: { uid: 'user123', ssid: 'session123' },
       });
 
       mockExecutionContext = {
@@ -82,7 +83,7 @@ describe('AnalyticsInterceptor', () => {
       };
 
       mockReflector.get.mockReturnValue(trackEventData);
-      mockAnalyticsService.trackEvent.mockResolvedValue({});
+      mockAnalyticsService.trackEventAsync.mockResolvedValue(true);
 
       interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
         next: (response) => {
@@ -90,7 +91,7 @@ describe('AnalyticsInterceptor', () => {
             TRACK_EVENT_KEY,
             mockExecutionContext.getHandler(),
           );
-          expect(mockAnalyticsService.trackEvent).toHaveBeenCalledWith(
+          expect(mockAnalyticsService.trackEventAsync).toHaveBeenCalledWith(
             {
               eventType: 'article_view',
               eventCategory: 'content',
@@ -102,10 +103,18 @@ describe('AnalyticsInterceptor', () => {
                 userAgent: 'Mozilla/5.0 Test Browser',
                 ipAddress: '192.168.1.1',
                 responseStatus: 200,
+                timestamp: expect.any(String),
               },
             },
             'user123',
             'session123',
+            {
+              method: 'GET',
+              url: '/articles/123',
+              userAgent: 'Mozilla/5.0 Test Browser',
+              ipAddress: '192.168.1.1',
+              responseStatus: 200,
+            },
           );
           expect(response).toEqual({ id: '123', title: 'Test Article' });
           done();
@@ -139,7 +148,7 @@ describe('AnalyticsInterceptor', () => {
       };
 
       mockReflector.get.mockReturnValue(trackEventData);
-      mockAnalyticsService.trackEvent.mockRejectedValue(
+      mockAnalyticsService.trackEventAsync.mockRejectedValue(
         new Error('Tracking failed'),
       );
 
@@ -150,7 +159,7 @@ describe('AnalyticsInterceptor', () => {
           // Wait a bit for the async error handling to complete
           setTimeout(() => {
             expect(consoleSpy).toHaveBeenCalledWith(
-              'Analytics tracking error:',
+              'Analytics queue error:',
               expect.any(Error),
             );
             expect(response).toEqual({ id: '123', title: 'Test Article' });
@@ -184,11 +193,11 @@ describe('AnalyticsInterceptor', () => {
       });
 
       mockReflector.get.mockReturnValue(trackEventData);
-      mockAnalyticsService.trackEvent.mockResolvedValue({});
+      mockAnalyticsService.trackEventAsync.mockResolvedValue(true);
 
       interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
         next: (response) => {
-          expect(mockAnalyticsService.trackEvent).toHaveBeenCalledWith(
+          expect(mockAnalyticsService.trackEventAsync).toHaveBeenCalledWith(
             {
               eventType: 'page_view',
               eventCategory: 'system',
@@ -200,10 +209,18 @@ describe('AnalyticsInterceptor', () => {
                 userAgent: 'Mozilla/5.0 Test Browser',
                 ipAddress: '192.168.1.1',
                 responseStatus: 200,
+                timestamp: expect.any(String),
               },
             },
             undefined,
             undefined,
+            {
+              method: 'GET',
+              url: '/',
+              userAgent: 'Mozilla/5.0 Test Browser',
+              ipAddress: '192.168.1.1',
+              responseStatus: 200,
+            },
           );
           expect(response).toEqual({ id: '123', title: 'Test Article' });
           done();
@@ -227,7 +244,7 @@ describe('AnalyticsInterceptor', () => {
         },
         ip: '192.168.1.1',
         params: { id: '123' },
-        user: { uid: 'user123' },
+        user: { uid: 'user123' }, // No ssid property
         sessionId: null,
       });
 
@@ -236,19 +253,34 @@ describe('AnalyticsInterceptor', () => {
       });
 
       mockReflector.get.mockReturnValue(trackEventData);
-      mockAnalyticsService.trackEvent.mockResolvedValue({});
+      mockAnalyticsService.trackEventAsync.mockResolvedValue(true);
 
       interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
         next: (response) => {
-          expect(mockAnalyticsService.trackEvent).toHaveBeenCalledWith(
+          expect(mockAnalyticsService.trackEventAsync).toHaveBeenCalledWith(
             expect.objectContaining({
               eventType: 'article_view',
               eventCategory: 'content',
               subjectType: 'article',
               subjectId: '123',
+              eventData: expect.objectContaining({
+                method: 'GET',
+                url: '/articles/123',
+                userAgent: 'Mozilla/5.0 Test Browser',
+                ipAddress: '192.168.1.1',
+                responseStatus: 200,
+                timestamp: expect.any(String),
+              }),
             }),
             'user123',
             undefined,
+            expect.objectContaining({
+              method: 'GET',
+              url: '/articles/123',
+              userAgent: 'Mozilla/5.0 Test Browser',
+              ipAddress: '192.168.1.1',
+              responseStatus: 200,
+            }),
           );
           expect(response).toEqual({ id: '123', title: 'Test Article' });
           done();
@@ -271,13 +303,13 @@ describe('AnalyticsInterceptor', () => {
       });
 
       mockReflector.get.mockReturnValue(trackEventData);
-      mockAnalyticsService.trackEvent.mockResolvedValue({});
+      mockAnalyticsService.trackEventAsync.mockResolvedValue(true);
 
       interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
         next: (response) => {
           // Wait a bit for the async error handling to complete
           setTimeout(() => {
-            expect(mockAnalyticsService.trackEvent).toHaveBeenCalledWith(
+            expect(mockAnalyticsService.trackEventAsync).toHaveBeenCalledWith(
               {
                 eventType: 'article_view',
                 eventCategory: 'content',
@@ -289,10 +321,18 @@ describe('AnalyticsInterceptor', () => {
                   userAgent: 'UNKNOWN',
                   ipAddress: 'UNKNOWN',
                   responseStatus: 200,
+                  timestamp: expect.any(String),
                 },
               },
               undefined,
               undefined,
+              {
+                method: 'UNKNOWN',
+                url: 'UNKNOWN',
+                userAgent: 'UNKNOWN',
+                ipAddress: 'UNKNOWN',
+                responseStatus: 200,
+              },
             );
             expect(response).toEqual({ id: '123', title: 'Test Article' });
             done();

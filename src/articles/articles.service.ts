@@ -2,31 +2,42 @@ import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
+import { createArticleSlug } from 'src/common/utils/slug.util';
 import { ARTICLE_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
-import { createArticleSlug } from 'src/common/utils/slug.util';
-import { Article } from './entities/article.entity';
-import { CreateArticleDto } from './dto/create-article.dto';
-import { UpdateArticleDto } from './dto/update-article.dto';
 import {
-  ScheduleArticleDto,
-  RescheduleArticleDto,
-  UpdateArticleStatusDto,
-} from './dto/schedule-article.dto';
-import { ScheduledPublishingService } from './services/scheduled-publishing.service';
-import {
+  DeepPartial,
+  FindOptionsRelations,
+  FindOptionsSelect,
   FindOptionsWhere,
-  Repository,
   LessThanOrEqual,
   Not,
-  DeepPartial,
+  Repository,
 } from 'typeorm';
+import { CreateArticleDto } from './dto/create-article.dto';
+import {
+  RescheduleArticleDto,
+  ScheduleArticleDto,
+  UpdateArticleStatusDto,
+} from './dto/schedule-article.dto';
+import { UpdateArticleDto } from './dto/update-article.dto';
+import { Article } from './entities/article.entity';
+import { ScheduledPublishingService } from './services/scheduled-publishing.service';
 
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { globalSnowflake } from 'src/shared/libs/snowflake';
+import { GetArticleDto } from './dto';
 
 @Injectable()
 export class ArticlesService extends BaseService<Article> {
+  private readonly logger = new Logger(ArticlesService.name);
+  protected readonly selectWhitelist: FindOptionsSelect<Article> = {
+    user: { id: true, username: true, avatar: { id: true, url: true } },
+  };
+  protected readonly relationsWhitelist: FindOptionsRelations<Article> = {
+    user: { avatar: true },
+  };
   constructor(
     @InjectRepository(Article)
     private readonly articleRepository: Repository<Article>,
@@ -40,7 +51,7 @@ export class ArticlesService extends BaseService<Article> {
         cache: { enabled: true, ttlSec: 60, prefix: 'articles', swrSec: 30 },
         defaultSearchField: 'title',
         relationsWhitelist: {
-          user: true,
+          user: { avatar: true },
         },
       },
       cacheService,
@@ -55,7 +66,8 @@ export class ArticlesService extends BaseService<Article> {
     data: DeepPartial<Article>,
   ): Promise<DeepPartial<Article>> {
     // Get existing slugs to avoid collisions
-    const existingSlugs = await this.getExistingSlugs();
+    // const existingSlugs = await this.getExistingSlugs();
+    const existingSlugs = [];
 
     // Generate unique slug from title
     const title = data.title;
@@ -64,10 +76,14 @@ export class ArticlesService extends BaseService<Article> {
       return data;
     }
 
-    const slug = createArticleSlug(title, existingSlugs, {
-      maxLength: 80,
-      separator: '-',
-    });
+    const slug =
+      createArticleSlug(title, existingSlugs, {
+        maxLength: 70,
+        separator: '-',
+      }) +
+      '.' +
+      globalSnowflake.nextId().toString() +
+      '.article';
 
     return {
       ...data,
@@ -85,6 +101,7 @@ export class ArticlesService extends BaseService<Article> {
    */
   async createArticle(createArticleDto: CreateArticleDto): Promise<Article> {
     // Use tagsArray field for backward compatibility with string[] tags
+    // this.logger.log('createArticleDto', createArticleDto);
     const articleData: DeepPartial<Article> = {
       ...createArticleDto,
       // Store tags as string array in tagsArray field
@@ -93,7 +110,7 @@ export class ArticlesService extends BaseService<Article> {
       tags: undefined,
     };
 
-    return await super.create(articleData);
+    return await this.create(articleData);
   }
 
   /**
@@ -125,10 +142,24 @@ export class ArticlesService extends BaseService<Article> {
    * @param paginationDto - Pagination parameters
    * @returns Paginated articles
    */
-  async findAll(
-    paginationDto: AdvancedPaginationDto,
-  ): Promise<IPagination<Article>> {
-    return this.listOffset(paginationDto);
+  async findAll(paginationDto: GetArticleDto): Promise<IPagination<Article>> {
+    const extraFilter: FindOptionsWhere<Article> = {};
+
+    if (!paginationDto.status) {
+      Object.assign(paginationDto, {
+        status: [...Object.values(ARTICLE_CONSTANTS.STATUS)],
+      });
+    }
+
+    if (paginationDto.visibility) {
+      Object.assign(extraFilter, { visibility: paginationDto.visibility });
+      delete paginationDto.visibility;
+    }
+
+    return this.listOffset(paginationDto, extraFilter, {
+      select: this.selectWhitelist,
+      relations: this.relationsWhitelist,
+    });
   }
 
   /**
