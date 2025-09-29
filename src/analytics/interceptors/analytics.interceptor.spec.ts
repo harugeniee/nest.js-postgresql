@@ -107,7 +107,7 @@ describe('AnalyticsInterceptor', () => {
               },
             },
             'user123',
-            undefined,
+            'session123',
             {
               method: 'GET',
               url: '/articles/123',
@@ -148,7 +148,7 @@ describe('AnalyticsInterceptor', () => {
       };
 
       mockReflector.get.mockReturnValue(trackEventData);
-      mockAnalyticsService.trackEvent.mockRejectedValue(
+      mockAnalyticsService.trackEventAsync.mockRejectedValue(
         new Error('Tracking failed'),
       );
 
@@ -159,7 +159,7 @@ describe('AnalyticsInterceptor', () => {
           // Wait a bit for the async error handling to complete
           setTimeout(() => {
             expect(consoleSpy).toHaveBeenCalledWith(
-              'Analytics tracking error:',
+              'Analytics queue error:',
               expect.any(Error),
             );
             expect(response).toEqual({ id: '123', title: 'Test Article' });
@@ -244,7 +244,7 @@ describe('AnalyticsInterceptor', () => {
         },
         ip: '192.168.1.1',
         params: { id: '123' },
-        user: { uid: 'user123', ssid: 'session123' },
+        user: { uid: 'user123' }, // No ssid property
         sessionId: null,
       });
 
