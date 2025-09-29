@@ -1,21 +1,22 @@
+import { Media } from 'src/media/entities/media.entity';
+import {
+  ARTICLE_CONSTANTS,
+  ArticleContentFormat,
+  ArticleStatus,
+  ArticleVisibility,
+} from 'src/shared/constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
-import { User } from 'src/users/entities/user.entity';
 import { Tag } from 'src/tags/entities/tag.entity';
+import { User } from 'src/users/entities/user.entity';
 import {
   Column,
   Entity,
   Index,
   JoinColumn,
-  ManyToOne,
-  ManyToMany,
   JoinTable,
+  ManyToMany,
+  ManyToOne,
 } from 'typeorm';
-import {
-  ArticleStatus,
-  ArticleVisibility,
-  ArticleContentFormat,
-  ARTICLE_CONSTANTS,
-} from 'src/shared/constants';
 
 /**
  * Article entity representing blog posts and articles
@@ -175,12 +176,26 @@ export class Article extends BaseEntityCustom {
   tagsArray?: string[];
 
   /**
+   * ID of the cover image for the article
+   * Can be null if no cover image is set
+   */
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    comment: 'ID of the article cover image',
+  })
+  coverImageId?: string;
+
+  @ManyToOne(() => Media, { nullable: true })
+  @JoinColumn({ name: 'coverImageId', referencedColumnName: 'id' })
+  coverImage: Media;
+
+  /**
    * URL of the cover image for the article
    * Can be null if no cover image is set
    */
   @Column({
     type: 'varchar',
-    length: ARTICLE_CONSTANTS.COVER_IMAGE_URL_MAX_LENGTH,
     nullable: true,
     comment: 'URL of the article cover image',
   })

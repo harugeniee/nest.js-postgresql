@@ -1,15 +1,13 @@
 import {
-  IsString,
-  IsOptional,
-  IsEnum,
   IsArray,
-  IsUrl,
+  IsEnum,
   IsInt,
-  Min,
-  Max,
   IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ARTICLE_CONSTANTS } from 'src/shared/constants';
 
 export class CreateArticleDto {
@@ -41,6 +39,10 @@ export class CreateArticleDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  coverImageId?: string;
 
   @IsOptional()
   @IsUrl()

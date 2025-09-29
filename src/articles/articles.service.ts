@@ -2,25 +2,25 @@ import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
+import { createArticleSlug } from 'src/common/utils/slug.util';
 import { ARTICLE_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
-import { createArticleSlug } from 'src/common/utils/slug.util';
-import { Article } from './entities/article.entity';
-import { CreateArticleDto } from './dto/create-article.dto';
-import { UpdateArticleDto } from './dto/update-article.dto';
 import {
-  ScheduleArticleDto,
-  RescheduleArticleDto,
-  UpdateArticleStatusDto,
-} from './dto/schedule-article.dto';
-import { ScheduledPublishingService } from './services/scheduled-publishing.service';
-import {
+  DeepPartial,
   FindOptionsWhere,
-  Repository,
   LessThanOrEqual,
   Not,
-  DeepPartial,
+  Repository,
 } from 'typeorm';
+import { CreateArticleDto } from './dto/create-article.dto';
+import {
+  RescheduleArticleDto,
+  ScheduleArticleDto,
+  UpdateArticleStatusDto,
+} from './dto/schedule-article.dto';
+import { UpdateArticleDto } from './dto/update-article.dto';
+import { Article } from './entities/article.entity';
+import { ScheduledPublishingService } from './services/scheduled-publishing.service';
 
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -93,7 +93,7 @@ export class ArticlesService extends BaseService<Article> {
       tags: undefined,
     };
 
-    return await super.create(articleData);
+    return await this.create(articleData);
   }
 
   /**
