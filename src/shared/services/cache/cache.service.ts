@@ -51,7 +51,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   onModuleInit(): void {
     this.setupRedisEventListeners();
-    void this.reset();
+    // void this.reset();
   }
 
   /**
@@ -60,7 +60,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   onModuleDestroy(): void {
     void this.redis.quit();
-    void this.clearCache();
+    // void this.clearCache();
   }
 
   /**

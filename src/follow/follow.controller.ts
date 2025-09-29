@@ -1,47 +1,48 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Delete,
   Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpException,
+  HttpStatus,
   Param,
+  Post,
   Query,
   Request,
-  HttpCode,
-  HttpStatus,
-  HttpException,
   UseInterceptors,
 } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
   ApiBearerAuth,
+  ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { Auth } from '../common/decorators';
 import { AuthPayload } from '../common/interface';
 import { SnowflakeIdPipe } from '../common/pipes';
-import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
-import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import {
+  BitsetExportDto,
+  BitsetImportDto,
+  FollowCountersDto,
+  FollowStatusDto,
+  FollowSuggestionsDto,
+  FollowSuggestionsListDto,
+  FollowersListDto,
+  FollowingListDto,
+  MutualFriendsDto,
+  MutualFriendsListDto,
+  PaginationDto,
+  RebuildDto,
+} from './dto/follow.dto';
 import { FollowBitsetService } from './follow-bitset.service';
 import { FollowSuggestionsService } from './follow-suggestions.service';
 import { NewsFeedService } from './newsfeed.service';
-import {
-  PaginationDto,
-  MutualFriendsDto,
-  FollowSuggestionsDto,
-  FollowCountersDto,
-  FollowStatusDto,
-  FollowingListDto,
-  FollowersListDto,
-  MutualFriendsListDto,
-  FollowSuggestionsListDto,
-  BitsetExportDto,
-  BitsetImportDto,
-  RebuildDto,
-} from './dto/follow.dto';
 
 /**
  * FollowController - REST API endpoints for follow system
@@ -65,7 +66,11 @@ export class FollowController {
   @Post(':targetUserId')
   @Auth()
   @HttpCode(HttpStatus.OK)
-  @TrackEvent('user_follow', 'social', 'user')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.USER_FOLLOW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SOCIAL,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.USER,
+  )
   @UseInterceptors(AnalyticsInterceptor)
   @ApiOperation({ summary: 'Follow a user' })
   @ApiParam({ name: 'targetUserId', description: 'ID of the user to follow' })

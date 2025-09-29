@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services/base.service';
-import { JOB_NAME } from 'src/shared/constants';
+import { ANALYTICS_CONSTANTS, JOB_NAME } from 'src/shared/constants';
 import { globalSnowflake } from 'src/shared/libs/snowflake';
 import { CacheService, RabbitMQService } from 'src/shared/services';
 import { Between, FindOptionsWhere, In, MoreThan, Repository } from 'typeorm';
@@ -39,9 +39,9 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
         entityName: 'AnalyticsEvent',
         cache: {
           enabled: true,
-          prefix: 'analytics',
-          ttlSec: 300, // 5 minutes
-          swrSec: 60, // 1 minute
+          prefix: ANALYTICS_CONSTANTS.CACHE.PREFIX,
+          ttlSec: ANALYTICS_CONSTANTS.CACHE.TTL_SEC,
+          swrSec: ANALYTICS_CONSTANTS.CACHE.SWR_SEC,
         },
         defaultSearchField: 'eventType',
       },
@@ -145,9 +145,13 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
    *
    * @param trackEventDto - Event data to update metrics for
    */
-  private async updateMetrics(trackEventDto: TrackEventDto) {
+  private async updateMetrics(trackEventDto: TrackEventDto | AnalyticsEvent) {
+    this.logger.log(`Updating metrics for event: ${trackEventDto.eventType}`);
     const dateKey = new Date().toISOString().split('T')[0];
     const metricType = this.getMetricType(trackEventDto.eventType);
+    this.logger.log(
+      `Metric type: ${metricType}, Subject: ${trackEventDto.subjectType}:${trackEventDto.subjectId}`,
+    );
 
     if (!metricType || !trackEventDto.subjectType || !trackEventDto.subjectId)
       return;
@@ -231,8 +235,10 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       order: {
         createdAt: 'DESC',
       },
-      take: query.limit || 1000,
-      skip: ((query.page || 1) - 1) * (query.limit || 1000),
+      take: query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT,
+      skip:
+        ((query.page || 1) - 1) *
+        (query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT),
     });
 
     return this.aggregateUserEvents(events);
@@ -311,22 +317,28 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
   /**
    * Get metric type from event type
    *
-   * @param eventType - Type of event
+   * @param eventType - Type of event (e.g., 'article_view', 'user_follow')
    * @returns Corresponding metric type
    */
   private getMetricType(eventType: string): string | null {
-    const metricMap: Record<string, string> = {
-      article_view: 'article_views',
-      article_like: 'article_likes',
-      article_comment: 'article_comments',
-      article_share: 'article_shares',
-      user_follow: 'user_follows',
-      user_unfollow: 'user_unfollows',
-      reaction_set: 'reaction_count',
-      bookmark_create: 'bookmark_count',
-      comment_create: 'comment_count',
-    };
-    return metricMap[eventType] || null;
+    // Parse event type format: {category}_{action}
+    const [category, action] = eventType.split('_');
+
+    if (!category || !action) {
+      return null;
+    }
+
+    // Get metric mapping for the category
+    const categoryMapping =
+      ANALYTICS_CONSTANTS.EVENT_METRIC_MAPPING[
+        category as keyof typeof ANALYTICS_CONSTANTS.EVENT_METRIC_MAPPING
+      ];
+    if (!categoryMapping) {
+      return null;
+    }
+
+    // Get metric type for the action
+    return categoryMapping[action as keyof typeof categoryMapping] || null;
   }
 
   /**
@@ -338,13 +350,13 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
   private getStartDate(timeRange: string): Date {
     const now = new Date();
     switch (timeRange) {
-      case '1d':
+      case ANALYTICS_CONSTANTS.TIME_RANGES.LAST_24_HOURS:
         return new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      case '7d':
+      case ANALYTICS_CONSTANTS.TIME_RANGES.LAST_7_DAYS:
         return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      case '30d':
+      case ANALYTICS_CONSTANTS.TIME_RANGES.LAST_30_DAYS:
         return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      case '90d':
+      case ANALYTICS_CONSTANTS.TIME_RANGES.LAST_90_DAYS:
         return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
       default:
         return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -401,7 +413,7 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       order: {
         createdAt: 'DESC',
       },
-      take: query.limit || 10000,
+      take: query.limit || ANALYTICS_CONSTANTS.PAGINATION.DASHBOARD_LIMIT,
     });
 
     return this.aggregateDashboardEvents(events, query);
@@ -464,16 +476,20 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       order: {
         [query.sortBy || 'createdAt']: query.order || 'DESC',
       },
-      take: query.limit || 100,
-      skip: ((query.page || 1) - 1) * (query.limit || 100),
+      take: query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT,
+      skip:
+        ((query.page || 1) - 1) *
+        (query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT),
     });
 
     return {
       events,
       total,
-      page: query.page || 1,
-      limit: query.limit || 100,
-      totalPages: Math.ceil(total / (query.limit || 100)),
+      page: query.page || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_PAGE,
+      limit: query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT,
+      totalPages: Math.ceil(
+        total / (query.limit || ANALYTICS_CONSTANTS.PAGINATION.DEFAULT_LIMIT),
+      ),
     };
   }
 
@@ -496,17 +512,21 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
         (aggregated.eventTypes[event.eventType] || 0) + 1;
 
       if (
-        ['article_view', 'article_like', 'article_comment'].includes(
-          event.eventType,
-        )
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_VIEW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_LIKE,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_COMMENT,
+        ].includes(event.eventType as any)
       ) {
         aggregated.contentInteractions++;
       }
 
       if (
-        ['user_follow', 'user_unfollow', 'reaction_set'].includes(
-          event.eventType,
-        )
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.USER_FOLLOW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.USER_UNFOLLOW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.REACTION_SET,
+        ].includes(event.eventType as any)
       ) {
         aggregated.socialInteractions++;
       }
@@ -531,16 +551,16 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
 
     metrics.forEach((metric) => {
       switch (metric.metricType) {
-        case 'article_views':
+        case ANALYTICS_CONSTANTS.METRIC_TYPES.ARTICLE_VIEWS:
           aggregated.totalViews += metric.metricValue;
           break;
-        case 'article_likes':
+        case ANALYTICS_CONSTANTS.METRIC_TYPES.ARTICLE_LIKES:
           aggregated.totalLikes += metric.metricValue;
           break;
-        case 'article_comments':
+        case ANALYTICS_CONSTANTS.METRIC_TYPES.ARTICLE_COMMENTS:
           aggregated.totalComments += metric.metricValue;
           break;
-        case 'article_shares':
+        case ANALYTICS_CONSTANTS.METRIC_TYPES.ARTICLE_SHARES:
           aggregated.totalShares += metric.metricValue;
           break;
       }
@@ -607,17 +627,32 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
 
       // Categorize interactions
       if (
-        ['article_view', 'article_like', 'article_comment'].includes(
-          event.eventType,
-        )
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_VIEW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_LIKE,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_COMMENT,
+        ].includes(event.eventType as any)
       ) {
         aggregated.contentInteractions++;
-      } else if (['user_follow', 'user_unfollow'].includes(event.eventType)) {
+      } else if (
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.USER_FOLLOW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.USER_UNFOLLOW,
+        ].includes(event.eventType as any)
+      ) {
         aggregated.socialInteractions++;
-      } else if (['page_view', 'system_event'].includes(event.eventType)) {
+      } else if (
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.PAGE_VIEW,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.SYSTEM_EVENT,
+        ].includes(event.eventType as any)
+      ) {
         aggregated.systemInteractions++;
       } else if (
-        ['reaction_set', 'bookmark_create'].includes(event.eventType)
+        [
+          ANALYTICS_CONSTANTS.EVENT_TYPES.REACTION_SET,
+          ANALYTICS_CONSTANTS.EVENT_TYPES.BOOKMARK_CREATE,
+        ].includes(event.eventType as any)
       ) {
         aggregated.engagementInteractions++;
       }
@@ -627,16 +662,16 @@ export class AnalyticsService extends BaseService<AnalyticsEvent> {
       let timeKey: string;
 
       switch (query.granularity) {
-        case 'hour':
+        case ANALYTICS_CONSTANTS.TIME_GRANULARITY.HOUR:
           timeKey = eventDate.toISOString().slice(0, 13) + ':00:00';
           break;
-        case 'week': {
+        case ANALYTICS_CONSTANTS.TIME_GRANULARITY.WEEK: {
           const weekStart = new Date(eventDate);
           weekStart.setDate(eventDate.getDate() - eventDate.getDay());
           timeKey = weekStart.toISOString().split('T')[0];
           break;
         }
-        case 'month':
+        case ANALYTICS_CONSTANTS.TIME_GRANULARITY.MONTH:
           timeKey = eventDate.toISOString().slice(0, 7);
           break;
         default: // day
