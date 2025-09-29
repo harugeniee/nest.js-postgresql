@@ -7,6 +7,8 @@ import { ARTICLE_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
 import {
   DeepPartial,
+  FindOptionsRelations,
+  FindOptionsSelect,
   FindOptionsWhere,
   LessThanOrEqual,
   Not,
@@ -30,6 +32,12 @@ import { GetArticleDto } from './dto';
 @Injectable()
 export class ArticlesService extends BaseService<Article> {
   private readonly logger = new Logger(ArticlesService.name);
+  protected readonly selectWhitelist: FindOptionsSelect<Article> = {
+    user: { id: true, username: true, avatar: { id: true, url: true } },
+  };
+  protected readonly relationsWhitelist: FindOptionsRelations<Article> = {
+    user: { avatar: true },
+  };
   constructor(
     @InjectRepository(Article)
     private readonly articleRepository: Repository<Article>,
@@ -43,7 +51,7 @@ export class ArticlesService extends BaseService<Article> {
         cache: { enabled: true, ttlSec: 60, prefix: 'articles', swrSec: 30 },
         defaultSearchField: 'title',
         relationsWhitelist: {
-          user: true,
+          user: { avatar: true },
         },
       },
       cacheService,
@@ -148,7 +156,10 @@ export class ArticlesService extends BaseService<Article> {
       delete paginationDto.visibility;
     }
 
-    return this.listOffset(paginationDto, extraFilter);
+    return this.listOffset(paginationDto, extraFilter, {
+      select: this.selectWhitelist,
+      relations: this.relationsWhitelist,
+    });
   }
 
   /**
