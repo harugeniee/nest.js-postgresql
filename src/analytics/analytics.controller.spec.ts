@@ -1,13 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { AnalyticsController } from './analytics.controller';
-import { AnalyticsService } from './analytics.service';
-import { TrackEventDto } from './dto/track-event.dto';
-import { AnalyticsQueryDto } from './dto/analytics-query.dto';
-import { DashboardQueryDto } from './dto/dashboard-query.dto';
+import { JwtService } from '@nestjs/jwt';
+import { Test, TestingModule } from '@nestjs/testing';
 import { AuthPayload } from 'src/common/interface';
 import { CacheService } from 'src/shared/services';
+import { AnalyticsController } from './analytics.controller';
+import { AnalyticsService } from './analytics.service';
+import { AnalyticsQueryDto } from './dto/analytics-query.dto';
+import { DashboardQueryDto } from './dto/dashboard-query.dto';
+import { TrackEventDto } from './dto/track-event.dto';
 
 describe('AnalyticsController', () => {
   let controller: AnalyticsController;
@@ -333,6 +333,468 @@ describe('AnalyticsController', () => {
       expect(result.lastUpdated.getTime()).toBeLessThanOrEqual(
         afterCall.getTime(),
       );
+    });
+  });
+
+  describe('getDashboardOverview', () => {
+    it('should return dashboard overview analytics', async () => {
+      const query: DashboardQueryDto = {
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-31'),
+        granularity: 'day',
+        eventTypes: ['article_view', 'user_follow'],
+        eventCategories: ['content', 'social'],
+        subjectTypes: ['article', 'user'],
+        userIds: ['user1', 'user2'],
+        page: 1,
+        limit: 100,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockDashboardData = {
+        totalEvents: 150,
+        uniqueUsers: 25,
+        eventTypes: {
+          article_view: 80,
+          user_follow: 40,
+          reaction_set: 30,
+        },
+        eventCategories: {
+          content: 80,
+          social: 40,
+          engagement: 30,
+        },
+        subjectTypes: {
+          article: 110,
+          user: 40,
+        },
+        contentInteractions: 80,
+        socialInteractions: 40,
+        systemInteractions: 0,
+        engagementInteractions: 30,
+        timeSeries: [
+          { date: '2024-01-01', count: 5 },
+          { date: '2024-01-02', count: 8 },
+          { date: '2024-01-03', count: 12 },
+        ],
+        topUsers: {
+          user1: 25,
+          user2: 20,
+          user3: 15,
+        },
+        topContent: {
+          'article:article1': 15,
+          'article:article2': 12,
+          'user:user1': 8,
+        },
+      };
+
+      mockAnalyticsService.getDashboardOverview.mockResolvedValue(
+        mockDashboardData,
+      );
+
+      const result = await controller.getDashboardOverview(query);
+
+      expect(mockAnalyticsService.getDashboardOverview).toHaveBeenCalledWith(
+        query,
+      );
+      expect(result).toEqual(mockDashboardData);
+    });
+
+    it('should return dashboard overview with default parameters', async () => {
+      const query: DashboardQueryDto = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockDashboardData = {
+        totalEvents: 50,
+        uniqueUsers: 10,
+        eventTypes: { page_view: 50 },
+        eventCategories: { system: 50 },
+        subjectTypes: {},
+        contentInteractions: 0,
+        socialInteractions: 0,
+        systemInteractions: 50,
+        engagementInteractions: 0,
+        timeSeries: [{ date: '2024-01-01', count: 50 }],
+        topUsers: {},
+        topContent: {},
+      };
+
+      mockAnalyticsService.getDashboardOverview.mockResolvedValue(
+        mockDashboardData,
+      );
+
+      const result = await controller.getDashboardOverview(query);
+
+      expect(result).toEqual(mockDashboardData);
+    });
+  });
+
+  describe('getAnalyticsEvents', () => {
+    it('should return paginated analytics events', async () => {
+      const query: AnalyticsQueryDto = {
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-31'),
+        eventType: 'article_view,user_follow',
+        eventCategory: 'content,social',
+        subjectType: 'article,user',
+        userId: 'user123',
+        page: 1,
+        limit: 50,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockEvents = [
+        {
+          id: '1',
+          userId: 'user123',
+          eventType: 'article_view',
+          eventCategory: 'content',
+          subjectType: 'article',
+          subjectId: 'article1',
+          createdAt: new Date(),
+        },
+        {
+          id: '2',
+          userId: 'user123',
+          eventType: 'user_follow',
+          eventCategory: 'social',
+          subjectType: 'user',
+          subjectId: 'user2',
+          createdAt: new Date(),
+        },
+      ];
+
+      const mockResponse = {
+        events: mockEvents,
+        total: 2,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      };
+
+      mockAnalyticsService.getAnalyticsEvents.mockResolvedValue(mockResponse);
+
+      const result = await controller.getAnalyticsEvents(query);
+
+      expect(mockAnalyticsService.getAnalyticsEvents).toHaveBeenCalledWith(
+        query,
+      );
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should return analytics events with default pagination', async () => {
+      const query: AnalyticsQueryDto = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockResponse = {
+        events: [],
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      };
+
+      mockAnalyticsService.getAnalyticsEvents.mockResolvedValue(mockResponse);
+
+      const result = await controller.getAnalyticsEvents(query);
+
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe('getAnalyticsTrends', () => {
+    it('should return analytics trends over time', async () => {
+      const query: DashboardQueryDto = {
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-31'),
+        granularity: 'day',
+        eventTypes: ['article_view'],
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockDashboardData = {
+        totalEvents: 100,
+        uniqueUsers: 20,
+        timeSeries: [
+          { date: '2024-01-01', count: 5 },
+          { date: '2024-01-02', count: 8 },
+          { date: '2024-01-03', count: 12 },
+        ],
+        eventTypes: { article_view: 100 },
+        eventCategories: { content: 100 },
+        subjectTypes: { article: 100 },
+        contentInteractions: 100,
+        socialInteractions: 0,
+        systemInteractions: 0,
+        engagementInteractions: 0,
+        topUsers: {},
+        topContent: {},
+      };
+
+      mockAnalyticsService.getDashboardOverview.mockResolvedValue(
+        mockDashboardData,
+      );
+
+      const result = await controller.getAnalyticsTrends(query);
+
+      expect(mockAnalyticsService.getDashboardOverview).toHaveBeenCalledWith(
+        query,
+      );
+      expect(result).toEqual({
+        timeSeries: mockDashboardData.timeSeries,
+        totalEvents: mockDashboardData.totalEvents,
+        uniqueUsers: mockDashboardData.uniqueUsers,
+        granularity: 'day',
+      });
+    });
+
+    it('should return analytics trends with default granularity', async () => {
+      const query: DashboardQueryDto = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockDashboardData = {
+        totalEvents: 50,
+        uniqueUsers: 10,
+        timeSeries: [{ date: '2024-01-01', count: 50 }],
+        eventTypes: {},
+        eventCategories: {},
+        subjectTypes: {},
+        contentInteractions: 0,
+        socialInteractions: 0,
+        systemInteractions: 0,
+        engagementInteractions: 0,
+        topUsers: {},
+        topContent: {},
+      };
+
+      mockAnalyticsService.getDashboardOverview.mockResolvedValue(
+        mockDashboardData,
+      );
+
+      const result = await controller.getAnalyticsTrends(query);
+
+      expect(result.granularity).toBe('day');
+    });
+  });
+
+  describe('getTopContent', () => {
+    it('should return top performing content analytics', async () => {
+      const query: DashboardQueryDto = {
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-31'),
+        subjectTypes: ['article'],
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockDashboardData = {
+        totalEvents: 200,
+        uniqueUsers: 30,
+        timeSeries: [],
+        eventTypes: {},
+        eventCategories: {},
+        subjectTypes: { article: 200 },
+        contentInteractions: 200,
+        socialInteractions: 0,
+        systemInteractions: 0,
+        engagementInteractions: 0,
+        topUsers: {},
+        topContent: {
+          'article:article1': 50,
+          'article:article2': 30,
+          'article:article3': 20,
+        },
+      };
+
+      mockAnalyticsService.getDashboardOverview.mockResolvedValue(
+        mockDashboardData,
+      );
+
+      const result = await controller.getTopContent(query);
+
+      expect(mockAnalyticsService.getDashboardOverview).toHaveBeenCalledWith(
+        query,
+      );
+      expect(result).toEqual({
+        topContent: mockDashboardData.topContent,
+        contentInteractions: mockDashboardData.contentInteractions,
+        subjectTypes: mockDashboardData.subjectTypes,
+      });
+    });
+
+    it('should return top content with empty data', async () => {
+      const query: DashboardQueryDto = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockDashboardData = {
+        totalEvents: 0,
+        uniqueUsers: 0,
+        timeSeries: [],
+        eventTypes: {},
+        eventCategories: {},
+        subjectTypes: {},
+        contentInteractions: 0,
+        socialInteractions: 0,
+        systemInteractions: 0,
+        engagementInteractions: 0,
+        topUsers: {},
+        topContent: {},
+      };
+
+      mockAnalyticsService.getDashboardOverview.mockResolvedValue(
+        mockDashboardData,
+      );
+
+      const result = await controller.getTopContent(query);
+
+      expect(result).toEqual({
+        topContent: {},
+        contentInteractions: 0,
+        subjectTypes: {},
+      });
+    });
+  });
+
+  describe('getUserEngagement', () => {
+    it('should return user engagement analytics', async () => {
+      const query: DashboardQueryDto = {
+        fromDate: new Date('2024-01-01'),
+        toDate: new Date('2024-01-31'),
+        eventCategories: ['social', 'engagement'],
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockDashboardData = {
+        totalEvents: 150,
+        uniqueUsers: 25,
+        timeSeries: [],
+        eventTypes: {
+          user_follow: 50,
+          reaction_set: 40,
+          bookmark_create: 30,
+          comment_create: 30,
+        },
+        eventCategories: {
+          social: 50,
+          engagement: 100,
+        },
+        subjectTypes: {},
+        contentInteractions: 0,
+        socialInteractions: 50,
+        systemInteractions: 0,
+        engagementInteractions: 100,
+        topUsers: {
+          user1: 25,
+          user2: 20,
+          user3: 15,
+        },
+        topContent: {},
+      };
+
+      mockAnalyticsService.getDashboardOverview.mockResolvedValue(
+        mockDashboardData,
+      );
+
+      const result = await controller.getUserEngagement(query);
+
+      expect(mockAnalyticsService.getDashboardOverview).toHaveBeenCalledWith(
+        query,
+      );
+      expect(result).toEqual({
+        topUsers: mockDashboardData.topUsers,
+        uniqueUsers: mockDashboardData.uniqueUsers,
+        socialInteractions: mockDashboardData.socialInteractions,
+        engagementInteractions: mockDashboardData.engagementInteractions,
+        eventTypes: mockDashboardData.eventTypes,
+      });
+    });
+
+    it('should return user engagement with no social interactions', async () => {
+      const query: DashboardQueryDto = {
+        page: 1,
+        limit: 10,
+        sortBy: 'createdAt',
+        order: 'DESC',
+      };
+
+      const mockDashboardData = {
+        totalEvents: 50,
+        uniqueUsers: 10,
+        timeSeries: [],
+        eventTypes: { page_view: 50 },
+        eventCategories: { system: 50 },
+        subjectTypes: {},
+        contentInteractions: 0,
+        socialInteractions: 0,
+        systemInteractions: 50,
+        engagementInteractions: 0,
+        topUsers: {},
+        topContent: {},
+      };
+
+      mockAnalyticsService.getDashboardOverview.mockResolvedValue(
+        mockDashboardData,
+      );
+
+      const result = await controller.getUserEngagement(query);
+
+      expect(result).toEqual({
+        topUsers: {},
+        uniqueUsers: 10,
+        socialInteractions: 0,
+        engagementInteractions: 0,
+        eventTypes: { page_view: 50 },
+      });
+    });
+  });
+
+  describe('getWidgetTitle', () => {
+    it('should return correct widget titles for different widget types', () => {
+      const testCases = [
+        { widgetType: 'overview', expected: 'Analytics Overview' },
+        { widgetType: 'user_activity', expected: 'User Activity' },
+        { widgetType: 'content_performance', expected: 'Content Performance' },
+        { widgetType: 'engagement_metrics', expected: 'Engagement Metrics' },
+        { widgetType: 'traffic_sources', expected: 'Traffic Sources' },
+        { widgetType: 'device_analytics', expected: 'Device Analytics' },
+        { widgetType: 'geographic_data', expected: 'Geographic Data' },
+        { widgetType: 'conversion_funnel', expected: 'Conversion Funnel' },
+        { widgetType: 'retention_analysis', expected: 'Retention Analysis' },
+        { widgetType: 'revenue_metrics', expected: 'Revenue Metrics' },
+        { widgetType: 'unknown_widget', expected: 'Analytics Widget' },
+      ];
+
+      testCases.forEach(({ widgetType, expected }) => {
+        const result = (controller as any).getWidgetTitle(widgetType);
+        expect(result).toBe(expected);
+      });
     });
   });
 });
