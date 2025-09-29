@@ -229,8 +229,8 @@ export abstract class BaseService<T extends { id: string }> {
         fields: searchFields,
       },
       this.defaultSearchField,
+      extraFilter,
     );
-
     const safe = this.applyQueryOpts(opts);
     const orderObj = this.buildOrderObject(sortBy, order);
     await this.onListQueryBuilt({ where, order: orderObj, dto: pagination });
@@ -304,7 +304,11 @@ export abstract class BaseService<T extends { id: string }> {
     if (extraFilter) {
       Object.assign(baseFilter, extraFilter);
     }
-    const where = ConditionBuilder.build(baseFilter, this.defaultSearchField);
+    const where = ConditionBuilder.build(
+      baseFilter,
+      this.defaultSearchField,
+      extraFilter,
+    );
     const safe = this.applyQueryOpts(opts);
     const token = decodeSignedCursor(cursor);
     const take = limit;
