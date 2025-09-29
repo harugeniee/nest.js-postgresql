@@ -7,17 +7,17 @@ import {
   Patch,
   Post,
   Query,
+  Request,
   UseInterceptors,
 } from '@nestjs/common';
 import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
 import { Auth } from 'src/common/decorators';
-import { AdvancedPaginationDto } from 'src/common/dto/advanced-pagination.dto';
+import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { ArticlesService } from './articles.service';
-import { CreateArticleDto } from './dto/create-article.dto';
-import { UpdateArticleDto } from './dto/update-article.dto';
+import { CreateArticleDto, GetArticleDto, UpdateArticleDto } from './dto';
 
 @Controller('articles')
 @UseInterceptors(AnalyticsInterceptor)
@@ -31,7 +31,11 @@ export class ArticlesController {
     ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
   )
   @Auth()
-  create(@Body() createArticleDto: CreateArticleDto) {
+  create(
+    @Body() createArticleDto: CreateArticleDto,
+    @Request() req: Request & { user: AuthPayload },
+  ) {
+    Object.assign(createArticleDto, { userId: req.user.uid });
     return this.articlesService.createArticle(createArticleDto);
   }
 
@@ -41,7 +45,7 @@ export class ArticlesController {
     ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
     ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
   )
-  findAll(@Query() query: AdvancedPaginationDto) {
+  findAll(@Query() query: GetArticleDto) {
     return this.articlesService.findAll(query);
   }
 

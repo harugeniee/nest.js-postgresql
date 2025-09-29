@@ -22,11 +22,14 @@ import { UpdateArticleDto } from './dto/update-article.dto';
 import { Article } from './entities/article.entity';
 import { ScheduledPublishingService } from './services/scheduled-publishing.service';
 
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { globalSnowflake } from 'src/shared/libs/snowflake';
+import { GetArticleDto } from './dto';
 
 @Injectable()
 export class ArticlesService extends BaseService<Article> {
+  private readonly logger = new Logger(ArticlesService.name);
   constructor(
     @InjectRepository(Article)
     private readonly articleRepository: Repository<Article>,
@@ -55,7 +58,8 @@ export class ArticlesService extends BaseService<Article> {
     data: DeepPartial<Article>,
   ): Promise<DeepPartial<Article>> {
     // Get existing slugs to avoid collisions
-    const existingSlugs = await this.getExistingSlugs();
+    // const existingSlugs = await this.getExistingSlugs();
+    const existingSlugs = [];
 
     // Generate unique slug from title
     const title = data.title;
@@ -64,10 +68,14 @@ export class ArticlesService extends BaseService<Article> {
       return data;
     }
 
-    const slug = createArticleSlug(title, existingSlugs, {
-      maxLength: 80,
-      separator: '-',
-    });
+    const slug =
+      createArticleSlug(title, existingSlugs, {
+        maxLength: 70,
+        separator: '-',
+      }) +
+      '.' +
+      globalSnowflake.nextId().toString() +
+      '.article';
 
     return {
       ...data,
@@ -85,6 +93,7 @@ export class ArticlesService extends BaseService<Article> {
    */
   async createArticle(createArticleDto: CreateArticleDto): Promise<Article> {
     // Use tagsArray field for backward compatibility with string[] tags
+    // this.logger.log('createArticleDto', createArticleDto);
     const articleData: DeepPartial<Article> = {
       ...createArticleDto,
       // Store tags as string array in tagsArray field
@@ -125,10 +134,24 @@ export class ArticlesService extends BaseService<Article> {
    * @param paginationDto - Pagination parameters
    * @returns Paginated articles
    */
-  async findAll(
-    paginationDto: AdvancedPaginationDto,
-  ): Promise<IPagination<Article>> {
-    return this.listOffset(paginationDto);
+  async findAll(paginationDto: GetArticleDto): Promise<IPagination<Article>> {
+    const extraFilter: FindOptionsWhere<Article> = {};
+
+    if (!paginationDto.status) {
+      Object.assign(extraFilter, {
+        status: [...Object.values(ARTICLE_CONSTANTS.STATUS)],
+      });
+      delete paginationDto.status;
+    }
+
+    if (paginationDto.visibility) {
+      Object.assign(extraFilter, { visibility: paginationDto.visibility });
+      delete paginationDto.visibility;
+    }
+
+    console.log('extraFilter', extraFilter);
+
+    return this.listOffset(paginationDto, extraFilter);
   }
 
   /**

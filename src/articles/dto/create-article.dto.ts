@@ -59,6 +59,7 @@ export class CreateArticleDto {
   readTimeMinutes?: number;
 
   @IsString()
+  @IsOptional()
   userId: string;
 
   @IsOptional()
