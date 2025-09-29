@@ -138,18 +138,15 @@ export class ArticlesService extends BaseService<Article> {
     const extraFilter: FindOptionsWhere<Article> = {};
 
     if (!paginationDto.status) {
-      Object.assign(extraFilter, {
+      Object.assign(paginationDto, {
         status: [...Object.values(ARTICLE_CONSTANTS.STATUS)],
       });
-      delete paginationDto.status;
     }
 
     if (paginationDto.visibility) {
       Object.assign(extraFilter, { visibility: paginationDto.visibility });
       delete paginationDto.visibility;
     }
-
-    console.log('extraFilter', extraFilter);
 
     return this.listOffset(paginationDto, extraFilter);
   }
