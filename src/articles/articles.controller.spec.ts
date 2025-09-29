@@ -1,19 +1,20 @@
+import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { AnalyticsService } from 'src/analytics/analytics.service';
+import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
+import { CacheService } from 'src/shared/services';
 import { ArticlesController } from './articles.controller';
 import { ArticlesService } from './articles.service';
 import { Article } from './entities/article.entity';
 import { ScheduledPublishingService } from './services/scheduled-publishing.service';
-import { CacheService } from 'src/shared/services';
-import { AnalyticsService } from 'src/analytics/analytics.service';
-import { Reflector } from '@nestjs/core';
 
 describe('ArticlesController', () => {
   let controller: ArticlesController;
   let articlesService: ArticlesService;
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       controllers: [ArticlesController],
       providers: [
         ArticlesService,
@@ -84,7 +85,14 @@ describe('ArticlesController', () => {
           },
         },
       ],
-    }).compile();
+    });
+
+    const module: TestingModule = await moduleBuilder
+      .overrideGuard(JwtAccessTokenGuard)
+      .useValue({
+        canActivate: jest.fn().mockResolvedValue(true),
+      })
+      .compile();
 
     controller = module.get<ArticlesController>(ArticlesController);
     articlesService = module.get<ArticlesService>(ArticlesService);
@@ -164,16 +172,14 @@ describe('ArticlesController', () => {
         title: 'Test Article',
         content: 'Test content',
         userId: 'user-123',
-      };
+      } as Article;
 
-      jest
-        .spyOn(articlesService, 'findOne')
-        .mockResolvedValue(mockArticle as unknown as Article);
+      jest.spyOn(articlesService, 'findById').mockResolvedValue(mockArticle);
 
       const result = await controller.findOne(articleId);
 
       expect(result).toEqual(mockArticle);
-      expect(articlesService.findOne).toHaveBeenCalledWith({ id: articleId });
+      expect(articlesService.findById).toHaveBeenCalledWith(articleId);
     });
   });
 
