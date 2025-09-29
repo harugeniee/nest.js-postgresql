@@ -6,7 +6,7 @@ import {
   Param,
   Patch,
   Post,
-  Query
+  Query,
 } from '@nestjs/common';
 import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 import { Auth } from 'src/common/decorators';
