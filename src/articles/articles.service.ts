@@ -211,10 +211,14 @@ export class ArticlesService extends BaseService<Article> {
       if (patch.title !== article.title) {
         const existingSlugs = await this.getExistingSlugs(id);
         const title = patch.title || '';
-        const newSlug = createArticleSlug(title, existingSlugs, {
-          maxLength: 80,
-          separator: '-',
-        });
+        const newSlug =
+          createArticleSlug(title, existingSlugs, {
+            maxLength: 70,
+            separator: '-',
+          }) +
+          '.' +
+          globalSnowflake.nextId().toString() +
+          '.article';
         patch.slug = newSlug;
       }
     }
