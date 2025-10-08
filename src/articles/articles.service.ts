@@ -52,6 +52,7 @@ export class ArticlesService extends BaseService<Article> {
         defaultSearchField: 'title',
         relationsWhitelist: {
           user: { avatar: true },
+          coverImage: true,
         },
       },
       cacheService,
@@ -181,7 +182,9 @@ export class ArticlesService extends BaseService<Article> {
    * @returns Article or throws NotFoundException
    */
   async findById(id: string): Promise<Article> {
-    return await super.findById(id, { relations: ['user'] });
+    return await super.findById(id, {
+      relations: ['user', 'tags', 'coverImage'],
+    });
   }
 
   /**

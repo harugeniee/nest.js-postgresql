@@ -67,5 +67,5 @@ export class CreateArticleDto {
   slug?: string;
 
   @IsOptional()
-  publishedAt?: Date;
+  scheduledAt?: Date;
 }
