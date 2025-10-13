@@ -17,6 +17,7 @@ export const EVENT_METRIC_MAPPING = {
     update: 'article_update',
     delete: 'article_delete',
     list: 'article_list',
+    listCursor: 'article_list_cursor',
   },
   user: {
     follow: 'user_follows',
@@ -48,7 +49,7 @@ export const ANALYTICS_EVENT_TYPES = {
   ARTICLE_UPDATE: 'article_update',
   ARTICLE_DELETE: 'article_delete',
   ARTICLE_LIST: 'article_list',
-
+  ARTICLE_LIST_CURSOR: 'article_list_cursor',
   // User events
   USER_FOLLOW: 'user_follow',
   USER_UNFOLLOW: 'user_unfollow',

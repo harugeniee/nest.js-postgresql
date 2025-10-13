@@ -13,6 +13,7 @@ import {
 import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
 import { Auth } from 'src/common/decorators';
+import { CursorPaginationDto } from 'src/common/dto/cursor-pagination.dto';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
@@ -47,6 +48,16 @@ export class ArticlesController {
   )
   findAll(@Query() query: GetArticleDto) {
     return this.articlesService.findAll(query);
+  }
+
+  @Get('cursor')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_LIST_CURSOR,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
+  )
+  findAllCursor(@Query() query: CursorPaginationDto) {
+    return this.articlesService.findAllCursor(query);
   }
 
   @Get(':id')
