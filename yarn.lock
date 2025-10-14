@@ -1858,7 +1858,7 @@
     path-to-regexp "8.2.0"
     tslib "2.8.1"
 
-"@nestjs/jwt@^11.0.0":
+"@nestjs/jwt@^11.0.1":
   version "11.0.1"
   resolved "https://registry.yarnpkg.com/@nestjs/jwt/-/jwt-11.0.1.tgz#3109ba23932330f4001db9e41e4374f2e41342df"
   integrity sha512-HXSsc7SAnCnjA98TsZqrE7trGtHDnYXWp4Ffy6LwSmck1QvbGYdMzBquXofX5l6tIRpeY4Qidl2Ti2CVG77Pdw==

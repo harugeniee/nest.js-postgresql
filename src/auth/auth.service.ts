@@ -109,17 +109,17 @@ export class AuthService {
     }); // 7 days in seconds
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.sign(
+      this.jwtService.signAsync<AuthPayload>(
         { uid: id, ssid: session.id, role: user.role },
         {
-          expiresIn: accessTokenExpiresIn,
+          expiresIn: +accessTokenExpiresIn,
           algorithm: 'HS256',
         },
       ),
-      this.jwtService.sign(
+      this.jwtService.signAsync<AuthPayload>(
         { uid: id, ssid: session.id },
         {
-          expiresIn: refreshTokenExpiresIn,
+          expiresIn: +refreshTokenExpiresIn,
           algorithm: 'HS512',
         },
       ),
@@ -207,10 +207,10 @@ export class AuthService {
       );
     }
     const user = await this.usersService.findById(session.userId);
-    const accessToken = await this.jwtService.signAsync(
+    const accessToken = await this.jwtService.signAsync<AuthPayload>(
       { uid: session.userId, ssid: session.id, role: user.role },
       {
-        expiresIn: accessTokenExpiresIn,
+        expiresIn: +accessTokenExpiresIn,
         algorithm: 'HS256',
       },
     );
