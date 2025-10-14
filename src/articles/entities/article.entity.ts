@@ -1,4 +1,5 @@
 import { Media } from 'src/media/entities/media.entity';
+import { Organization } from 'src/organizations/entities/organization.entity';
 import {
   ARTICLE_CONSTANTS,
   ArticleContentFormat,
@@ -303,4 +304,24 @@ export class Article extends BaseEntityCustom {
     comment: 'Date and time when article was actually published',
   })
   publishedAt?: Date;
+
+  /**
+   * Foreign key reference to the organization this article belongs to
+   * Can be null if article is not associated with any organization
+   */
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    comment: 'Foreign key reference to organizations.id',
+  })
+  organizationId?: string;
+
+  /**
+   * Organization this article belongs to
+   * Many-to-one relationship: many articles can belong to one organization
+   * Can be null if article is not associated with any organization
+   */
+  @ManyToOne(() => Organization, { nullable: true })
+  @JoinColumn({ name: 'organizationId', referencedColumnName: 'id' })
+  organization?: Organization;
 }

@@ -12,18 +12,23 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AnalyticsModule } from './analytics/analytics.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ArticlesModule } from './articles/articles.module';
 import { AuthModule } from './auth/auth.module';
+import { BookmarksModule } from './bookmarks/bookmarks.module';
 import { CommentsModule } from './comments/comments.module';
+import { FollowModule } from './follow/follow.module';
 import { MediaModule } from './media/media.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { PermissionsModule } from './permissions/permissions.module';
 import { QrModule } from './qr/qr.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { ReportsModule } from './reports/reports.module';
-import { BookmarksModule } from './bookmarks/bookmarks.module';
-import { TagsModule } from './tags/tags.module';
+import { ShareModule } from './share/share.module';
 import {
   appConfig,
   awsConfig,
@@ -39,12 +44,9 @@ import {
 import { configValidationSchema } from './shared/config/schema';
 import { CacheModule, MailModule, RabbitmqModule } from './shared/services';
 import { StickersModule } from './stickers/stickers.module';
+import { TagsModule } from './tags/tags.module';
 import { UsersModule } from './users/users.module';
 import { WorkerModule } from './workers/worker.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { FollowModule } from './follow/follow.module';
-import { AnalyticsModule } from './analytics/analytics.module';
-import { ShareModule } from './share/share.module';
 
 @Module({
   imports: [
@@ -112,6 +114,8 @@ import { ShareModule } from './share/share.module';
     FollowModule,
     AnalyticsModule,
     ShareModule,
+    OrganizationsModule,
+    PermissionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

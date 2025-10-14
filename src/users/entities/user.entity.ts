@@ -1,8 +1,17 @@
-import { instanceToPlain, Exclude } from 'class-transformer';
+import { Exclude, instanceToPlain } from 'class-transformer';
 import { Media } from 'src/media/entities/media.entity';
+import { Organization } from 'src/organizations/entities/organization.entity';
+import { UserOrganization } from 'src/organizations/entities/user-organization.entity';
 import { USER_CONSTANTS, UserRole, UserStatus } from 'src/shared/constants';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm';
 
 @Entity({
   name: 'users',
@@ -127,6 +136,30 @@ export class User extends BaseEntityCustom {
   @ManyToOne(() => Media, { nullable: true })
   @JoinColumn({ name: 'avatarId', referencedColumnName: 'id' })
   avatar: Media; // Avatar media
+
+  /**
+   * Organizations owned by this user
+   * One-to-many relationship: one user can own multiple organizations
+   */
+  @OneToMany(() => Organization, (organization) => organization.owner, {
+    cascade: false, // Don't cascade delete organizations when user is deleted
+    eager: false, // Don't load organizations by default for performance
+  })
+  ownedOrganizations?: Organization[];
+
+  /**
+   * User memberships in organizations
+   * Many-to-many relationship through UserOrganization entity
+   */
+  @OneToMany(
+    () => UserOrganization,
+    (userOrganization) => userOrganization.user,
+    {
+      cascade: false, // Don't cascade delete memberships when user is deleted
+      eager: false, // Don't load memberships by default for performance
+    },
+  )
+  organizationMemberships?: UserOrganization[];
 
   toJSON() {
     const result = instanceToPlain(this);
