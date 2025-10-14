@@ -1,4 +1,5 @@
 import { Media } from 'src/media/entities/media.entity';
+import { Role } from 'src/permissions/entities/role.entity';
 import {
   ORGANIZATION_CONSTANTS,
   OrganizationStatus,
@@ -179,6 +180,6 @@ export class Organization extends BaseEntityCustom {
    * Roles associated with this organization
    * One-to-many relationship with Role entity for organization-specific roles
    */
-  @OneToMany('Role', 'organization')
-  roles: any[];
+  @OneToMany(() => Role, (role) => role.organization)
+  roles: Role[];
 }

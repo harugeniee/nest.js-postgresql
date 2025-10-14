@@ -2,11 +2,14 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services/base.service';
+import { seedPermissions } from 'src/db/seed/permissions.seed';
 import { UserPermissionService } from 'src/permissions/services/user-permission.service';
 import { PermissionName } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
@@ -32,7 +35,11 @@ import { UserRole } from './entities/user-role.entity';
  * and effective permission calculations using BigInt bitwise operations
  */
 @Injectable()
-export class PermissionsService extends BaseService<Role> {
+export class PermissionsService
+  extends BaseService<Role>
+  implements OnModuleInit
+{
+  private readonly logger = new Logger(PermissionsService.name);
   constructor(
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
@@ -77,6 +84,43 @@ export class PermissionsService extends BaseService<Role> {
       },
       cacheService,
     );
+  }
+
+  /**
+   * Initialize permissions data when module starts
+   */
+  async onModuleInit(): Promise<void> {
+    await this.initializeData();
+  }
+
+  /**
+   * Initialize permissions data if not already exists
+   * Checks for existing data before seeding to avoid duplicates
+   */
+  private async initializeData(): Promise<void> {
+    try {
+      // Check if roles already exist
+      const existingRolesCount = await this.roleRepository.count();
+
+      if (existingRolesCount === 0) {
+        this.logger.log('No roles found, initializing permissions data...');
+
+        // Get DataSource from repository to pass to seed function
+        const dataSource = this.roleRepository.manager.connection;
+        await seedPermissions(dataSource);
+
+        this.logger.log(
+          'Permissions data initialization completed successfully',
+        );
+      } else {
+        this.logger.log(
+          `Permissions data already exists (${existingRolesCount} roles found), skipping initialization`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Error initializing permissions data:', error);
+      throw error;
+    }
   }
 
   /**

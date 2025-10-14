@@ -14,13 +14,13 @@ export class UserRole extends BaseEntityCustom {
   /**
    * ID of the user this role assignment belongs to
    */
-  @Column({ type: 'varchar', length: 50 })
+  @Column({ type: 'bigint' })
   userId: string;
 
   /**
    * ID of the role assigned to the user
    */
-  @Column({ type: 'varchar', length: 50 })
+  @Column({ type: 'bigint' })
   roleId: string;
 
   /**
@@ -39,7 +39,7 @@ export class UserRole extends BaseEntityCustom {
   /**
    * ID of the user who assigned this role (for audit purposes)
    */
-  @Column({ type: 'varchar', length: 50, nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   assignedBy?: string;
 
   /**

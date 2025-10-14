@@ -1,5 +1,7 @@
+import { Organization } from 'src/organizations/entities/organization.entity';
 import { BaseEntityCustom } from 'src/shared/entities/base.entity';
 import { Column, Entity, Index, ManyToOne, OneToMany } from 'typeorm';
+import { UserRole } from './user-role.entity';
 
 /**
  * Role entity representing Discord-style roles with permission bitfields
@@ -73,14 +75,16 @@ export class Role extends BaseEntityCustom {
   /**
    * User roles that reference this role
    */
-  @OneToMany('UserRole', 'role')
-  userRoles: any[];
+  @OneToMany(() => UserRole, (userRole) => userRole.role)
+  userRoles: UserRole[];
 
   /**
    * Organization this role belongs to (optional, for organization-specific roles)
    */
-  @ManyToOne('Organization', 'roles', { nullable: true })
-  organization?: any;
+  @ManyToOne(() => Organization, (organization) => organization.roles, {
+    nullable: true,
+  })
+  organization?: Organization;
 
   /**
    * Get permissions as BigInt for bitwise operations

@@ -13,7 +13,11 @@ export class UserPermission extends BaseEntityCustom {
   /**
    * ID of the user this permission is granted to
    */
-  @Column({ type: 'varchar', length: 50 })
+  @Column({
+    type: 'bigint',
+    nullable: false,
+    comment: 'Foreign key reference to users.id',
+  })
   userId: string;
 
   /**
@@ -38,13 +42,13 @@ export class UserPermission extends BaseEntityCustom {
   /**
    * Optional context for the permission (e.g., channel ID, organization ID)
    */
-  @Column({ type: 'varchar', length: 50, nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   contextId?: string;
 
   /**
    * Type of context (e.g., 'channel', 'organization')
    */
-  @Column({ type: 'varchar', length: 50, nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   contextType?: string;
 
   /**
@@ -56,7 +60,7 @@ export class UserPermission extends BaseEntityCustom {
   /**
    * ID of the user who granted this permission
    */
-  @Column({ type: 'varchar', length: 50, nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   grantedBy?: string;
 
   /**

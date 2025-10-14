@@ -14,13 +14,13 @@ export class ChannelOverwrite extends BaseEntityCustom {
   /**
    * ID of the channel this overwrite applies to
    */
-  @Column({ type: 'varchar', length: 50 })
+  @Column({ type: 'bigint' })
   channelId: string;
 
   /**
    * ID of the role or user this overwrite targets
    */
-  @Column({ type: 'varchar', length: 50 })
+  @Column({ type: 'bigint' })
   targetId: string;
 
   /**
