@@ -1,3 +1,4 @@
+import { HttpException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -6,10 +7,15 @@ import {
   OverwriteTargetType,
   PERMISSIONS,
 } from './constants/permissions.constants';
+import { AssignRoleDto } from './dto/assign-role.dto';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { EffectivePermissionsDto } from './dto/effective-permissions.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 import { ChannelOverwrite } from './entities/channel-overwrite.entity';
 import { Role } from './entities/role.entity';
 import { UserRole } from './entities/user-role.entity';
 import { PermissionsService } from './permissions.service';
+import { UserPermissionService } from './services/user-permission.service';
 
 /**
  * Helper function to create a complete mock Role object for testing
@@ -62,6 +68,10 @@ describe('PermissionsService', () => {
     deleteKeysByPattern: jest.fn(),
   };
 
+  const mockUserPermissionService = {
+    refreshUserPermissions: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -98,6 +108,10 @@ describe('PermissionsService', () => {
           provide: 'CacheService',
           useValue: mockCacheService,
         },
+        {
+          provide: UserPermissionService,
+          useValue: mockUserPermissionService,
+        },
       ],
     }).compile();
 
@@ -115,6 +129,450 @@ describe('PermissionsService', () => {
     jest.clearAllMocks();
   });
 
+  describe('createRole', () => {
+    it('should create a new role successfully', async () => {
+      // Arrange
+      const createDto: CreateRoleDto = {
+        name: 'test-role',
+        description: 'A test role',
+        permissions: PERMISSIONS.ARTICLE_CREATE.toString(),
+        position: 1,
+        color: '#ff0000',
+        mentionable: true,
+        managed: false,
+        icon: 'https://example.com/icon.png',
+        unicodeEmoji: '👑',
+      };
+
+      const expectedRole = createMockRole({
+        name: createDto.name,
+        description: createDto.description,
+        permissions: createDto.permissions,
+        position: createDto.position,
+        color: createDto.color,
+        mentionable: createDto.mentionable,
+        managed: createDto.managed,
+        icon: createDto.icon,
+        unicodeEmoji: createDto.unicodeEmoji,
+      });
+
+      jest.spyOn(service, 'create').mockResolvedValue(expectedRole);
+
+      // Act
+      const result = await service.createRole(createDto);
+
+      // Assert
+      expect(result).toEqual(expectedRole);
+      expect(service.create).toHaveBeenCalledWith({
+        name: createDto.name,
+        description: createDto.description,
+        permissions: createDto.permissions,
+        position: createDto.position,
+        color: createDto.color,
+        mentionable: createDto.mentionable,
+        managed: createDto.managed,
+        icon: createDto.icon,
+        unicodeEmoji: createDto.unicodeEmoji,
+      });
+    });
+
+    it('should create role with default values', async () => {
+      // Arrange
+      const createDto: CreateRoleDto = {
+        name: 'minimal-role',
+      };
+
+      const expectedRole = createMockRole({
+        name: createDto.name,
+        permissions: '0',
+        position: 0,
+        mentionable: false,
+        managed: false,
+      });
+
+      jest.spyOn(service, 'create').mockResolvedValue(expectedRole);
+
+      // Act
+      const result = await service.createRole(createDto);
+
+      // Assert
+      expect(result).toEqual(expectedRole);
+      expect(service.create).toHaveBeenCalledWith({
+        name: createDto.name,
+        description: undefined,
+        permissions: '0',
+        position: 0,
+        color: undefined,
+        mentionable: false,
+        managed: false,
+        icon: undefined,
+        unicodeEmoji: undefined,
+      });
+    });
+
+    it('should throw HttpException when role creation fails', async () => {
+      // Arrange
+      const createDto: CreateRoleDto = {
+        name: 'test-role',
+      };
+
+      const error = new Error('Database connection failed');
+      jest.spyOn(service, 'create').mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(service.createRole(createDto)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.createRole(createDto)).rejects.toThrow(
+        'permission.PERMISSION_INTERNAL_SERVER_ERROR',
+      );
+    });
+  });
+
+  describe('updateRole', () => {
+    it('should update role successfully', async () => {
+      // Arrange
+      const roleId = 'role-123';
+      const updateDto: UpdateRoleDto = {
+        name: 'updated-role',
+        description: 'Updated description',
+        permissions: PERMISSIONS.ARTICLE_EDIT.toString(),
+      };
+
+      const existingRole = createMockRole({ id: roleId, name: 'old-name' });
+      const updatedRole = createMockRole({ ...existingRole, ...updateDto });
+
+      jest.spyOn(service, 'findById').mockResolvedValue(existingRole);
+      jest.spyOn(service, 'update').mockResolvedValue(updatedRole);
+
+      // Act
+      const result = await service.updateRole(roleId, updateDto);
+
+      // Assert
+      expect(result).toEqual(updatedRole);
+      expect(service.findById).toHaveBeenCalledWith(roleId);
+      expect(service.update).toHaveBeenCalledWith(roleId, {
+        name: updateDto.name,
+        description: updateDto.description,
+        permissions: updateDto.permissions,
+      });
+    });
+
+    it('should throw HttpException when role not found', async () => {
+      // Arrange
+      const roleId = 'non-existent-role';
+      const updateDto: UpdateRoleDto = { name: 'updated-name' };
+
+      jest.spyOn(service, 'findById').mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.updateRole(roleId, updateDto)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.updateRole(roleId, updateDto)).rejects.toThrow(
+        'permission.ROLE_NOT_FOUND',
+      );
+    });
+
+    it('should throw HttpException when update fails', async () => {
+      // Arrange
+      const roleId = 'role-123';
+      const updateDto: UpdateRoleDto = { name: 'updated-name' };
+
+      const existingRole = createMockRole({ id: roleId });
+      jest.spyOn(service, 'findById').mockResolvedValue(existingRole);
+
+      const error = new Error('Database update failed');
+      jest.spyOn(service, 'update').mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(service.updateRole(roleId, updateDto)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.updateRole(roleId, updateDto)).rejects.toThrow(
+        'permission.PERMISSION_INTERNAL_SERVER_ERROR',
+      );
+    });
+  });
+
+  describe('assignRole', () => {
+    it('should assign role to user successfully', async () => {
+      // Arrange
+      const assignDto: AssignRoleDto = {
+        userId: 'user-123',
+        roleId: 'role-456',
+        reason: 'Test assignment',
+        assignedBy: 'admin-789',
+        isTemporary: false,
+        expiresAt: '2024-12-31T23:59:59.000Z',
+      };
+
+      const role = createMockRole({ id: assignDto.roleId });
+      const userRole = {
+        id: 'user-role-123',
+        userId: assignDto.userId,
+        roleId: assignDto.roleId,
+        reason: assignDto.reason,
+        assignedBy: assignDto.assignedBy,
+        isTemporary: assignDto.isTemporary,
+        expiresAt: new Date(assignDto.expiresAt),
+        createdAt: new Date(),
+      } as UserRole;
+
+      jest.spyOn(service, 'findById').mockResolvedValue(role);
+      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(null); // No existing assignment
+      jest.spyOn(userRoleRepository, 'save').mockResolvedValue(userRole);
+      mockUserPermissionService.refreshUserPermissions.mockResolvedValue(
+        undefined,
+      );
+
+      // Act
+      const result = await service.assignRole(assignDto);
+
+      // Assert
+      expect(result).toEqual(userRole);
+      expect(service.findById).toHaveBeenCalledWith(assignDto.roleId);
+      expect(userRoleRepository.findOne).toHaveBeenCalledWith({
+        where: { userId: assignDto.userId, roleId: assignDto.roleId },
+      });
+      expect(userRoleRepository.save).toHaveBeenCalledWith({
+        userId: assignDto.userId,
+        roleId: assignDto.roleId,
+        reason: assignDto.reason,
+        assignedBy: assignDto.assignedBy,
+        isTemporary: assignDto.isTemporary,
+        expiresAt: new Date(assignDto.expiresAt),
+      });
+      expect(
+        mockUserPermissionService.refreshUserPermissions,
+      ).toHaveBeenCalledWith(assignDto.userId);
+    });
+
+    it('should throw HttpException when role not found', async () => {
+      // Arrange
+      const assignDto: AssignRoleDto = {
+        userId: 'user-123',
+        roleId: 'non-existent-role',
+      };
+
+      jest.spyOn(service, 'findById').mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.assignRole(assignDto)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.assignRole(assignDto)).rejects.toThrow(
+        'permission.ROLE_NOT_FOUND',
+      );
+    });
+
+    it('should throw HttpException when role already assigned', async () => {
+      // Arrange
+      const assignDto: AssignRoleDto = {
+        userId: 'user-123',
+        roleId: 'role-456',
+      };
+
+      const role = createMockRole({ id: assignDto.roleId });
+      const existingAssignment = {
+        id: 'existing-assignment',
+        userId: assignDto.userId,
+        roleId: assignDto.roleId,
+      } as UserRole;
+
+      jest.spyOn(service, 'findById').mockResolvedValue(role);
+      jest
+        .spyOn(userRoleRepository, 'findOne')
+        .mockResolvedValue(existingAssignment);
+
+      // Act & Assert
+      await expect(service.assignRole(assignDto)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.assignRole(assignDto)).rejects.toThrow(
+        'permission.USER_ROLE_ALREADY_EXISTS',
+      );
+    });
+
+    it('should throw HttpException when assignment fails', async () => {
+      // Arrange
+      const assignDto: AssignRoleDto = {
+        userId: 'user-123',
+        roleId: 'role-456',
+      };
+
+      const role = createMockRole({ id: assignDto.roleId });
+      jest.spyOn(service, 'findById').mockResolvedValue(role);
+      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(null);
+
+      const error = new Error('Database save failed');
+      jest.spyOn(userRoleRepository, 'save').mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(service.assignRole(assignDto)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.assignRole(assignDto)).rejects.toThrow(
+        'permission.PERMISSION_INTERNAL_SERVER_ERROR',
+      );
+    });
+  });
+
+  describe('removeRole', () => {
+    it('should remove role from user successfully', async () => {
+      // Arrange
+      const userId = 'user-123';
+      const roleId = 'role-456';
+      const userRole = {
+        id: 'user-role-123',
+        userId,
+        roleId,
+        createdAt: new Date(),
+      } as UserRole;
+
+      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(userRole);
+      jest.spyOn(userRoleRepository, 'remove').mockResolvedValue(userRole);
+      mockUserPermissionService.refreshUserPermissions.mockResolvedValue(
+        undefined,
+      );
+
+      // Act
+      await service.removeRole(userId, roleId);
+
+      // Assert
+      expect(userRoleRepository.findOne).toHaveBeenCalledWith({
+        where: { userId, roleId },
+      });
+      expect(userRoleRepository.remove).toHaveBeenCalledWith(userRole);
+      expect(
+        mockUserPermissionService.refreshUserPermissions,
+      ).toHaveBeenCalledWith(userId);
+    });
+
+    it('should throw HttpException when role assignment not found', async () => {
+      // Arrange
+      const userId = 'user-123';
+      const roleId = 'role-456';
+
+      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(service.removeRole(userId, roleId)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.removeRole(userId, roleId)).rejects.toThrow(
+        'permission.USER_ROLE_NOT_FOUND',
+      );
+    });
+
+    it('should throw HttpException when removal fails', async () => {
+      // Arrange
+      const userId = 'user-123';
+      const roleId = 'role-456';
+      const userRole = {
+        id: 'user-role-123',
+        userId,
+        roleId,
+        createdAt: new Date(),
+      } as UserRole;
+
+      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(userRole);
+
+      const error = new Error('Database remove failed');
+      jest.spyOn(userRoleRepository, 'remove').mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(service.removeRole(userId, roleId)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.removeRole(userId, roleId)).rejects.toThrow(
+        'permission.PERMISSION_INTERNAL_SERVER_ERROR',
+      );
+    });
+  });
+
+  describe('deleteOverwrite', () => {
+    it('should delete channel overwrite successfully', async () => {
+      // Arrange
+      const channelId = 'channel-123';
+      const targetId = 'role-456';
+      const targetType = OverwriteTargetType.ROLE;
+      const overwrite = {
+        id: 'overwrite-123',
+        channelId,
+        targetId,
+        targetType,
+        allow: '0',
+        deny: '0',
+        createdAt: new Date(),
+      } as ChannelOverwrite;
+
+      jest
+        .spyOn(channelOverwriteRepository, 'findOne')
+        .mockResolvedValue(overwrite);
+      jest
+        .spyOn(channelOverwriteRepository, 'remove')
+        .mockResolvedValue(overwrite);
+
+      // Act
+      await service.deleteOverwrite(channelId, targetId, targetType);
+
+      // Assert
+      expect(channelOverwriteRepository.findOne).toHaveBeenCalledWith({
+        where: { channelId, targetId, targetType },
+      });
+      expect(channelOverwriteRepository.remove).toHaveBeenCalledWith(overwrite);
+    });
+
+    it('should throw HttpException when overwrite not found', async () => {
+      // Arrange
+      const channelId = 'channel-123';
+      const targetId = 'non-existent-target';
+      const targetType = OverwriteTargetType.ROLE;
+
+      jest.spyOn(channelOverwriteRepository, 'findOne').mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        service.deleteOverwrite(channelId, targetId, targetType),
+      ).rejects.toThrow(HttpException);
+      await expect(
+        service.deleteOverwrite(channelId, targetId, targetType),
+      ).rejects.toThrow('permission.CHANNEL_OVERWRITE_NOT_FOUND');
+    });
+
+    it('should throw HttpException when deletion fails', async () => {
+      // Arrange
+      const channelId = 'channel-123';
+      const targetId = 'role-456';
+      const targetType = OverwriteTargetType.ROLE;
+      const overwrite = {
+        id: 'overwrite-123',
+        channelId,
+        targetId,
+        targetType,
+        allow: '0',
+        deny: '0',
+        createdAt: new Date(),
+      } as ChannelOverwrite;
+
+      jest
+        .spyOn(channelOverwriteRepository, 'findOne')
+        .mockResolvedValue(overwrite);
+
+      const error = new Error('Database remove failed');
+      jest.spyOn(channelOverwriteRepository, 'remove').mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(
+        service.deleteOverwrite(channelId, targetId, targetType),
+      ).rejects.toThrow(HttpException);
+      await expect(
+        service.deleteOverwrite(channelId, targetId, targetType),
+      ).rejects.toThrow('permission.PERMISSION_INTERNAL_SERVER_ERROR');
+    });
+  });
+
   describe('computeEffectivePermissions', () => {
     beforeEach(() => {
       // Mock default everyone role
@@ -127,6 +585,35 @@ describe('PermissionsService', () => {
         updatedAt: new Date(),
         getPermissionsAsBigInt: () => 0n,
       } as Role);
+    });
+
+    it('should throw HttpException when userId is not provided', async () => {
+      // Arrange
+      const dto: EffectivePermissionsDto = {};
+
+      // Act & Assert
+      await expect(service.computeEffectivePermissions(dto)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.computeEffectivePermissions(dto)).rejects.toThrow(
+        'permission.INVALID_USER_ID',
+      );
+    });
+
+    it('should throw HttpException when permission calculation fails', async () => {
+      // Arrange
+      const dto: EffectivePermissionsDto = { userId: 'user-123' };
+      const error = new Error('Database connection failed');
+
+      jest.spyOn(service, 'getUserRoles').mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(service.computeEffectivePermissions(dto)).rejects.toThrow(
+        HttpException,
+      );
+      await expect(service.computeEffectivePermissions(dto)).rejects.toThrow(
+        'permission.PERMISSION_CALCULATION_FAILED',
+      );
     });
 
     it('Scenario 1: User with ADMINISTRATOR permission should return ALL_PERMISSIONS', async () => {
