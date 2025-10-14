@@ -408,10 +408,10 @@ describe('PermissionLogicUtil', () => {
   describe('Real-world scenarios', () => {
     it('Content moderator - can edit OR delete, but NOT publish', () => {
       const moderatorPerms =
-        PERMISSIONS.ARTICLE_EDIT_ALL | PERMISSIONS.ARTICLE_DELETE_ALL;
+        PERMISSIONS.ARTICLE_EDIT | PERMISSIONS.ARTICLE_DELETE;
 
       const isModerator = checkPermissions(moderatorPerms, {
-        any: ['ARTICLE_EDIT_ALL', 'ARTICLE_DELETE_ALL'],
+        any: ['ARTICLE_EDIT', 'ARTICLE_DELETE'],
         none: ['ARTICLE_PUBLISH'],
       });
 
@@ -447,14 +447,14 @@ describe('PermissionLogicUtil', () => {
 
       // Add moderator permissions
       userPerms = addPermissions(userPerms, [
-        'ARTICLE_MODERATE',
+        'ARTICLE_EDIT',
         'COMMENT_MODERATE',
-        'COMMENT_DELETE_ALL',
+        'COMMENT_DELETE',
       ]);
 
-      expect(hasPermission(userPerms, 'ARTICLE_MODERATE')).toBe(true);
+      expect(hasPermission(userPerms, 'ARTICLE_EDIT')).toBe(true);
       expect(hasPermission(userPerms, 'COMMENT_MODERATE')).toBe(true);
-      expect(hasPermission(userPerms, 'COMMENT_DELETE_ALL')).toBe(true);
+      expect(hasPermission(userPerms, 'COMMENT_DELETE')).toBe(true);
       expect(hasPermission(userPerms, 'ARTICLE_CREATE')).toBe(true); // Original permission still exists
     });
   });
