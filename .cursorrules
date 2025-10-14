@@ -56,7 +56,9 @@ export class EntityName extends BaseEntityCustom {
 ### 1.4 Migration Policy
 * **DO NOT generate or run migrations automatically**
   * Never run `yarn migration:generate` or `yarn migration:run`
-  * Never auto-run migrations on startup
+  * Never run `typeorm migration:generate` or `typeorm migration:run`
+  * Never auto-run migrations on application startup
+  * Never use `synchronize: true` in TypeORM configuration
 * **Only create or modify entity classes manually**
 * Schema updates will be handled separately by maintainers
 * Avoid destructive changes (dropping fields/tables)
@@ -251,8 +253,10 @@ const result = await this.listCursor(
 
 ### 4.3 Pagination Utils
 * **Never use custom base64 encoding** for cursors
-* Always use `encodeSignedCursor()` and `decodeSignedCursor()` from `src/common/utils/cursor.util.ts`
-* These include HMAC signatures for tamper protection
+* Use **signed cursors** with HMAC protection: `encodeSignedCursor()` and `decodeSignedCursor()`
+* Use **unsigned cursors** for simple cases: `encodeCursor()` and `decodeCursor()`
+* All cursor functions available in `src/common/utils/cursor.util.ts`
+* Signed cursors include HMAC signatures for tamper protection
 
 ---
 
@@ -273,7 +277,10 @@ const result = await this.listCursor(
   * `articles:id:123` - single article by ID
   * `articles:list:hash(filters)` - article list with filters
   * `users:profile:456` - user profile
-* BaseService automatically generates cache keys using SHA256 hash of query parameters
+* BaseService automatically generates cache keys using:
+  * `sha256Hex()` for consistent hashing
+  * `stableStringify()` for deterministic JSON serialization
+  * `normalizeSearchInput()` for search query normalization
 
 ### 5.3 Cache Invalidation
 * BaseService automatically invalidates cache on create/update/delete
