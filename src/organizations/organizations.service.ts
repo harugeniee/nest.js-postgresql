@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
@@ -79,47 +79,63 @@ export class OrganizationsService extends BaseService<Organization> {
   async createOrganization(
     createOrganizationDto: CreateOrganizationDto,
   ): Promise<Organization> {
-    // Generate slug if not provided
-    if (!createOrganizationDto.slug) {
-      createOrganizationDto.slug = await this.generateUniqueSlug(
-        createOrganizationDto.name,
-      );
-    }
-
-    const organizationData = {
-      ...createOrganizationDto,
-      ownerId: createOrganizationDto.ownerId,
-      status: ORGANIZATION_CONSTANTS.STATUS.ACTIVE,
-      visibility:
-        createOrganizationDto.visibility ||
-        ORGANIZATION_CONSTANTS.VISIBILITY.PUBLIC,
-      memberCount: 1, // Owner is the first member
-      articleCount: 0,
-    };
-
-    const organization = await this.create(organizationData);
-
-    // Create default organization roles using permissions system
     try {
-      const defaultRoles = await this.permissionsService.createDefaultRoles();
-
-      // Associate the created roles with this organization
-      for (const role of defaultRoles) {
-        role.organization = organization;
-        await this.permissionsService.update(role.id, { organization });
+      // Generate slug if not provided
+      if (!createOrganizationDto.slug) {
+        createOrganizationDto.slug = await this.generateUniqueSlug(
+          createOrganizationDto.name,
+        );
       }
 
-      this.logger.log(
-        `Created ${defaultRoles.length} default roles for organization ${organization.id}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to create default roles for organization ${organization.id}`,
-        error,
+      const organizationData = {
+        ...createOrganizationDto,
+        ownerId: createOrganizationDto.ownerId,
+        status: ORGANIZATION_CONSTANTS.STATUS.ACTIVE,
+        visibility:
+          createOrganizationDto.visibility ||
+          ORGANIZATION_CONSTANTS.VISIBILITY.PUBLIC,
+        memberCount: 1, // Owner is the first member
+        articleCount: 0,
+      };
+
+      const organization = await this.create(organizationData);
+
+      // Create default organization roles using permissions system
+      try {
+        const defaultRoles = await this.permissionsService.createDefaultRoles();
+
+        // Associate the created roles with this organization
+        for (const role of defaultRoles) {
+          role.organization = organization;
+          await this.permissionsService.update(role.id, { organization });
+        }
+
+        this.logger.log(
+          `Created ${defaultRoles.length} default roles for organization ${organization.id}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to create default roles for organization ${organization.id}`,
+          error,
+        );
+        throw new HttpException(
+          { messageKey: 'organization.ORGANIZATION_DEFAULT_ROLES_FAILED' },
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+
+      return organization;
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error('Error creating organization:', error);
+      throw new HttpException(
+        { messageKey: 'organization.ORGANIZATION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    return organization;
   }
 
   /**
@@ -133,7 +149,27 @@ export class OrganizationsService extends BaseService<Organization> {
     id: string,
     updateOrganizationDto: UpdateOrganizationDto,
   ): Promise<Organization> {
-    return await this.update(id, updateOrganizationDto);
+    try {
+      const organization = await this.findById(id);
+      if (!organization) {
+        throw new HttpException(
+          { messageKey: 'organization.ORGANIZATION_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return await this.update(id, updateOrganizationDto);
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Error updating organization ${id}:`, error);
+      throw new HttpException(
+        { messageKey: 'organization.ORGANIZATION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**
@@ -153,9 +189,30 @@ export class OrganizationsService extends BaseService<Organization> {
    * @returns Organization with full details
    */
   async findById(id: string): Promise<Organization> {
-    return await super.findById(id, {
-      relations: ['owner'],
-    });
+    try {
+      const organization = await super.findById(id, {
+        relations: ['owner'],
+      });
+
+      if (!organization) {
+        throw new HttpException(
+          { messageKey: 'organization.ORGANIZATION_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return organization;
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Error finding organization ${id}:`, error);
+      throw new HttpException(
+        { messageKey: 'organization.ORGANIZATION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**
@@ -269,13 +326,33 @@ export class OrganizationsService extends BaseService<Organization> {
    * @param id - Organization ID to delete
    */
   async remove(id: string): Promise<void> {
-    // TODO: Implement cascade logic for related entities
-    // This should handle:
-    // - User memberships (soft delete)
-    // - Article associations (set to null or delete)
-    // - Cache invalidation
+    try {
+      const organization = await this.findById(id);
+      if (!organization) {
+        throw new HttpException(
+          { messageKey: 'organization.ORGANIZATION_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
 
-    return await this.softDelete(id);
+      // TODO: Implement cascade logic for related entities
+      // This should handle:
+      // - User memberships (soft delete)
+      // - Article associations (set to null or delete)
+      // - Cache invalidation
+
+      return await this.softDelete(id);
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Error removing organization ${id}:`, error);
+      throw new HttpException(
+        { messageKey: 'organization.ORGANIZATION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**
@@ -337,35 +414,54 @@ export class OrganizationsService extends BaseService<Organization> {
     roleId: string,
     reason?: string,
   ) {
-    // Verify the role exists in the permissions system
-    const role = await this.permissionsService.findById(roleId);
-    if (!role) {
-      throw new Error(`Role ${roleId} not found`);
-    }
+    try {
+      // Verify the role exists in the permissions system
+      const role = await this.permissionsService.findById(roleId);
+      if (!role) {
+        throw new HttpException(
+          { messageKey: 'organization.ORGANIZATION_ROLE_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
 
-    // Verify the user-organization relationship exists
-    const userOrg = await this.organizationRepository
-      .createQueryBuilder('org')
-      .innerJoin('user_organizations', 'uo', 'uo.organizationId = org.id')
-      .where('org.id = :organizationId', { organizationId })
-      .andWhere('uo.userId = :userId', { userId })
-      .andWhere('uo.isActive = :isActive', { isActive: true })
-      .getOne();
+      // Verify the user-organization relationship exists
+      const userOrg = await this.organizationRepository
+        .createQueryBuilder('org')
+        .innerJoin('user_organizations', 'uo', 'uo.organizationId = org.id')
+        .where('org.id = :organizationId', { organizationId })
+        .andWhere('uo.userId = :userId', { userId })
+        .andWhere('uo.isActive = :isActive', { isActive: true })
+        .getOne();
 
-    if (!userOrg) {
-      throw new Error(
-        `User ${userId} is not a member of organization ${organizationId}`,
+      if (!userOrg) {
+        throw new HttpException(
+          { messageKey: 'organization.ORGANIZATION_MEMBER_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Assign the role using permissions service
+      return await this.permissionsService.assignRole({
+        userId,
+        roleId,
+        reason: reason || `Assigned role in organization ${organizationId}`,
+        assignedBy: userOrg.ownerId, // Organization owner assigns roles
+        isTemporary: false,
+      });
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error assigning role ${roleId} to user ${userId} in organization ${organizationId}:`,
+        error,
+      );
+      throw new HttpException(
+        { messageKey: 'organization.ORGANIZATION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    // Assign the role using permissions service
-    return await this.permissionsService.assignRole({
-      userId,
-      roleId,
-      reason: reason || `Assigned role in organization ${organizationId}`,
-      assignedBy: userOrg.ownerId, // Organization owner assigns roles
-      isTemporary: false,
-    });
   }
 
   /**
@@ -380,13 +476,31 @@ export class OrganizationsService extends BaseService<Organization> {
     organizationId: string,
     roleId: string,
   ): Promise<void> {
-    // Verify the user-organization relationship exists
-    const organization = await this.findById(organizationId);
-    if (!organization) {
-      throw new Error(`Organization ${organizationId} not found`);
-    }
+    try {
+      // Verify the user-organization relationship exists
+      const organization = await this.findById(organizationId);
+      if (!organization) {
+        throw new HttpException(
+          { messageKey: 'organization.ORGANIZATION_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
 
-    // Remove the role using permissions service
-    return await this.permissionsService.removeRole(userId, roleId);
+      // Remove the role using permissions service
+      return await this.permissionsService.removeRole(userId, roleId);
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error removing role ${roleId} from user ${userId} in organization ${organizationId}:`,
+        error,
+      );
+      throw new HttpException(
+        { messageKey: 'organization.ORGANIZATION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }
