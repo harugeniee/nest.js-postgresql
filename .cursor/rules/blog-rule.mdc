@@ -1,0 +1,675 @@
+---
+alwaysApply: true
+---
+# Cursor Rules — nest.js-postgresql (blog branch)
+
+## 0) General Principles
+
+* Develop **within existing domain modules** (`articles`, `auth`, `bookmarks`, `comments`, `follow`, `media`, `notifications`, `qr`, `rate-limit`, `reactions`, `reports`, `share`, `stickers`, `tags`, `users`, etc.).
+* Keep **controllers thin**: handle validation and routing only, delegate all business logic to services.
+* **Never** use auto-scaffolding or code generators (no `nest g` commands).
+  ➜ **You only need to create or update entities and service logic manually** — no migration commands, no file generation, no CLI runs.
+* Follow patterns and naming conventions already established in `src/`, `src/shared`, and `src/common`.
+* Before touching any shared core (in `/docs`, `BaseService`, `rate-limit`, `cache`, etc.), read the relevant documentation.
+
+---
+
+## 1) Entities & Identifiers
+
+### 1.1 Base Entity
+* All entities **must extend** `BaseEntityCustom` from `src/shared/entities/base.entity.ts`, ensuring consistent:
+  * **Snowflake ID** (`id` as bigint) - generated automatically via `@BeforeInsert()` hook
+  * **UUID** (`uuid`) - auto-generated for external references
+  * **Timestamps** (`createdAt`, `updatedAt`, `deletedAt`) - with microsecond precision
+  * **Soft delete** support via `deletedAt`
+  * **Optimistic locking** via `version` column
+  * **Helper methods**: `toJSON()`, `isDeleted()`, `getAge()`, `getTimeSinceUpdate()`
+
+### 1.2 Naming Conventions
+* **Table names**: snake_case, plural (e.g., `users`, `articles`, `qr_tickets`)
+* **Column names**: snake_case, singular (e.g., `user_id`, `created_at`)
+* **Boolean fields**: prefix with `is_`, `has_`, `can_` (e.g., `is_active`, `has_avatar`)
+* **Datetime fields**: suffix with `_at` (e.g., `created_at`, `published_at`)
+* **Foreign keys**: `<parent_table>_id` format (e.g., `user_id`, `article_id`)
+* Follow complete conventions in `docs/DATABASE_NAMING_CONVENTIONS.md`
+
+### 1.3 Entity Structure
+```typescript
+@Entity('table_name')
+@Index(['field1', 'field2']) // Composite indexes
+export class EntityName extends BaseEntityCustom {
+  @Column({ type: 'varchar', length: 255 })
+  name: string;
+
+  @Column({ type: 'enum', enum: CONSTANTS.STATUS, default: CONSTANTS.STATUS.ACTIVE })
+  status: StatusType;
+
+  @Column('jsonb', { nullable: true })
+  metadata?: Record<string, unknown>;
+
+  @Column({ nullable: true })
+  userId?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'userId', referencedColumnName: 'id' })
+  user?: User;
+}
+```
+
+### 1.4 Migration Policy
+* **DO NOT generate or run migrations automatically**
+  * Never run `yarn migration:generate` or `yarn migration:run`
+  * Never run `typeorm migration:generate` or `typeorm migration:run`
+  * Never auto-run migrations on application startup
+  * Never use `synchronize: true` in TypeORM configuration
+* **Only create or modify entity classes manually**
+* Schema updates will be handled separately by maintainers
+* Avoid destructive changes (dropping fields/tables)
+
+---
+
+## 2) Repositories & Services
+
+### 2.1 Repository Pattern
+* Use `TypeOrmBaseRepository<T>` which implements `BaseRepository<T>` interface
+* Located in `src/common/repositories/typeorm.base-repo.ts`
+* Provides: `create`, `save`, `saveMany`, `findById`, `findOne`, `findAndCount`, `updateById`, `deleteById`, `softDeleteById`, `restoreById`, `withTransaction`
+* Repositories wrap TypeORM Repository and provide transaction support
+
+```typescript
+@Injectable()
+export class ArticleRepository extends TypeOrmBaseRepository<Article> {
+  constructor(
+    @InjectRepository(Article)
+    private readonly articleRepo: Repository<Article>,
+  ) {
+    super(articleRepo);
+  }
+}
+```
+
+### 2.2 Service Pattern
+* **Extend `BaseService<T>`** from `src/common/services/base.service.ts`
+* BaseService provides:
+  * **CRUD operations**: `create`, `createMany`, `update`, `updateMany`, `remove`, `removeMany`, `softDelete`, `softDeleteMany`, `restore`
+  * **Query operations**: `findById`, `findOne`, `listOffset`, `listCursor`
+  * **Caching**: Redis-based with SWR (Stale-While-Revalidate) pattern
+  * **Pagination**: Both offset-based and cursor-based
+  * **Security**: Relations whitelist, select whitelist
+  * **Events**: Domain event emission
+  * **Lifecycle hooks**: `beforeCreate`, `afterCreate`, `beforeUpdate`, `afterUpdate`, `beforeDelete`, `afterDelete`
+  * **Transaction support**: `runInTransaction`
+
+```typescript
+@Injectable()
+export class ArticleService extends BaseService<Article> {
+  constructor(
+    @InjectRepository(Article)
+    private readonly articleRepository: Repository<Article>,
+    cacheService: CacheService,
+  ) {
+    super(
+      new TypeOrmBaseRepository<Article>(articleRepository),
+      {
+        entityName: 'Article',
+        cache: { enabled: true, ttlSec: 60, prefix: 'articles', swrSec: 30 },
+        defaultSearchField: 'title',
+        relationsWhitelist: {
+          user: { avatar: true },
+          coverImage: true,
+        },
+        selectWhitelist: {
+          id: true,
+          title: true,
+          content: true,
+          user: { id: true, username: true },
+        },
+      },
+      cacheService,
+    );
+  }
+
+  // Define which fields can be searched
+  protected getSearchableColumns(): (keyof Article)[] {
+    return ['title', 'summary', 'content'];
+  }
+
+  // Override lifecycle hooks for custom logic
+  protected async beforeCreate(data: DeepPartial<Article>): Promise<DeepPartial<Article>> {
+    // Custom validation, data transformation
+    return data;
+  }
+
+  protected async afterCreate(entity: Article): Promise<void> {
+    // Post-creation logic (e.g., send notifications, update counters)
+  }
+}
+```
+
+### 2.3 Lifecycle Hooks
+Override these methods in your service for custom behavior:
+* `beforeCreate(data)` - Data validation, normalization before entity creation
+* `afterCreate(entity)` - Post-creation side effects (notifications, cache updates)
+* `beforeUpdate(id, patch)` - Validation before update
+* `afterUpdate(entity)` - Post-update side effects
+* `beforeDelete(id)` - Pre-deletion checks
+* `afterDelete(id)` - Post-deletion cleanup
+* `onListQueryBuilt(ctx)` - Modify query conditions dynamically
+
+---
+
+## 3) Query Building & Filtering
+
+### 3.1 ConditionBuilder
+* Use `ConditionBuilder` from `src/shared/helpers/condition-builder.ts`
+* Builds TypeORM `FindOptionsWhere` conditions dynamically
+* **Never concatenate SQL strings manually**
+* Supports: status filtering, ID filtering, user filtering, date ranges, search (case-sensitive/insensitive)
+
+```typescript
+import { ConditionBuilder } from 'src/shared/helpers';
+
+const where = ConditionBuilder.build(
+  {
+    status: 'published',
+    fromDate: '2024-01-01',
+    toDate: '2024-12-31',
+    query: 'search term',
+    fields: ['title', 'content'],
+    caseSensitive: 0, // Use ILike for case-insensitive search
+  },
+  'title', // default search field
+  { visibility: 'public' } // extra filters
+);
+```
+
+### 3.2 Search Field Validation
+* Define searchable columns in service using `getSearchableColumns()`
+* BaseService validates user-provided search fields against this whitelist
+* Throws `BadRequestException` if invalid fields are provided
+
+---
+
+## 4) Pagination
+
+### 4.1 Offset-Based Pagination
+* Use `listOffset()` method from BaseService
+* Returns formatted response via `PaginationFormatter.offset()`
+* Good for: admin panels, browsing with page numbers
+
+```typescript
+// In service (inherited from BaseService)
+const result = await this.listOffset(
+  {
+    page: 1,
+    limit: 10,
+    sortBy: 'createdAt',
+    order: 'DESC',
+    query: 'search term',
+    fields: ['title', 'content'],
+  },
+  { status: 'published' }, // extra filters
+  { relations: ['user'], select: { id: true, title: true } }, // query options
+);
+
+// Response format
+{
+  result: Article[],
+  metaData: {
+    currentPage: 1,
+    pageSize: 10,
+    totalRecords: 100,
+    totalPages: 10
+  }
+}
+```
+
+### 4.2 Cursor-Based Pagination
+* Use `listCursor()` method from BaseService
+* Returns formatted response via `PaginationFormatter.cursor()`
+* Uses **signed cursors** with HMAC for security (`encodeSignedCursor`, `decodeSignedCursor`)
+* Good for: real-time feeds, infinite scroll
+
+```typescript
+// In service (inherited from BaseService)
+const result = await this.listCursor(
+  {
+    limit: 20,
+    cursor: 'signed_cursor_token',
+    sortBy: 'createdAt',
+    order: 'DESC',
+  }
+);
+
+// Response format
+{
+  result: Article[],
+  metaData: {
+    nextCursor: 'signed_cursor_token',
+    prevCursor: null,
+    take: 20,
+    sortBy: 'createdAt',
+    order: 'DESC'
+  }
+}
+```
+
+### 4.3 Pagination Utils
+* **Never use custom base64 encoding** for cursors
+* Use **signed cursors** with HMAC protection: `encodeSignedCursor()` and `decodeSignedCursor()`
+* Use **unsigned cursors** for simple cases: `encodeCursor()` and `decodeCursor()`
+* All cursor functions available in `src/common/utils/cursor.util.ts`
+* Signed cursors include HMAC signatures for tamper protection
+
+---
+
+## 5) Caching
+
+### 5.1 CacheService
+* Located in `src/shared/services/cache/cache.service.ts`
+* Redis-based with comprehensive features:
+  * Basic operations: `get`, `set`, `delete`, `exists`
+  * Pattern operations: `deleteKeysByPattern`, `findKeysByPattern`, `countKeysByPattern`
+  * Distributed locking: `setLock`, `releaseLock`
+  * Atomic operations: `atomicIncrementWithLimit`, `compareAndSwap`, `atomicMultiOperation`
+  * Cache-aside pattern: `remember`, `getOrSetWithPrefix`
+
+### 5.2 Cache Key Naming
+* Prefix by entity: `<entity>:<operation>:<identifier>`
+* Examples:
+  * `articles:id:123` - single article by ID
+  * `articles:list:hash(filters)` - article list with filters
+  * `users:profile:456` - user profile
+* BaseService automatically generates cache keys using:
+  * `sha256Hex()` for consistent hashing
+  * `stableStringify()` for deterministic JSON serialization
+  * `normalizeSearchInput()` for search query normalization
+
+### 5.3 Cache Invalidation
+* BaseService automatically invalidates cache on create/update/delete
+* Invalidates both ID-based and list-based caches
+* Uses pattern-based deletion via `CacheService.deleteKeysByPattern()`
+
+### 5.4 Stale-While-Revalidate (SWR)
+* Configure `swrSec` in BaseService options
+* When cache TTL is within SWR window, returns stale data immediately
+* Refreshes cache in background asynchronously
+* Improves response time and availability
+
+```typescript
+super(repo, {
+  cache: {
+    enabled: true,
+    ttlSec: 300,    // 5 minutes cache TTL
+    swrSec: 60,     // Refresh in background when < 60s remain
+    prefix: 'articles'
+  }
+}, cacheService);
+```
+
+---
+
+## 6) Security & Validation
+
+### 6.1 Input Validation
+* Use `class-validator` and `class-transformer` for all DTOs
+* Validate at controller layer before passing to service
+* Use `SnowflakeIdPipe` from `src/common/pipes/snowflake-id.pipe.ts` for ID parameters
+
+```typescript
+@Post(':id')
+async getArticle(@Param('id', SnowflakeIdPipe) id: string) {
+  return this.articlesService.findById(id);
+}
+```
+
+### 6.2 Relations Whitelist
+* Configure in BaseService options to restrict which relations can be loaded
+* Prevents over-fetching and N+1 queries
+* Supports nested relations
+
+```typescript
+relationsWhitelist: {
+  user: { avatar: true },
+  tags: true,
+  coverImage: true,
+  comments: {
+    user: true,
+    reactions: true
+  }
+}
+```
+
+### 6.3 Select Fields Whitelist
+* Configure in BaseService options to restrict which fields can be selected
+* Prevents exposing sensitive data (passwords, tokens, internal IDs)
+* Applied automatically when no select is specified by consumer
+
+```typescript
+selectWhitelist: {
+  id: true,
+  title: true,
+  content: true,
+  user: {
+    id: true,
+    username: true,
+    avatar: { url: true }
+  }
+}
+```
+
+### 6.4 Error Handling
+* Use structured errors with `messageKey` and optional `suggestion`
+* Supports i18n (internationalization) with translations in `src/i18n/`
+* Never expose internal error details to clients
+
+```typescript
+throw new HttpException(
+  { 
+    messageKey: 'articles.notFound',
+    suggestion: 'articles.checkId'
+  },
+  HttpStatus.NOT_FOUND,
+);
+```
+
+---
+
+## 7) Authentication & Authorization
+
+### 7.1 Route Protection
+* Use `@Auth()` decorator from `src/common/decorators/auth.decorator.ts`
+* Combines JWT authentication and optional role-based access control
+* Guards: `JwtAccessTokenGuard`, `RoleGuard`, `WebSocketAuthGuard`
+
+```typescript
+@Post()
+@Auth() // Requires authentication
+async create(@Body() dto: CreateArticleDto, @Req() req: ReqUser) {
+  return this.articlesService.createArticle(req.user.id, dto);
+}
+
+@Delete(':id')
+@Auth(['admin', 'moderator']) // Requires specific roles
+async delete(@Param('id') id: string) {
+  return this.articlesService.remove(id);
+}
+```
+
+### 7.2 Rate Limiting
+* Apply rate limiting using decorators or guards
+* Hybrid system: plan-based + policy-based
+* See `docs/HYBRID_RATE_LIMITING_IMPLEMENTATION.md` for details
+
+### 7.3 User Context
+* Access current user via `@Req() req: ReqUser` or `@CurrentUser() user: User`
+* User object includes: `id`, `email`, `roles`, `permissions`
+
+---
+
+## 8) Controller Design
+
+### 8.1 Controller Responsibilities
+* **Input validation** - Validate DTOs with class-validator
+* **Routing** - Map HTTP requests to service methods
+* **Response formatting** - Return consistent API responses
+* **NO business logic** - All logic belongs in services
+
+### 8.2 Controller Pattern
+```typescript
+@Controller('articles')
+@ApiTags('Articles')
+export class ArticlesController {
+  constructor(private readonly articlesService: ArticlesService) {}
+
+  @Post()
+  @Auth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create new article' })
+  async create(
+    @Body() dto: CreateArticleDto,
+    @Req() req: ReqUser,
+  ): Promise<Article> {
+    return this.articlesService.createArticle(dto);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get articles with pagination' })
+  async findAll(
+    @Query() dto: GetArticleDto,
+  ): Promise<IPagination<Article>> {
+    return this.articlesService.findAll(dto);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get article by ID' })
+  async findOne(
+    @Param('id', SnowflakeIdPipe) id: string,
+  ): Promise<Article> {
+    return this.articlesService.findById(id);
+  }
+
+  @Patch(':id')
+  @Auth()
+  @ApiOperation({ summary: 'Update article' })
+  async update(
+    @Param('id', SnowflakeIdPipe) id: string,
+    @Body() dto: UpdateArticleDto,
+  ): Promise<Article> {
+    return this.articlesService.updateArticle(id, dto);
+  }
+
+  @Delete(':id')
+  @Auth(['admin'])
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete article' })
+  async remove(@Param('id', SnowflakeIdPipe) id: string): Promise<void> {
+    return this.articlesService.remove(id);
+  }
+}
+```
+
+---
+
+## 9) Infrastructure & Configuration
+
+### 9.1 Technology Stack
+* **Framework**: NestJS 11.x with TypeScript 5.x
+* **Database**: PostgreSQL with TypeORM 0.3.x
+* **Cache**: Redis with ioredis client
+* **Message Queue**: RabbitMQ (optional, for background jobs)
+* **Authentication**: JWT with Firebase Auth support
+* **Validation**: class-validator, class-transformer
+* **ID Generation**: Snowflake IDs via `globalSnowflake.nextId()`
+
+### 9.2 Configuration Management
+* All config in `src/shared/config/` using `@nestjs/config`
+* **Never access `process.env` directly** - use config services
+* Validate environment variables with Joi schemas
+* Config files: `app.config.ts`, `database.config.ts`, `redis.config.ts`, `aws.config.ts`, etc.
+
+### 9.3 Module Structure
+Each feature module should include:
+```
+module-name/
+├── module-name.module.ts      # Module definition
+├── module-name.controller.ts  # HTTP routes
+├── module-name.service.ts     # Business logic
+├── module-name.repository.ts  # Data access (if needed)
+├── entities/
+│   └── entity-name.entity.ts  # Database entities
+├── dto/
+│   ├── create-*.dto.ts        # Creation DTOs
+│   ├── update-*.dto.ts        # Update DTOs
+│   └── query-*.dto.ts         # Query/filter DTOs
+└── services/                  # Additional services
+    └── specialized.service.ts
+```
+
+---
+
+## 10) Logging & Monitoring
+
+### 10.1 Logging
+* Use NestJS built-in `Logger` class
+* Available in all services via `private readonly logger = new Logger(ServiceName.name)`
+* Log levels: `debug`, `log`, `warn`, `error`
+* Structured logging with context
+
+```typescript
+this.logger.log('Article created', { articleId: article.id });
+this.logger.warn('Cache miss', { key: cacheKey });
+this.logger.error('Database error', error);
+```
+
+### 10.2 Never Log Sensitive Data
+* **NO**: passwords, tokens, API keys, secrets
+* **NO**: full user objects with sensitive fields
+* **YES**: IDs, timestamps, operation names, status codes
+
+---
+
+## 11) Testing Strategy
+
+### 11.1 Test Types
+* **Unit tests**: `*.spec.ts` files alongside source files
+* **E2E tests**: `test/*.e2e-spec.ts` files
+* Run with: `yarn test`, `yarn test:watch`, `yarn test:cov`, `yarn test:e2e`
+
+### 11.2 Testing Best Practices
+* Mock external dependencies (database, cache, external APIs)
+* Use `@nestjs/testing` utilities
+* Test service logic, not infrastructure
+* Aim for high coverage on business logic
+
+---
+
+## 12) Performance & Optimization
+
+### 12.1 Query Optimization
+* **Select only needed columns** using `select` option
+* **Load only needed relations** using `relations` option
+* Use indexed columns for filtering and sorting
+* Avoid N+1 queries by using proper `relations`
+
+### 12.2 Caching Strategy
+* Cache frequently accessed read-heavy data
+* Use short TTL for real-time data (30-60s)
+* Use longer TTL for static data (5-30 minutes)
+* Enable SWR for better performance
+
+### 12.3 Database Indexes
+* Index foreign keys automatically
+* Index frequently filtered/sorted columns
+* Use composite indexes for multi-column filters
+* Follow naming: `idx_<table>_<field1>_<field2>`
+
+---
+
+## 13) File Organization & Naming
+
+### 13.1 File Naming
+* **Files**: `kebab-case` (e.g., `article.service.ts`, `create-article.dto.ts`)
+* **Classes**: `PascalCase` (e.g., `ArticleService`, `CreateArticleDto`)
+* **Interfaces**: `PascalCase` with `I` prefix (e.g., `IPagination`)
+* **Constants**: `UPPER_SNAKE_CASE` (e.g., `ARTICLE_CONSTANTS`)
+
+### 13.2 Shared Code Location
+* **Common utilities**: `src/common/` - cross-cutting concerns, shared across domains
+  * Decorators, DTOs, filters, pipes, repositories, services, utils
+* **Shared services**: `src/shared/` - core services and configurations
+  * Config, constants, entities, helpers, interceptors, services (cache, firebase, etc.)
+* **Domain-specific code**: `src/<domain>/` - feature modules
+  * Keep domain logic isolated and cohesive
+
+---
+
+## 14) Things You Must NOT Do
+
+❌ Do not run `nest g` or any code generation commands
+❌ Do not generate or run database migrations (`yarn migration:generate`, `yarn migration:run`)
+❌ Do not access database directly from controllers
+❌ Do not bypass `BaseService` or `BaseRepository` patterns
+❌ Do not hardcode error messages (use i18n message keys)
+❌ Do not access `process.env` directly (use config services)
+❌ Do not modify shared infrastructure without understanding impact
+❌ Do not expose sensitive data in API responses
+❌ Do not create custom pagination or cursor logic (use BaseService)
+❌ Do not use `@Entity()` without table name specification
+❌ Do not skip input validation on DTOs
+
+---
+
+## 15) Things You Should Always Do
+
+✅ Extend `BaseEntityCustom` for all entities
+✅ Extend `BaseService` for all data services
+✅ Use `TypeOrmBaseRepository` for data access
+✅ Use `ConditionBuilder` for building where conditions
+✅ Use `PaginationFormatter` for formatting responses
+✅ Use `CacheService` for caching with proper key prefixes
+✅ Use signed cursors (`encodeSignedCursor`/`decodeSignedCursor`)
+✅ Define searchable columns via `getSearchableColumns()`
+✅ Configure relations and select whitelists for security
+✅ Use lifecycle hooks for data transformation and side effects
+✅ Validate inputs with class-validator decorators
+✅ Use `@Auth()` decorator for protected routes
+✅ Log important operations with appropriate log levels
+✅ Write tests for business logic
+✅ Follow naming conventions consistently
+✅ Read documentation before modifying shared code
+
+---
+
+## 16) Documentation & References
+
+Read these docs before working on related features:
+* `docs/PROJECT_OVERVIEW.md` - Complete project overview
+* `docs/ARCHITECTURE.md` - System architecture and design
+* `docs/BASE_SERVICE_GUIDE.md` - BaseService usage and patterns
+* `docs/DATABASE_NAMING_CONVENTIONS.md` - Database naming standards
+* `docs/HYBRID_RATE_LIMITING_IMPLEMENTATION.md` - Rate limiting system
+* `docs/NOTIFICATION_SYSTEM.md` - Notification architecture
+* `docs/QR_ACTIONS.md` - QR action system
+* `docs/FIREBASE_AUTHENTICATION.md` - Firebase auth integration
+* `docs/FOLLOW_SYSTEM.md` - Follow system with Roaring Bitmap
+* `docs/CONTENT_MANAGEMENT_SYSTEM.md` - CMS features
+* `docs/RELATIONS_WHITELIST_EXAMPLES.md` - Security whitelist examples
+
+---
+
+## 17) Development Workflow Summary
+
+### When Adding a New Feature:
+
+1. **Read existing patterns** in similar modules
+2. **Create entity** extending `BaseEntityCustom` in `entities/` folder
+3. **Create DTOs** for create/update/query operations in `dto/` folder
+4. **Create repository** (optional) if custom queries needed
+5. **Create service** extending `BaseService` with proper configuration
+   - Configure cache, whitelists, searchable columns
+   - Override lifecycle hooks if needed
+6. **Create controller** with thin methods delegating to service
+   - Apply `@Auth()`, validation pipes, and decorators
+7. **Register** in module and export if needed by other modules
+8. **Test** functionality with unit and/or E2E tests
+9. **Document** if adding shared functionality or patterns
+
+### When Modifying Existing Features:
+
+1. **Read related docs** to understand current implementation
+2. **Check for side effects** in other modules
+3. **Update tests** to reflect changes
+4. **Maintain backward compatibility** when possible
+5. **Update documentation** if changing shared patterns
+
+---
+
+✅ **In Summary:**
+
+When developing features — **just add or update entities and service logic manually** within the appropriate module folder. Extend `BaseService` for data operations, use `TypeOrmBaseRepository` for data access, leverage `CacheService` for caching, and follow established patterns for pagination, validation, and security. 
+
+**No generators, no migrations, no scaffolding, no CLI commands.**
+
+This architecture provides a robust, scalable, and maintainable foundation for your NestJS social media platform. Follow these rules consistently to ensure code quality and system reliability.
+
