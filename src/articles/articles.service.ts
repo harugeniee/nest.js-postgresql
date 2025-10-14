@@ -10,6 +10,7 @@ import {
   FindOptionsRelations,
   FindOptionsSelect,
   FindOptionsWhere,
+  In,
   LessThanOrEqual,
   Not,
   Repository,
@@ -23,6 +24,7 @@ import {
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { Article } from './entities/article.entity';
 import { ScheduledPublishingService } from './services/scheduled-publishing.service';
+import { User } from 'src/users/entities/user.entity';
 
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -53,6 +55,7 @@ export class ArticlesService extends BaseService<Article> {
         relationsWhitelist: {
           user: { avatar: true },
           coverImage: true,
+          authors: { avatar: true },
         },
       },
       cacheService,
@@ -109,9 +112,18 @@ export class ArticlesService extends BaseService<Article> {
       tagsArray: createArticleDto.tags,
       // Don't set tags relationship - it will be handled separately if needed
       tags: undefined,
+      // Don't set authors relationship - it will be handled separately if needed
+      authors: undefined,
     };
 
-    return await this.create(articleData);
+    const article = await this.create(articleData);
+
+    // Handle co-authors if provided
+    if (createArticleDto.authorIds && createArticleDto.authorIds.length > 0) {
+      await this.addCoAuthors(article.id, createArticleDto.authorIds);
+    }
+
+    return article;
   }
 
   /**
@@ -132,9 +144,18 @@ export class ArticlesService extends BaseService<Article> {
       tagsArray: updateArticleDto.tags,
       // Don't set tags relationship - it will be handled separately if needed
       tags: undefined,
+      // Don't set authors relationship - it will be handled separately if needed
+      authors: undefined,
     };
 
-    return await super.update(id, articleData);
+    const article = await super.update(id, articleData);
+
+    // Handle co-authors if provided
+    if (updateArticleDto.authorIds !== undefined) {
+      await this.updateCoAuthors(id, updateArticleDto.authorIds);
+    }
+
+    return article;
   }
 
   /**
@@ -183,7 +204,7 @@ export class ArticlesService extends BaseService<Article> {
    */
   async findById(id: string): Promise<Article> {
     return await super.findById(id, {
-      relations: ['user', 'tags', 'coverImage'],
+      relations: ['user', 'tags', 'coverImage', 'authors'],
     });
   }
 
@@ -402,9 +423,9 @@ export class ArticlesService extends BaseService<Article> {
           status: ARTICLE_CONSTANTS.STATUS.SCHEDULED,
         })
         .getRawOne()
-        .then((result: any) => {
+        .then((result: { nextScheduled?: string } | null) => {
           if (result?.nextScheduled) {
-            return new Date(result.nextScheduled as string);
+            return new Date(result.nextScheduled);
           }
           return null;
         }),
@@ -476,5 +497,159 @@ export class ArticlesService extends BaseService<Article> {
       isValid: true,
       slug,
     };
+  }
+
+  /**
+   * Add co-authors to an article
+   *
+   * @param articleId - Article ID
+   * @param authorIds - Array of user IDs to add as co-authors
+   */
+  private async addCoAuthors(
+    articleId: string,
+    authorIds: string[],
+  ): Promise<void> {
+    const article = await this.findById(articleId);
+
+    // Get users by IDs using proper repository
+    const users = await this.articleRepository.manager
+      .getRepository(User)
+      .findBy({ id: In(authorIds) });
+
+    if (users.length !== authorIds.length) {
+      throw new HttpException(
+        { messageKey: 'article.SOME_AUTHORS_NOT_FOUND' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Add co-authors to the article
+    article.authors = users;
+    await this.articleRepository.save(article);
+  }
+
+  /**
+   * Update co-authors for an article
+   *
+   * @param articleId - Article ID
+   * @param authorIds - Array of user IDs to set as co-authors (empty array removes all co-authors)
+   */
+  private async updateCoAuthors(
+    articleId: string,
+    authorIds: string[],
+  ): Promise<void> {
+    const article = await this.findById(articleId);
+
+    if (authorIds.length === 0) {
+      // Remove all co-authors
+      article.authors = [];
+    } else {
+      // Get users by IDs using proper repository
+      const users = await this.articleRepository.manager
+        .getRepository(User)
+        .findBy({ id: In(authorIds) });
+
+      if (users.length !== authorIds.length) {
+        throw new HttpException(
+          { messageKey: 'article.SOME_AUTHORS_NOT_FOUND' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Set co-authors
+      article.authors = users;
+    }
+
+    await this.articleRepository.save(article);
+  }
+
+  /**
+   * Get all co-authors for an article
+   *
+   * @param articleId - Article ID
+   * @returns Array of co-author users
+   */
+  async getCoAuthors(articleId: string): Promise<User[]> {
+    // Load authors relation separately
+    const articleWithAuthors = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ['authors', 'authors.avatar'],
+    });
+
+    return articleWithAuthors?.authors || [];
+  }
+
+  /**
+   * Add a single co-author to an article
+   *
+   * @param articleId - Article ID
+   * @param userId - User ID to add as co-author
+   */
+  async addCoAuthor(articleId: string, userId: string): Promise<void> {
+    const article = await this.findById(articleId);
+
+    // Load authors relation separately
+    const articleWithAuthors = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ['authors'],
+    });
+
+    // Check if user is already a co-author
+    const isAlreadyCoAuthor =
+      articleWithAuthors?.authors?.some((author) => author.id === userId) ??
+      false;
+    if (isAlreadyCoAuthor) {
+      throw new HttpException(
+        { messageKey: 'article.USER_ALREADY_CO_AUTHOR' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Check if user is the main author
+    if (article.userId === userId) {
+      throw new HttpException(
+        { messageKey: 'article.CANNOT_ADD_MAIN_AUTHOR_AS_CO_AUTHOR' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Get user
+    const user = await this.articleRepository.manager
+      .getRepository(User)
+      .findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new HttpException(
+        { messageKey: 'article.AUTHOR_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Add co-author
+    articleWithAuthors!.authors = [
+      ...(articleWithAuthors!.authors || []),
+      user,
+    ];
+    await this.articleRepository.save(articleWithAuthors!);
+  }
+
+  /**
+   * Remove a co-author from an article
+   *
+   * @param articleId - Article ID
+   * @param userId - User ID to remove as co-author
+   */
+  async removeCoAuthor(articleId: string, userId: string): Promise<void> {
+    // Load authors relation separately
+    const articleWithAuthors = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ['authors'],
+    });
+
+    // Remove co-author
+    articleWithAuthors!.authors =
+      articleWithAuthors!.authors?.filter((author) => author.id !== userId) ||
+      [];
+    await this.articleRepository.save(articleWithAuthors!);
   }
 }

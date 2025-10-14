@@ -165,6 +165,29 @@ export class Article extends BaseEntityCustom {
   tags?: Tag[];
 
   /**
+   * Co-authors of the article
+   * Many-to-Many relationship with User entity
+   * Represents additional authors besides the main author (user field)
+   * Can be null if no co-authors are assigned
+   */
+  @ManyToMany(() => User, {
+    cascade: false, // Don't cascade delete users when article is deleted
+    eager: false, // Don't load co-authors by default for performance
+  })
+  @JoinTable({
+    name: 'article_authors',
+    joinColumn: {
+      name: 'article_id',
+      referencedColumnName: 'id',
+    },
+    inverseJoinColumn: {
+      name: 'user_id',
+      referencedColumnName: 'id',
+    },
+  })
+  authors?: User[];
+
+  /**
    * Legacy tags field for backward compatibility
    * Stored as JSON array of strings
    * This will be populated from the tags relationship

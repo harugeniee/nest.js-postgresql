@@ -96,6 +96,7 @@ describe('ArticlesService', () => {
         title: 'Test Article',
         content: 'Test content',
         userId: 'user-123',
+        authorIds: ['co-author-1', 'co-author-2'],
       };
 
       const mockArticle = {
@@ -103,6 +104,7 @@ describe('ArticlesService', () => {
         ...createArticleDto,
         slug: 'test-article',
         user: null,
+        authors: [],
         summary: 'Test summary',
         contentFormat: 'html',
         visibility: 'public',

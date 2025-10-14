@@ -113,6 +113,7 @@ describe('ArticlesController', () => {
         title: 'Test Article',
         content: 'Test content',
         userId: 'should-be-overwritten',
+        authorIds: ['co-author-1', 'co-author-2'],
       };
 
       const mockArticle = {

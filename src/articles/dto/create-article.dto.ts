@@ -41,6 +41,11 @@ export class CreateArticleDto {
   tags?: string[];
 
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  authorIds?: string[];
+
+  @IsOptional()
   @IsString()
   coverImageId?: string;
 
