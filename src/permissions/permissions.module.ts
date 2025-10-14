@@ -24,7 +24,7 @@ import { AuthPermissionService, UserPermissionService } from './services';
     CacheModule,
   ],
   controllers: [PermissionsController],
-  providers: [PermissionsService, AuthPermissionService, UserPermissionService],
-  exports: [PermissionsService, AuthPermissionService, UserPermissionService],
+  providers: [PermissionsService, UserPermissionService, AuthPermissionService],
+  exports: [PermissionsService, UserPermissionService, AuthPermissionService],
 })
 export class PermissionsModule {}

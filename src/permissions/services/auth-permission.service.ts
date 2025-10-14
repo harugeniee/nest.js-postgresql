@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { UserPermissionService } from 'src/permissions/services/user-permission.service';
 
 /**
@@ -9,7 +9,10 @@ import { UserPermissionService } from 'src/permissions/services/user-permission.
 export class AuthPermissionService {
   private readonly logger = new Logger(AuthPermissionService.name);
 
-  constructor(private readonly userPermissionService: UserPermissionService) {}
+  constructor(
+    @Inject(forwardRef(() => UserPermissionService))
+    private readonly userPermissionService: UserPermissionService,
+  ) {}
 
   /**
    * Initialize user permissions on login

@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PermissionsService } from 'src/permissions/permissions.service';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { checkPermissions, hasPermission } from 'src/permissions/utils';
 import { PermissionName } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
+import { PermissionsService } from 'src/permissions/permissions.service';
 
 /**
  * High-performance permission service with Redis caching
@@ -16,6 +16,7 @@ export class UserPermissionService {
 
   constructor(
     private readonly cacheService: CacheService,
+    @Inject(forwardRef(() => PermissionsService))
     private readonly permissionsService: PermissionsService,
   ) {}
 

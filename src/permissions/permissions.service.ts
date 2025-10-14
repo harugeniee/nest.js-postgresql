@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services/base.service';
-import { AuthPermissionService } from 'src/permissions/services/auth-permission.service';
+import { UserPermissionService } from 'src/permissions/services/user-permission.service';
 import { PermissionName } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
 import { In, Repository } from 'typeorm';
@@ -40,7 +45,8 @@ export class PermissionsService extends BaseService<Role> {
 
     cacheService: CacheService,
 
-    private readonly authPermissionService: AuthPermissionService,
+    @Inject(forwardRef(() => UserPermissionService))
+    private readonly userPermissionService: UserPermissionService,
   ) {
     super(
       new TypeOrmBaseRepository<Role>(roleRepository),
@@ -170,7 +176,7 @@ export class PermissionsService extends BaseService<Role> {
 
     const saved = await this.userRoleRepository.save(userRoleData);
     // Refresh user's cached permissions after role assignment
-    await this.authPermissionService.onPermissionsChanged(dto.userId);
+    await this.userPermissionService.refreshUserPermissions(dto.userId);
     return saved;
   }
 
@@ -190,7 +196,7 @@ export class PermissionsService extends BaseService<Role> {
 
     await this.userRoleRepository.remove(assignment);
     // Refresh user's cached permissions after role removal
-    await this.authPermissionService.onPermissionsChanged(userId);
+    await this.userPermissionService.refreshUserPermissions(userId);
   }
 
   /**
