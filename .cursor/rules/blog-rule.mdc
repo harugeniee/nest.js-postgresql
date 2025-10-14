@@ -9,6 +9,8 @@ alwaysApply: true
 * Keep **controllers thin**: handle validation and routing only, delegate all business logic to services.
 * **Never** use auto-scaffolding or code generators (no `nest g` commands).
   ➜ **You only need to create or update entities and service logic manually** — no migration commands, no file generation, no CLI runs.
+* **ONLY use Yarn** for package management - never use npm, pnpm, or other package managers.
+  ➜ Use `yarn add`, `yarn remove`, `yarn install`, `yarn upgrade` commands exclusively.
 * Follow patterns and naming conventions already established in `src/`, `src/shared`, and `src/common`.
 * Before touching any shared core (in `/docs`, `BaseService`, `rate-limit`, `cache`, etc.), read the relevant documentation.
 
@@ -597,6 +599,7 @@ this.logger.error('Database error', error);
 ❌ Do not create custom pagination or cursor logic (use BaseService)
 ❌ Do not use `@Entity()` without table name specification
 ❌ Do not skip input validation on DTOs
+❌ **Do not use npm, pnpm, or other package managers** - ONLY use Yarn
 
 ---
 
@@ -618,6 +621,7 @@ this.logger.error('Database error', error);
 ✅ Write tests for business logic
 ✅ Follow naming conventions consistently
 ✅ Read documentation before modifying shared code
+✅ **Use Yarn exclusively** for all package management operations
 
 ---
 
@@ -670,6 +674,7 @@ Read these docs before working on related features:
 When developing features — **just add or update entities and service logic manually** within the appropriate module folder. Extend `BaseService` for data operations, use `TypeOrmBaseRepository` for data access, leverage `CacheService` for caching, and follow established patterns for pagination, validation, and security. 
 
 **No generators, no migrations, no scaffolding, no CLI commands.**
+**ONLY use Yarn for package management - never npm, pnpm, or other package managers.**
 
 This architecture provides a robust, scalable, and maintainable foundation for your NestJS social media platform. Follow these rules consistently to ensure code quality and system reliability.
 
