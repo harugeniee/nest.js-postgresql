@@ -242,12 +242,12 @@ export class PermissionChecker {
   /**
    * Get user permissions as array of names (cached)
    * @param userId - User ID
-   * @param organizationId - Optional organization context
+   * @param _organizationId - Optional organization context
    * @returns Promise<PermissionName[]>
    */
   async getUserPermissionNames(
     userId: string,
-    organizationId?: string,
+    _organizationId?: string,
   ): Promise<PermissionName[]> {
     return this.permissionsService.getUserPermissions(userId);
   }

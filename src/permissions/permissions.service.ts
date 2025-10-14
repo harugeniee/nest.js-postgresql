@@ -1,9 +1,10 @@
 import {
   forwardRef,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   Logger,
-  NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -136,39 +137,70 @@ export class PermissionsService
    * Create a new role
    */
   async createRole(dto: CreateRoleDto): Promise<Role> {
-    const roleData = {
-      name: dto.name,
-      description: dto.description,
-      permissions: dto.permissions || '0',
-      position: dto.position || 0,
-      color: dto.color,
-      mentionable: dto.mentionable || false,
-      managed: dto.managed || false,
-      icon: dto.icon,
-      unicodeEmoji: dto.unicodeEmoji,
-    };
+    try {
+      const roleData = {
+        name: dto.name,
+        description: dto.description,
+        permissions: dto.permissions || '0',
+        position: dto.position || 0,
+        color: dto.color,
+        mentionable: dto.mentionable || false,
+        managed: dto.managed || false,
+        icon: dto.icon,
+        unicodeEmoji: dto.unicodeEmoji,
+      };
 
-    return this.create(roleData);
+      return this.create(roleData);
+    } catch (error: any) {
+      this.logger.error('Error creating role:', error);
+      throw new HttpException(
+        { messageKey: 'permission.PERMISSION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**
    * Update an existing role
    */
   async updateRole(id: string, dto: UpdateRoleDto): Promise<Role> {
-    const updateData: Partial<Role> = {};
+    try {
+      const role = await this.findById(id);
+      if (!role) {
+        throw new HttpException(
+          { messageKey: 'permission.ROLE_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
 
-    if (dto.name !== undefined) updateData.name = dto.name;
-    if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.permissions !== undefined) updateData.permissions = dto.permissions;
-    if (dto.position !== undefined) updateData.position = dto.position;
-    if (dto.color !== undefined) updateData.color = dto.color;
-    if (dto.mentionable !== undefined) updateData.mentionable = dto.mentionable;
-    if (dto.managed !== undefined) updateData.managed = dto.managed;
-    if (dto.icon !== undefined) updateData.icon = dto.icon;
-    if (dto.unicodeEmoji !== undefined)
-      updateData.unicodeEmoji = dto.unicodeEmoji;
+      const updateData: Partial<Role> = {};
 
-    return this.update(id, updateData);
+      if (dto.name !== undefined) updateData.name = dto.name;
+      if (dto.description !== undefined)
+        updateData.description = dto.description;
+      if (dto.permissions !== undefined)
+        updateData.permissions = dto.permissions;
+      if (dto.position !== undefined) updateData.position = dto.position;
+      if (dto.color !== undefined) updateData.color = dto.color;
+      if (dto.mentionable !== undefined)
+        updateData.mentionable = dto.mentionable;
+      if (dto.managed !== undefined) updateData.managed = dto.managed;
+      if (dto.icon !== undefined) updateData.icon = dto.icon;
+      if (dto.unicodeEmoji !== undefined)
+        updateData.unicodeEmoji = dto.unicodeEmoji;
+
+      return this.update(id, updateData);
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Error updating role ${id}:`, error);
+      throw new HttpException(
+        { messageKey: 'permission.PERMISSION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**
@@ -194,53 +226,90 @@ export class PermissionsService
    * Assign a role to a user
    */
   async assignRole(dto: AssignRoleDto): Promise<UserRole> {
-    // Check if role exists
-    const role = await this.findById(dto.roleId);
-    if (!role) {
-      throw new NotFoundException(`Role with ID ${dto.roleId} not found`);
+    try {
+      // Check if role exists
+      const role = await this.findById(dto.roleId);
+      if (!role) {
+        throw new HttpException(
+          { messageKey: 'permission.ROLE_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      // Check if assignment already exists
+      const existingAssignment = await this.userRoleRepository.findOne({
+        where: { userId: dto.userId, roleId: dto.roleId },
+      });
+
+      if (existingAssignment) {
+        throw new HttpException(
+          { messageKey: 'permission.USER_ROLE_ALREADY_EXISTS' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const userRoleData = {
+        userId: dto.userId,
+        roleId: dto.roleId,
+        reason: dto.reason,
+        assignedBy: dto.assignedBy,
+        isTemporary: dto.isTemporary || false,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
+      };
+
+      const saved = await this.userRoleRepository.save(userRoleData);
+      // Refresh user's cached permissions after role assignment
+      await this.userPermissionService.refreshUserPermissions(dto.userId);
+      return saved;
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error assigning role ${dto.roleId} to user ${dto.userId}:`,
+        error,
+      );
+      throw new HttpException(
+        { messageKey: 'permission.PERMISSION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    // Check if assignment already exists
-    const existingAssignment = await this.userRoleRepository.findOne({
-      where: { userId: dto.userId, roleId: dto.roleId },
-    });
-
-    if (existingAssignment) {
-      throw new Error(`User ${dto.userId} already has role ${dto.roleId}`);
-    }
-
-    const userRoleData = {
-      userId: dto.userId,
-      roleId: dto.roleId,
-      reason: dto.reason,
-      assignedBy: dto.assignedBy,
-      isTemporary: dto.isTemporary || false,
-      expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
-    };
-
-    const saved = await this.userRoleRepository.save(userRoleData);
-    // Refresh user's cached permissions after role assignment
-    await this.userPermissionService.refreshUserPermissions(dto.userId);
-    return saved;
   }
 
   /**
    * Remove a role from a user
    */
   async removeRole(userId: string, roleId: string): Promise<void> {
-    const assignment = await this.userRoleRepository.findOne({
-      where: { userId, roleId },
-    });
+    try {
+      const assignment = await this.userRoleRepository.findOne({
+        where: { userId, roleId },
+      });
 
-    if (!assignment) {
-      throw new NotFoundException(
-        `Role assignment not found for user ${userId} and role ${roleId}`,
+      if (!assignment) {
+        throw new HttpException(
+          { messageKey: 'permission.USER_ROLE_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      await this.userRoleRepository.remove(assignment);
+      // Refresh user's cached permissions after role removal
+      await this.userPermissionService.refreshUserPermissions(userId);
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error removing role ${roleId} from user ${userId}:`,
+        error,
+      );
+      throw new HttpException(
+        { messageKey: 'permission.PERMISSION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    await this.userRoleRepository.remove(assignment);
-    // Refresh user's cached permissions after role removal
-    await this.userPermissionService.refreshUserPermissions(userId);
   }
 
   /**
@@ -323,18 +392,34 @@ export class PermissionsService
     targetId: string,
     targetType: OverwriteTargetType,
   ): Promise<void> {
-    const overwrite = await this.channelOverwriteRepository.findOne({
-      where: { channelId, targetId, targetType },
-    });
+    try {
+      const overwrite = await this.channelOverwriteRepository.findOne({
+        where: { channelId, targetId, targetType },
+      });
 
-    if (!overwrite) {
-      throw new NotFoundException(
-        `Overwrite not found for channel ${channelId}, target ${targetId}`,
+      if (!overwrite) {
+        throw new HttpException(
+          { messageKey: 'permission.CHANNEL_OVERWRITE_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      await this.channelOverwriteRepository.remove(overwrite);
+      // TODO: Implement cache invalidation for channel overwrites when needed
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error deleting channel overwrite for channel ${channelId}, target ${targetId}:`,
+        error,
+      );
+      throw new HttpException(
+        { messageKey: 'permission.PERMISSION_INTERNAL_SERVER_ERROR' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    await this.channelOverwriteRepository.remove(overwrite);
-    // TODO: Implement cache invalidation for channel overwrites when needed
   }
 
   // ==================== PERMISSION CALCULATION ====================
@@ -346,103 +431,121 @@ export class PermissionsService
   async computeEffectivePermissions(
     dto: EffectivePermissionsDto,
   ): Promise<EffectivePermissions> {
-    const { userId, channelId } = dto;
+    try {
+      const { userId, channelId } = dto;
 
-    if (!userId) {
-      throw new Error('userId is required for permission calculation');
-    }
+      if (!userId) {
+        throw new HttpException(
+          { messageKey: 'permission.INVALID_USER_ID' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
 
-    // 1. Load user roles (including @everyone role)
-    const userRoles = await this.getUserRoles(userId);
-    const roleIds = userRoles.map((ur) => ur.roleId);
+      // 1. Load user roles (including @everyone role)
+      const userRoles = await this.getUserRoles(userId);
+      const roleIds = userRoles.map((ur) => ur.roleId);
 
-    // Get the everyone role (should always exist)
-    const everyoneRole = await this.findRoleByName(DEFAULT_ROLES.EVERYONE);
-    if (everyoneRole) {
-      roleIds.push(everyoneRole.id);
-    }
+      // Get the everyone role (should always exist)
+      const everyoneRole = await this.findRoleByName(DEFAULT_ROLES.EVERYONE);
+      if (everyoneRole) {
+        roleIds.push(everyoneRole.id);
+      }
 
-    // Get role entities
-    const roles = await this.roleRepository.find({
-      where: { id: In(roleIds) },
-    });
+      // Get role entities
+      const roles = await this.roleRepository.find({
+        where: { id: In(roleIds) },
+      });
 
-    // 2. Calculate base permissions from roles (OR operation)
-    let permissions = 0n;
-    for (const role of roles) {
-      permissions |= BigInt(role.permissions);
-    }
+      // 2. Calculate base permissions from roles (OR operation)
+      let permissions = 0n;
+      for (const role of roles) {
+        permissions |= BigInt(role.permissions);
+      }
 
-    // 3. Short-circuit for ADMINISTRATOR permission
-    if ((permissions & PERMISSIONS.ADMINISTRATOR) !== 0n) {
-      return {
-        mask: ~0n, // All permissions (all bits set)
-        map: this.permissionsMaskToMap(~0n),
-      };
-    }
+      // 3. Short-circuit for ADMINISTRATOR permission
+      if ((permissions & PERMISSIONS.ADMINISTRATOR) !== 0n) {
+        return {
+          mask: ~0n, // All permissions (all bits set)
+          map: this.permissionsMaskToMap(~0n),
+        };
+      }
 
-    // If no channel specified, return base permissions
-    if (!channelId) {
+      // If no channel specified, return base permissions
+      if (!channelId) {
+        return {
+          mask: permissions,
+          map: this.permissionsMaskToMap(permissions),
+        };
+      }
+
+      // 4. Apply @everyone overwrite for the channel
+      const everyoneOverwrite = await this.channelOverwriteRepository.findOne({
+        where: {
+          channelId,
+          targetType: OverwriteTargetType.ROLE,
+          targetId: everyoneRole?.id || DEFAULT_ROLES.EVERYONE,
+        },
+      });
+
+      if (everyoneOverwrite) {
+        const deny = BigInt(everyoneOverwrite.deny);
+        const allow = BigInt(everyoneOverwrite.allow);
+        permissions = (permissions & ~deny) | allow;
+      }
+
+      // 5. Aggregate role overwrites (deny first, then allow)
+      let roleDeny = 0n;
+      let roleAllow = 0n;
+
+      const roleOverwrites = await this.channelOverwriteRepository.find({
+        where: {
+          channelId,
+          targetType: OverwriteTargetType.ROLE,
+          targetId: In(roleIds.filter((id) => id !== everyoneRole?.id)),
+        },
+      });
+
+      for (const overwrite of roleOverwrites) {
+        roleDeny |= BigInt(overwrite.deny);
+        roleAllow |= BigInt(overwrite.allow);
+      }
+
+      // Apply role overwrites: deny first, then allow
+      permissions = (permissions & ~roleDeny) | roleAllow;
+
+      // 6. Apply member-specific overwrite (highest priority)
+      const memberOverwrite = await this.channelOverwriteRepository.findOne({
+        where: {
+          channelId,
+          targetType: OverwriteTargetType.MEMBER,
+          targetId: userId,
+        },
+      });
+
+      if (memberOverwrite) {
+        const deny = BigInt(memberOverwrite.deny);
+        const allow = BigInt(memberOverwrite.allow);
+        permissions = (permissions & ~deny) | allow;
+      }
+
       return {
         mask: permissions,
         map: this.permissionsMaskToMap(permissions),
       };
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Error computing effective permissions for user ${dto.userId}:`,
+        error,
+      );
+      throw new HttpException(
+        { messageKey: 'permission.PERMISSION_CALCULATION_FAILED' },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    // 4. Apply @everyone overwrite for the channel
-    const everyoneOverwrite = await this.channelOverwriteRepository.findOne({
-      where: {
-        channelId,
-        targetType: OverwriteTargetType.ROLE,
-        targetId: everyoneRole?.id || DEFAULT_ROLES.EVERYONE,
-      },
-    });
-
-    if (everyoneOverwrite) {
-      const deny = BigInt(everyoneOverwrite.deny);
-      const allow = BigInt(everyoneOverwrite.allow);
-      permissions = (permissions & ~deny) | allow;
-    }
-
-    // 5. Aggregate role overwrites (deny first, then allow)
-    let roleDeny = 0n;
-    let roleAllow = 0n;
-
-    const roleOverwrites = await this.channelOverwriteRepository.find({
-      where: {
-        channelId,
-        targetType: OverwriteTargetType.ROLE,
-        targetId: In(roleIds.filter((id) => id !== everyoneRole?.id)),
-      },
-    });
-
-    for (const overwrite of roleOverwrites) {
-      roleDeny |= BigInt(overwrite.deny);
-      roleAllow |= BigInt(overwrite.allow);
-    }
-
-    // Apply role overwrites: deny first, then allow
-    permissions = (permissions & ~roleDeny) | roleAllow;
-
-    // 6. Apply member-specific overwrite (highest priority)
-    const memberOverwrite = await this.channelOverwriteRepository.findOne({
-      where: {
-        channelId,
-        targetType: OverwriteTargetType.MEMBER,
-        targetId: userId,
-      },
-    });
-
-    if (memberOverwrite) {
-      const deny = BigInt(memberOverwrite.deny);
-      const allow = BigInt(memberOverwrite.allow);
-      permissions = (permissions & ~deny) | allow;
-    }
-
-    return {
-      mask: permissions,
-      map: this.permissionsMaskToMap(permissions),
-    };
   }
 
   /**

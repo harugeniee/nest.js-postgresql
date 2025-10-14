@@ -1,8 +1,8 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { PermissionsService } from 'src/permissions/permissions.service';
 import { checkPermissions, hasPermission } from 'src/permissions/utils';
 import { PermissionName } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
-import { PermissionsService } from 'src/permissions/permissions.service';
 
 /**
  * High-performance permission service with Redis caching
