@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services/base.service';
-import { PermissionCacheInterceptor } from 'src/permissions/interceptors/permission-cache.interceptor';
+import { AuthPermissionService } from 'src/permissions/services/auth-permission.service';
 import { PermissionName } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
 import { In, Repository } from 'typeorm';
@@ -31,12 +31,16 @@ export class PermissionsService extends BaseService<Role> {
   constructor(
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
+
     @InjectRepository(UserRole)
     private readonly userRoleRepository: Repository<UserRole>,
+
     @InjectRepository(ChannelOverwrite)
     private readonly channelOverwriteRepository: Repository<ChannelOverwrite>,
+
     cacheService: CacheService,
-    private readonly permissionCacheInterceptor: PermissionCacheInterceptor,
+
+    private readonly authPermissionService: AuthPermissionService,
   ) {
     super(
       new TypeOrmBaseRepository<Role>(roleRepository),
@@ -166,10 +170,7 @@ export class PermissionsService extends BaseService<Role> {
 
     const saved = await this.userRoleRepository.save(userRoleData);
     // Refresh user's cached permissions after role assignment
-    await this.permissionCacheInterceptor.onRoleAssigned(
-      dto.userId,
-      dto.roleId,
-    );
+    await this.authPermissionService.onPermissionsChanged(dto.userId);
     return saved;
   }
 
@@ -189,7 +190,7 @@ export class PermissionsService extends BaseService<Role> {
 
     await this.userRoleRepository.remove(assignment);
     // Refresh user's cached permissions after role removal
-    await this.permissionCacheInterceptor.onRoleRemoved(userId, roleId);
+    await this.authPermissionService.onPermissionsChanged(userId);
   }
 
   /**
@@ -235,10 +236,7 @@ export class PermissionsService extends BaseService<Role> {
       existing.deny = dto.deny || '0';
       existing.reason = dto.reason;
       const updated = await this.channelOverwriteRepository.save(existing);
-      // Invalidate/refresh cache impacted by channel overwrites
-      await this.permissionCacheInterceptor.onChannelOverwriteChanged(
-        dto.channelId,
-      );
+      // TODO: Implement cache invalidation for channel overwrites when needed
       return updated;
     }
 
@@ -253,10 +251,7 @@ export class PermissionsService extends BaseService<Role> {
     };
 
     const created = await this.channelOverwriteRepository.save(overwriteData);
-    // Invalidate/refresh cache impacted by channel overwrites
-    await this.permissionCacheInterceptor.onChannelOverwriteChanged(
-      dto.channelId,
-    );
+    // TODO: Implement cache invalidation for channel overwrites when needed
     return created;
   }
 
@@ -289,8 +284,7 @@ export class PermissionsService extends BaseService<Role> {
     }
 
     await this.channelOverwriteRepository.remove(overwrite);
-    // Invalidate/refresh cache impacted by channel overwrites
-    await this.permissionCacheInterceptor.onChannelOverwriteChanged(channelId);
+    // TODO: Implement cache invalidation for channel overwrites when needed
   }
 
   // ==================== PERMISSION CALCULATION ====================

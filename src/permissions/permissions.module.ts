@@ -7,6 +7,7 @@ import { UserPermission } from './entities/user-permission.entity';
 import { UserRole } from './entities/user-role.entity';
 import { PermissionsController } from './permissions.controller';
 import { PermissionsService } from './permissions.service';
+import { AuthPermissionService, UserPermissionService } from './services';
 
 /**
  * Permissions module providing Discord-style permission system
@@ -23,7 +24,7 @@ import { PermissionsService } from './permissions.service';
     CacheModule,
   ],
   controllers: [PermissionsController],
-  providers: [PermissionsService],
-  exports: [PermissionsService],
+  providers: [PermissionsService, AuthPermissionService, UserPermissionService],
+  exports: [PermissionsService, AuthPermissionService, UserPermissionService],
 })
 export class PermissionsModule {}
