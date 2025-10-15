@@ -96,9 +96,9 @@ export class AuthService {
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const { id, uuid } = user;
     const accessTokenExpiresIn =
-      this.configService.get<string>('app.jwt.accessTokenExpiresIn') || '1h';
+      this.configService.get<number>('app.jwt.accessTokenExpiresIn') || '1h';
     const refreshTokenExpiresIn =
-      this.configService.get<string>('app.jwt.refreshTokenExpiresIn') || '7d';
+      this.configService.get<number>('app.jwt.refreshTokenExpiresIn') || '7d';
 
     const session = await this.usersService.createSession({
       userId: id,
@@ -109,17 +109,17 @@ export class AuthService {
     }); // 7 days in seconds
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(
+      this.jwtService.signAsync<AuthPayload>(
         { uid: id, ssid: session.id, role: user.role },
         {
-          expiresIn: +accessTokenExpiresIn,
+          expiresIn: accessTokenExpiresIn,
           algorithm: 'HS256',
         },
       ),
-      this.jwtService.signAsync(
+      this.jwtService.signAsync<AuthPayload>(
         { uid: id, ssid: session.id },
         {
-          expiresIn: +refreshTokenExpiresIn,
+          expiresIn: refreshTokenExpiresIn,
           algorithm: 'HS512',
         },
       ),
@@ -197,7 +197,7 @@ export class AuthService {
 
   async refreshToken(authPayload: AuthPayload) {
     const accessTokenExpiresIn =
-      this.configService.get<string>('app.jwt.accessTokenExpiresIn') || '1h';
+      this.configService.get<number>('app.jwt.accessTokenExpiresIn') || '1h';
     const session = await this.usersService.findSessionById(authPayload.ssid);
 
     if (!session || session.isExpired() || !session.isValid()) {
@@ -207,10 +207,10 @@ export class AuthService {
       );
     }
     const user = await this.usersService.findById(session.userId);
-    const accessToken = await this.jwtService.signAsync(
+    const accessToken = await this.jwtService.signAsync<AuthPayload>(
       { uid: session.userId, ssid: session.id, role: user.role },
       {
-        expiresIn: +accessTokenExpiresIn,
+        expiresIn: accessTokenExpiresIn,
         algorithm: 'HS256',
       },
     );
