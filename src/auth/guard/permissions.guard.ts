@@ -28,6 +28,44 @@ export class PermissionsGuard implements CanActivate {
     private readonly userPermissionService: UserPermissionService,
   ) {}
 
+  /**
+   * Extract organizationId from request params, body, or query
+   */
+  private extractOrganizationIdFromRequest(
+    request: Request,
+  ): string | undefined {
+    // Try to get from URL params first (e.g., /organizations/:id/articles)
+    const params = request.params as Record<string, string>;
+    if (params.organizationId) {
+      return params.organizationId;
+    }
+    if (params.id && request.url.includes('/organizations/')) {
+      return params.id;
+    }
+
+    // Try to get from request body
+    const body = request.body as Record<string, unknown>;
+    if (body && typeof body === 'object') {
+      if (body.organizationId && typeof body.organizationId === 'string') {
+        return body.organizationId;
+      }
+      if (body.organization && typeof body.organization === 'object') {
+        const org = body.organization as Record<string, unknown>;
+        if (org.id && typeof org.id === 'string') {
+          return org.id;
+        }
+      }
+    }
+
+    // Try to get from query parameters
+    const query = request.query as Record<string, string>;
+    if (query.organizationId) {
+      return query.organizationId;
+    }
+
+    return undefined;
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Get permission requirements from decorator
     const permissionOptions = this.reflector.get<PermissionCheckOptions>(
@@ -58,6 +96,14 @@ export class PermissionsGuard implements CanActivate {
     }
 
     try {
+      // Get organizationId from request if not provided in decorator
+      let organizationId = permissionOptions.organizationId;
+
+      // Try to get organizationId from request params or body
+      if (!organizationId) {
+        organizationId = this.extractOrganizationIdFromRequest(request);
+      }
+
       // Check permissions using cached service
       const hasRequiredPermissions =
         await this.userPermissionService.checkPermissions(
@@ -67,7 +113,7 @@ export class PermissionsGuard implements CanActivate {
             any: permissionOptions.any,
             none: permissionOptions.none,
           },
-          permissionOptions.organizationId,
+          organizationId,
         );
 
       if (!hasRequiredPermissions) {
