@@ -12,8 +12,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Auth } from 'src/common/decorators';
-import { RequirePermissions } from 'src/common/decorators/require-permissions.decorator';
+import { Auth, RequirePermissions } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import {
@@ -83,8 +82,8 @@ export class OrganizationsController {
    * Only organization owners or admins can update organizations
    */
   @Patch(':id')
-  @Auth()
   @RequirePermissions({ all: ['ORGANIZATION_MANAGE_SETTINGS'] })
+  @Auth()
   async update(
     @Param('id', SnowflakeIdPipe) id: string,
     @Body() updateOrganizationDto: UpdateOrganizationDto,
@@ -100,8 +99,8 @@ export class OrganizationsController {
    * Only organization owners can delete their organizations
    */
   @Delete(':id')
-  @Auth()
   @RequirePermissions({ all: ['ORGANIZATION_DELETE'] })
+  @Auth()
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id', SnowflakeIdPipe) id: string): Promise<void> {
     return this.organizationsService.remove(id);
@@ -112,8 +111,8 @@ export class OrganizationsController {
    * Requires permission to view organization members
    */
   @Get(':id/members')
-  @Auth()
   @RequirePermissions({ all: ['ORGANIZATION_MANAGE_MEMBERS'] })
+  @Auth()
   async getOrganizationMembers(@Param('id', SnowflakeIdPipe) id: string) {
     return this.organizationsService.getOrganizationMembers(id);
   }
@@ -123,8 +122,8 @@ export class OrganizationsController {
    * Requires permission to manage organization members
    */
   @Post(':id/members/:userId/roles/:roleId')
-  @Auth()
   @RequirePermissions({ all: ['ORGANIZATION_MANAGE_MEMBERS'] })
+  @Auth()
   @HttpCode(HttpStatus.CREATED)
   async assignOrganizationRole(
     @Param('id', SnowflakeIdPipe) organizationId: string,
@@ -143,8 +142,8 @@ export class OrganizationsController {
    * Requires permission to manage organization members
    */
   @Delete(':id/members/:userId/roles/:roleId')
-  @Auth()
   @RequirePermissions({ all: ['ORGANIZATION_MANAGE_MEMBERS'] })
+  @Auth()
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeOrganizationRole(
     @Param('id', SnowflakeIdPipe) organizationId: string,

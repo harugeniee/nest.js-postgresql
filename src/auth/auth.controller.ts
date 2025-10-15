@@ -2,27 +2,27 @@ import { Auth, ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { CreateDeviceTokenDto, LoginDto, RegisterDto } from 'src/users/dto';
 import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
-import { OtpRequestDto, OtpVerifyDto, FirebaseLoginDto } from './dto';
+import { FirebaseLoginDto, OtpRequestDto, OtpVerifyDto } from './dto';
 
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
-  Get,
+  Param,
   Post,
   Put,
   Query,
   Request,
   UseGuards,
-  Param,
 } from '@nestjs/common';
 
+import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
+import { CustomRateLimit } from 'src/rate-limit/rate-limit.decorator';
 import { AuthService } from './auth.service';
 import { JwtAccessTokenGuard } from './guard/jwt-access-token.guard';
 import { JwtRefreshTokenGuard } from './guard/jwt-refresh-token.guard';
-import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
-import { CustomRateLimit } from 'src/rate-limit/rate-limit.decorator';
 
 @Controller('auth')
 export class AuthController {

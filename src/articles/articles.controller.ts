@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
-import { Auth } from 'src/common/decorators';
+import { Auth, RequirePermissions } from 'src/common/decorators';
 import { CursorPaginationDto } from 'src/common/dto/cursor-pagination.dto';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
@@ -31,6 +31,7 @@ export class ArticlesController {
     ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
     ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
   )
+  @RequirePermissions({ all: ['ARTICLE_CREATE'] })
   @Auth()
   create(
     @Body() createArticleDto: CreateArticleDto,
@@ -61,7 +62,6 @@ export class ArticlesController {
   }
 
   @Get(':id')
-  @Auth()
   @TrackEvent(
     ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_VIEW,
     ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
@@ -72,12 +72,16 @@ export class ArticlesController {
   }
 
   @Patch(':id')
-  @Auth()
   @TrackEvent(
     ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_UPDATE,
     ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
     ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
   )
+  @RequirePermissions({
+    all: ['ARTICLE_EDIT'],
+    any: ['ARTICLE_MANAGE_ALL'], // Admin có thể edit tất cả bài viết
+  })
+  @Auth()
   update(
     @Param('id', new SnowflakeIdPipe()) id: string,
     @Body() updateArticleDto: UpdateArticleDto,
@@ -85,13 +89,47 @@ export class ArticlesController {
     return this.articlesService.updateArticle(id, updateArticleDto);
   }
 
-  @Delete(':id')
+  @Patch(':id/publish')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
+  )
+  @RequirePermissions({
+    all: ['ARTICLE_PUBLISH'],
+    any: ['ARTICLE_MANAGE_ALL'], // Admin có thể publish tất cả bài viết
+  })
   @Auth()
+  publish(@Param('id', new SnowflakeIdPipe()) id: string) {
+    return this.articlesService.updateArticle(id, { status: 'published' });
+  }
+
+  @Patch(':id/unpublish')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
+  )
+  @RequirePermissions({
+    all: ['ARTICLE_PUBLISH'],
+    any: ['ARTICLE_MANAGE_ALL'], // Admin có thể unpublish tất cả bài viết
+  })
+  @Auth()
+  unpublish(@Param('id', new SnowflakeIdPipe()) id: string) {
+    return this.articlesService.updateArticle(id, { status: 'draft' });
+  }
+
+  @Delete(':id')
   @TrackEvent(
     ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_DELETE,
     ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
     ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
   )
+  @RequirePermissions({
+    all: ['ARTICLE_DELETE'],
+    any: ['ARTICLE_MANAGE_ALL'], // Admin có thể xóa tất cả bài viết
+  })
+  @Auth()
   remove(@Param('id', new SnowflakeIdPipe()) id: string) {
     return this.articlesService.remove(id);
   }

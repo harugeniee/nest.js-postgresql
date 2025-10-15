@@ -1,6 +1,6 @@
-import { UsersModule } from 'src/users/users.module';
-import { MailModule } from 'src/shared/services/mail/mail.module';
 import { FirebaseModule } from 'src/shared/services/firebase/firebase.module';
+import { MailModule } from 'src/shared/services/mail/mail.module';
+import { UsersModule } from 'src/users/users.module';
 
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -8,7 +8,7 @@ import { JwtModule } from '@nestjs/jwt';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { RedisOtpStore, MailerEmailOtpSender } from './providers';
+import { MailerEmailOtpSender, RedisOtpStore } from './providers';
 
 @Module({
   imports: [

@@ -11,6 +11,15 @@
  * @returns Number ID for bitset
  */
 export function stringToNumberId(id: string): number {
+  if (!id || typeof id !== 'string') {
+    throw new Error(`Invalid ID format: ${id}`);
+  }
+
+  // Check if string contains only digits (no decimals, negatives, or letters)
+  if (!/^\d+$/.test(id)) {
+    throw new Error(`Invalid ID format: ${id}`);
+  }
+
   const numId = parseInt(id, 10);
   if (isNaN(numId) || numId < 0) {
     throw new Error(`Invalid ID format: ${id}`);
@@ -34,6 +43,12 @@ export function numberToStringId(id: number): string {
  */
 export function isValidId(id: string): boolean {
   if (!id || typeof id !== 'string') return false;
+
+  // Check if string contains only digits (no decimals, negatives, or letters)
+  if (!/^\d+$/.test(id)) {
+    return false;
+  }
+
   const numId = parseInt(id, 10);
   return !isNaN(numId) && numId >= 0;
 }
@@ -101,14 +116,16 @@ export function getPaginationParams(cursor?: string, limit: number = 20) {
     const parsed = parseCursor(cursor);
     if (parsed) {
       return {
-        afterId: parsed.id,
-        afterTimestamp: parsed.timestamp,
+        startId: parsed.id,
+        startTimestamp: parsed.timestamp,
         limit,
       };
     }
   }
 
   return {
+    startId: null,
+    startTimestamp: null,
     limit,
   };
 }
@@ -123,7 +140,7 @@ export function generateNextCursor(
   lastItem: { id: string; createdAt?: Date },
   timestamp?: Date,
 ): string | null {
-  if (!lastItem) return null;
+  if (!lastItem || !lastItem.id) return null;
   return generateCursor(lastItem.id, timestamp || lastItem.createdAt);
 }
 
@@ -149,6 +166,8 @@ export function validatePaginationLimit(
  * @returns Offset value
  */
 export function calculateOffset(page: number, limit: number): number {
+  if (page <= 0) return 0;
+  if (limit <= 0) return 0;
   return (page - 1) * limit;
 }
 
