@@ -1,0 +1,11 @@
+@rule condition_builder_usage
+- Build filters via ConditionBuilder; forbid raw string concatenation.
+- Prefer ILIKE for keyword search when caseSensitive=0; validate requested fields against getSearchableColumns().
+
+@example
+const where = ConditionBuilder.build(
+  { query: q.keyword, fields: q.fields, caseSensitive: 0, fromDate: q.from, toDate: q.to },
+  'title',
+  { is_active: true }
+);
+return this.repo.findAndCount({ where });

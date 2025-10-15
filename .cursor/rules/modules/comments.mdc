@@ -1,0 +1,8 @@
+@rule comments_contract
+- Entity: content (text), article_id (FK) or target_type/target_id, parent_id (nullable), is_active (bool).
+- Sanitize content; support mentions; media references reuse src/media (no new storage).
+- Service: provide fetch tree or flat-with-parent mapping; cache hot threads (ttl 30s).
+
+@acceptance
+- [ ] Parent chain validated; depth limited if required.
+- [ ] No raw HTML injection; sanitized output path exists.

@@ -1,0 +1,7 @@
+@rule stickers_contract
+- StickerPack + Sticker; media via src/media.
+- Comment sticker = comment with kind='sticker' + sticker_id; do not fork storage logic.
+
+@acceptance
+- [ ] Upload flow uses existing media pipeline.
+- [ ] Retrieval via standard comment read path.

@@ -1,0 +1,11 @@
+@rule module_contract
+A domain module includes ONLY:
+- *.module.ts: wire controller/service/repo via TypeOrmModule.forFeature([Entity]).
+- *.controller.ts: DTO validation and thin delegations.
+- *.service.ts: extends BaseService<T>, defines getSearchableColumns(), hooks, cache prefix.
+- *.repository.ts: extends TypeOrmBaseRepository<T> when custom queries are needed.
+- entities/*.entity.ts: extends BaseEntityCustom with explicit table name.
+
+@anti-patterns
+- Direct DB access from controller.
+- process.env usage inside feature modules (use centralized config services).

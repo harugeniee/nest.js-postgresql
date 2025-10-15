@@ -625,23 +625,6 @@ this.logger.error('Database error', error);
 
 ---
 
-## 16) Documentation & References
-
-Read these docs before working on related features:
-* `docs/PROJECT_OVERVIEW.md` - Complete project overview
-* `docs/ARCHITECTURE.md` - System architecture and design
-* `docs/BASE_SERVICE_GUIDE.md` - BaseService usage and patterns
-* `docs/DATABASE_NAMING_CONVENTIONS.md` - Database naming standards
-* `docs/HYBRID_RATE_LIMITING_IMPLEMENTATION.md` - Rate limiting system
-* `docs/NOTIFICATION_SYSTEM.md` - Notification architecture
-* `docs/QR_ACTIONS.md` - QR action system
-* `docs/FIREBASE_AUTHENTICATION.md` - Firebase auth integration
-* `docs/FOLLOW_SYSTEM.md` - Follow system with Roaring Bitmap
-* `docs/CONTENT_MANAGEMENT_SYSTEM.md` - CMS features
-* `docs/RELATIONS_WHITELIST_EXAMPLES.md` - Security whitelist examples
-
----
-
 ## 17) Development Workflow Summary
 
 ### When Adding a New Feature:

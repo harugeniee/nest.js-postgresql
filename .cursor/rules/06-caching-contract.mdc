@@ -1,0 +1,10 @@
+@rule cache_keys
+- Key shapes:
+  - `${prefix}:id:${id}`
+  - `${prefix}:list:${sha256Hex(stableStringify(filters))}`
+- SWR: enable when ttlSec>0 and swrSec>0.
+- Invalidate both id-based and list-based keys in afterCreate/afterUpdate/afterDelete.
+
+@example
+await this.cache.deleteKeysByPattern('articles:list:*');
+await this.cache.delete(`articles:id:${id}`);

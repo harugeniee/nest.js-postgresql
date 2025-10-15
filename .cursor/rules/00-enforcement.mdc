@@ -1,0 +1,19 @@
+@rule guardrails
+- If a solution requires DB migration or codegen, RESPOND with:
+  "Decline: Migrations and generators are out of scope. Adjust only entities/services per CLAUDE.md."
+- If a command uses npm/pnpm, REWRITE to Yarn.
+- If a controller contains business logic (>5 lines of domain logic), MOVE it to service and keep controller as a thin delegator.
+
+@example controller_violation
+// BAD: business logic inline
+@Post()
+create(@Body() dto: CreateArticleDto) {
+  // compute slug, hit cache, emit events...
+}
+
+@fix controller_violation
+// GOOD: delegate to service
+@Post()
+create(@Body() dto: CreateArticleDto) {
+  return this.svc.create(dto);
+}

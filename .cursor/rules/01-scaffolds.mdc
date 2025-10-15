@@ -1,0 +1,18 @@
+@rule service_scaffold
+Generate a service that EXTENDS BaseService<T> with:
+- options: { entityName, cache {enabled, ttlSec, prefix, swrSec}, defaultSearchField }
+- methods: listOffset(q), listCursor(q), create(dto), update(id, dto), remove(id)
+- hooks: beforeCreate, afterCreate, beforeUpdate, afterUpdate (empty by default)
+
+@example
+@Injectable()
+export class ArticlesService extends BaseService<Article> {
+  constructor(@InjectRepository(Article) repo: Repository<Article>, cache: CacheService) {
+    super(new TypeOrmBaseRepository<Article>(repo), {
+      entityName: 'Article',
+      cache: { enabled: true, ttlSec: 60, swrSec: 30, prefix: 'articles' },
+      defaultSearchField: 'title',
+    }, cache);
+  }
+  protected getSearchableColumns(): (keyof Article)[] { return ['title','summary','content']; }
+}

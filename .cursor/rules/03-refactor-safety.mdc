@@ -1,0 +1,13 @@
+@rule refactor_contracts
+- Do not change public method signatures in service/controller without adding an adapter layer.
+- When renaming columns/props in entities, ADD a temporary mapping layer in the service and mark TODO for maintainers.
+- Preserve relation/select whitelists; if expanded, ensure no secret fields are exposed; add unit test stubs.
+
+@example adapter_layer
+// OLD
+findById(id: string): Promise<Article>
+
+// NEW (internals changed), keep external signature:
+findById(id: string): Promise<Article> {
+  return this.repo.findOneById(id); // updated internal call
+}

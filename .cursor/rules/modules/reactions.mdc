@@ -1,0 +1,8 @@
+@rule reactions_contract
+- Polymorphic: target_type, target_id, user_id, kind('like'|'love'|...).
+- Unique constraint: (user_id, target_type, target_id, kind).
+- Service: toggle semantics; expose counts; cache `reactions:count:<type>:<id>`.
+
+@acceptance
+- [ ] Toggle idempotent.
+- [ ] Count cache invalidated correctly on toggle.

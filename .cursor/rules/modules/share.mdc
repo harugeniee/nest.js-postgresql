@@ -1,0 +1,7 @@
+@rule share_contract
+- Entities: share_links, share_sessions, share_clicks, share_attributions.
+- Service: code generation, session attribution, dedupe via ip_hash/ua_hash/day; rate-limit ingestion; cache counters per link.
+
+@acceptance
+- [ ] Click ingestion resilient to bots (is_bot flagging/policy).
+- [ ] Aggregates cached & invalidated on relevant writes.

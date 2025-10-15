@@ -1,0 +1,9 @@
+@rule cursor_contract
+INPUT: { limit: number(1..100), cursor?: string, sortBy?: keyof T, order?: 'ASC'|'DESC' }
+OUTPUT: { data: T[], pageInfo: { nextCursor?: string, prevCursor?: string, take: number, sortBy: string, order: 'ASC'|'DESC' } }
+- Use encodeSignedCursor/decodeSignedCursor only.
+- Never expose numeric offsets to clients.
+
+@example
+const out = await this.listCursor({ limit: q.limit, cursor: q.cursor, sortBy: 'createdAt', order: 'DESC' });
+return out;
