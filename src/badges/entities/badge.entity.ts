@@ -46,7 +46,6 @@ export class Badge extends BaseEntityCustom {
    */
   @Column({
     type: 'text',
-    length: BADGE_CONSTANTS.DESCRIPTION_MAX_LENGTH,
     nullable: true,
   })
   description?: string;
