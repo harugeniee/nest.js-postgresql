@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AnalyticsService } from 'src/analytics/analytics.service';
 import { JwtAccessTokenGuard } from 'src/auth/guard/jwt-access-token.guard';
+import { PermissionsGuard } from 'src/auth/guard/permissions.guard';
+import { UserPermissionService } from 'src/permissions/services/user-permission.service';
 import { CacheService } from 'src/shared/services';
 import { ArticlesController } from './articles.controller';
 import { ArticlesService } from './articles.service';
@@ -85,11 +87,33 @@ describe('ArticlesController', () => {
             get: jest.fn(),
           },
         },
+        {
+          provide: UserPermissionService,
+          useValue: {
+            getUserPermissions: jest.fn(),
+            hasPermission: jest.fn(),
+            hasAnyPermission: jest.fn(),
+            hasAllPermissions: jest.fn(),
+            checkUserPermissions: jest.fn(),
+            getUserRoles: jest.fn(),
+            hasRole: jest.fn(),
+            hasAnyRole: jest.fn(),
+            hasAllRoles: jest.fn(),
+            checkUserRoles: jest.fn(),
+            getEffectivePermissions: jest.fn(),
+            refreshUserPermissions: jest.fn(),
+            clearUserPermissions: jest.fn(),
+          },
+        },
       ],
     });
 
     const module: TestingModule = await moduleBuilder
       .overrideGuard(JwtAccessTokenGuard)
+      .useValue({
+        canActivate: jest.fn().mockResolvedValue(true),
+      })
+      .overrideGuard(PermissionsGuard)
       .useValue({
         canActivate: jest.fn().mockResolvedValue(true),
       })
