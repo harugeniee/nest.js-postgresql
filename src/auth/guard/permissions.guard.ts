@@ -89,7 +89,7 @@ export class PermissionsGuard implements CanActivate {
       throw new UnauthorizedException({
         messageKey: 'auth.UNAUTHORIZED',
         details: {
-          userId: user.uid,
+          userId: user?.uid,
           message: 'User does not have the required permissions',
         },
       });

@@ -47,10 +47,6 @@ export class ArticlesController {
     ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
     ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
   )
-  @RequirePermissions({
-    any: ['ARTICLE_VIEW_DRAFTS', 'ARTICLE_MANAGE_ALL'],
-    none: ['ARTICLE_CREATE'], // Chỉ xem được bài viết đã publish, không cần quyền tạo
-  })
   findAll(@Query() query: GetArticleDto) {
     return this.articlesService.findAll(query);
   }
@@ -61,10 +57,6 @@ export class ArticlesController {
     ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
     ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
   )
-  @RequirePermissions({
-    any: ['ARTICLE_VIEW_DRAFTS', 'ARTICLE_MANAGE_ALL'],
-    none: ['ARTICLE_CREATE'], // Chỉ xem được bài viết đã publish, không cần quyền tạo
-  })
   findAllCursor(@Query() query: CursorPaginationDto) {
     return this.articlesService.findAllCursor(query);
   }
@@ -75,11 +67,6 @@ export class ArticlesController {
     ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
     ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
   )
-  @RequirePermissions({
-    any: ['ARTICLE_VIEW_DRAFTS', 'ARTICLE_MANAGE_ALL'],
-    none: ['ARTICLE_CREATE'], // Chỉ xem được bài viết đã publish, không cần quyền tạo
-  })
-  @Auth()
   findOne(@Param('id', new SnowflakeIdPipe()) id: string) {
     return this.articlesService.findById(id);
   }
