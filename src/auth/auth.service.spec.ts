@@ -9,10 +9,10 @@ import { AuthPayload } from 'src/common/interface';
 import { CacheService } from 'src/shared/services';
 import { FirebaseService } from 'src/shared/services/firebase/firebase.service';
 import {
-    CreateDeviceTokenDto,
-    LoginDto,
-    RegisterDto,
-    UpdatePasswordDto,
+  CreateDeviceTokenDto,
+  LoginDto,
+  RegisterDto,
+  UpdatePasswordDto,
 } from 'src/users/dto';
 import { User } from 'src/users/entities';
 import { UsersService } from 'src/users/users.service';
@@ -254,9 +254,9 @@ describe('AuthService', () => {
       usersService.register.mockRejectedValue(error);
 
       // Act & Assert
-      await expect(service.register(registerDto, mockClientInfo)).rejects.toThrow(
-        HttpException,
-      );
+      await expect(
+        service.register(registerDto, mockClientInfo),
+      ).rejects.toThrow(HttpException);
     });
   });
 
@@ -338,7 +338,10 @@ describe('AuthService', () => {
         .mockResolvedValueOnce(mockRefreshToken);
 
       // Act
-      const result = await service.generateToken(mockUser as User, mockClientInfo);
+      const result = await service.generateToken(
+        mockUser as User,
+        mockClientInfo,
+      );
 
       // Assert
       expect(usersService.createSession).toHaveBeenCalledWith({
@@ -369,7 +372,9 @@ describe('AuthService', () => {
       const result = await service.logout(mockAuthPayload);
 
       // Assert
-      expect(usersService.revokeSession).toHaveBeenCalledWith(mockAuthPayload.ssid);
+      expect(usersService.revokeSession).toHaveBeenCalledWith(
+        mockAuthPayload.ssid,
+      );
       expect(cacheService.deleteKeysBySuffix).toHaveBeenCalledWith(
         `*${mockAuthPayload.ssid}`,
       );
@@ -393,7 +398,10 @@ describe('AuthService', () => {
       expect(cacheService.deleteKeysBySuffix).toHaveBeenCalledWith(
         `auth:user:${mockAuthPayload.uid}:*`,
       );
-      expect(result).toHaveProperty('messageKey', 'user.LOGOUT_ALL_DEVICES_SUCCESS');
+      expect(result).toHaveProperty(
+        'messageKey',
+        'user.LOGOUT_ALL_DEVICES_SUCCESS',
+      );
     });
   });
 
@@ -412,7 +420,10 @@ describe('AuthService', () => {
       usersService.updateUser.mockResolvedValue({ affected: 1 } as any);
 
       // Act
-      const result = await service.updatePassword(mockAuthPayload, updatePasswordDto);
+      const result = await service.updatePassword(
+        mockAuthPayload,
+        updatePasswordDto,
+      );
 
       // Assert
       expect(usersService.findById).toHaveBeenCalledWith(mockAuthPayload.uid);
@@ -420,11 +431,20 @@ describe('AuthService', () => {
         updatePasswordDto.currentPassword,
         mockUser.password,
       );
-      expect(mockedBcrypt.hash).toHaveBeenCalledWith(updatePasswordDto.newPassword, 10);
-      expect(usersService.updateUser).toHaveBeenCalledWith(mockAuthPayload.uid, {
-        password: 'hashedNewPassword',
-      });
-      expect(result).toHaveProperty('messageKey', 'user.PASSWORD_UPDATED_SUCCESS');
+      expect(mockedBcrypt.hash).toHaveBeenCalledWith(
+        updatePasswordDto.newPassword,
+        10,
+      );
+      expect(usersService.updateUser).toHaveBeenCalledWith(
+        mockAuthPayload.uid,
+        {
+          password: 'hashedNewPassword',
+        },
+      );
+      expect(result).toHaveProperty(
+        'messageKey',
+        'user.PASSWORD_UPDATED_SUCCESS',
+      );
     });
 
     it('should throw error when user not found', async () => {
@@ -474,7 +494,9 @@ describe('AuthService', () => {
       const result = await service.refreshToken(mockAuthPayload);
 
       // Assert
-      expect(usersService.findSessionById).toHaveBeenCalledWith(mockAuthPayload.ssid);
+      expect(usersService.findSessionById).toHaveBeenCalledWith(
+        mockAuthPayload.ssid,
+      );
       expect(usersService.findById).toHaveBeenCalledWith(mockSession.userId);
       expect(jwtService.signAsync).toHaveBeenCalledWith(
         {
@@ -492,7 +514,10 @@ describe('AuthService', () => {
         mockAccessToken,
         3600,
       );
-      expect(result).toHaveProperty('messageKey', 'user.ACCESS_TOKEN_REFRESHED_SUCCESS');
+      expect(result).toHaveProperty(
+        'messageKey',
+        'user.ACCESS_TOKEN_REFRESHED_SUCCESS',
+      );
       expect(result.data).toHaveProperty('accessToken', mockAccessToken);
     });
 
@@ -595,7 +620,9 @@ describe('AuthService', () => {
       const result = await service.getSessions(paginationDto);
 
       // Assert
-      expect(usersService.findSessionsByUserId).toHaveBeenCalledWith(paginationDto);
+      expect(usersService.findSessionsByUserId).toHaveBeenCalledWith(
+        paginationDto,
+      );
       expect(result).toEqual(mockSessions);
     });
   });
@@ -622,7 +649,9 @@ describe('AuthService', () => {
         },
       };
 
-      usersService.findSessionsByUserIdCursor.mockResolvedValue(mockSessions as any);
+      usersService.findSessionsByUserIdCursor.mockResolvedValue(
+        mockSessions as any,
+      );
 
       // Act
       const result = await service.getSessionsCursor(paginationDto);
@@ -665,7 +694,9 @@ describe('AuthService', () => {
       const result = await service.requestOtp(otpRequestDto);
 
       // Assert
-      expect(usersService.findByEmail).toHaveBeenCalledWith(otpRequestDto.email);
+      expect(usersService.findByEmail).toHaveBeenCalledWith(
+        otpRequestDto.email,
+      );
       expect(otpStore.set).toHaveBeenCalledWith(
         `otp:login:${otpRequestDto.email.toLowerCase()}`,
         expect.objectContaining({
@@ -702,7 +733,9 @@ describe('AuthService', () => {
       const result = await service.requestOtp(otpRequestDto);
 
       // Assert
-      expect(usersService.findByEmail).toHaveBeenCalledWith(otpRequestDto.email);
+      expect(usersService.findByEmail).toHaveBeenCalledWith(
+        otpRequestDto.email,
+      );
       expect(otpStore.set).not.toHaveBeenCalled();
       expect(emailOtpSender.sendOtp).not.toHaveBeenCalled();
       expect(result).toHaveProperty('messageKey', 'auth.OTP_SENT_SUCCESS');
@@ -719,7 +752,9 @@ describe('AuthService', () => {
       usersService.findByEmail.mockRejectedValue(new Error('Database error'));
 
       // Act & Assert
-      await expect(service.requestOtp(otpRequestDto)).rejects.toThrow(HttpException);
+      await expect(service.requestOtp(otpRequestDto)).rejects.toThrow(
+        HttpException,
+      );
     });
   });
 
@@ -763,9 +798,9 @@ describe('AuthService', () => {
       otpStore.get.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.verifyOtp(otpVerifyDto, mockClientInfo)).rejects.toThrow(
-        HttpException,
-      );
+      await expect(
+        service.verifyOtp(otpVerifyDto, mockClientInfo),
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw error when OTP is already used', async () => {
@@ -780,9 +815,9 @@ describe('AuthService', () => {
       otpStore.get.mockResolvedValue(usedOtpData);
 
       // Act & Assert
-      await expect(service.verifyOtp(otpVerifyDto, mockClientInfo)).rejects.toThrow(
-        HttpException,
-      );
+      await expect(
+        service.verifyOtp(otpVerifyDto, mockClientInfo),
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw error when OTP is expired', async () => {
@@ -801,9 +836,9 @@ describe('AuthService', () => {
       otpStore.delete.mockResolvedValue(undefined);
 
       // Act & Assert
-      await expect(service.verifyOtp(otpVerifyDto, mockClientInfo)).rejects.toThrow(
-        HttpException,
-      );
+      await expect(
+        service.verifyOtp(otpVerifyDto, mockClientInfo),
+      ).rejects.toThrow(HttpException);
       expect(otpStore.delete).toHaveBeenCalledWith(
         `otp:login:${otpVerifyDto.email.toLowerCase()}`,
       );
@@ -825,9 +860,9 @@ describe('AuthService', () => {
       otpStore.delete.mockResolvedValue(undefined);
 
       // Act & Assert
-      await expect(service.verifyOtp(otpVerifyDto, mockClientInfo)).rejects.toThrow(
-        HttpException,
-      );
+      await expect(
+        service.verifyOtp(otpVerifyDto, mockClientInfo),
+      ).rejects.toThrow(HttpException);
       expect(otpStore.delete).toHaveBeenCalledWith(
         `otp:login:${otpVerifyDto.email.toLowerCase()}`,
       );
@@ -848,9 +883,9 @@ describe('AuthService', () => {
       });
 
       // Act & Assert
-      await expect(service.verifyOtp(otpVerifyDto, mockClientInfo)).rejects.toThrow(
-        HttpException,
-      );
+      await expect(
+        service.verifyOtp(otpVerifyDto, mockClientInfo),
+      ).rejects.toThrow(HttpException);
       expect(otpStore.incrementAttempts).toHaveBeenCalledWith(
         `otp:login:${otpVerifyDto.email.toLowerCase()}`,
       );
@@ -869,9 +904,9 @@ describe('AuthService', () => {
       usersService.findByEmail.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.verifyOtp(otpVerifyDto, mockClientInfo)).rejects.toThrow(
-        HttpException,
-      );
+      await expect(
+        service.verifyOtp(otpVerifyDto, mockClientInfo),
+      ).rejects.toThrow(HttpException);
     });
   });
 
@@ -890,7 +925,10 @@ describe('AuthService', () => {
       usersService.updateUser.mockResolvedValue({ affected: 1 } as any);
 
       // Act
-      const result = await service.firebaseLogin(firebaseLoginDto, mockClientInfo);
+      const result = await service.firebaseLogin(
+        firebaseLoginDto,
+        mockClientInfo,
+      );
 
       // Assert
       expect(firebaseService.authenticate).toHaveBeenCalledWith(
@@ -903,7 +941,10 @@ describe('AuthService', () => {
         isEmailVerified: mockFirebaseUser.email_verified,
         photoUrl: mockFirebaseUser.picture,
       });
-      expect(result).toHaveProperty('messageKey', 'auth.FIREBASE_LOGIN_SUCCESS');
+      expect(result).toHaveProperty(
+        'messageKey',
+        'auth.FIREBASE_LOGIN_SUCCESS',
+      );
       expect(result.data).toHaveProperty('user', mockUser);
       expect(result.data).toHaveProperty('token');
     });
@@ -924,7 +965,10 @@ describe('AuthService', () => {
       usersService.createFromFirebase.mockResolvedValue(newUser as User);
 
       // Act
-      const result = await service.firebaseLogin(firebaseLoginDto, mockClientInfo);
+      const result = await service.firebaseLogin(
+        firebaseLoginDto,
+        mockClientInfo,
+      );
 
       // Assert
       expect(firebaseService.authenticate).toHaveBeenCalledWith(
@@ -942,7 +986,10 @@ describe('AuthService', () => {
         oauthId: mockFirebaseUser.uid,
         oauthProvider: mockFirebaseUser.firebase.sign_in_provider,
       });
-      expect(result).toHaveProperty('messageKey', 'auth.FIREBASE_LOGIN_SUCCESS');
+      expect(result).toHaveProperty(
+        'messageKey',
+        'auth.FIREBASE_LOGIN_SUCCESS',
+      );
       expect(result.data).toHaveProperty('user', newUser);
       expect(result.data).toHaveProperty('token');
     });
@@ -970,7 +1017,9 @@ describe('AuthService', () => {
         idToken: 'firebase-id-token-123',
       };
 
-      firebaseService.authenticate.mockRejectedValue(new Error('Firebase error'));
+      firebaseService.authenticate.mockRejectedValue(
+        new Error('Firebase error'),
+      );
 
       // Act & Assert
       await expect(
