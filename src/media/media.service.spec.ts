@@ -229,7 +229,9 @@ describe('MediaService', () => {
       const userId = '1234567890123456789';
 
       mockR2Service.uploadFile.mockResolvedValue(mockUploadResult);
-      jest.spyOn(service, 'createMany').mockResolvedValue([createMockMedia(), createMockMedia()]);
+      jest
+        .spyOn(service, 'createMany')
+        .mockResolvedValue([createMockMedia(), createMockMedia()]);
 
       // Act
       const result = await service.uploadMedia(files, userId);
@@ -328,7 +330,10 @@ describe('MediaService', () => {
       mockR2Service.uploadFile.mockResolvedValue(mockUploadResult);
 
       // Act
-      const result = await (service as any).processUploadedFile(mockFile, userId);
+      const result = await (service as any).processUploadedFile(
+        mockFile,
+        userId,
+      );
 
       // Assert
       expect(result).toEqual({
@@ -375,10 +380,13 @@ describe('MediaService', () => {
 
       for (const testCase of testCases) {
         const file = { ...mockFile, mimetype: testCase.mimeType };
-        
+
         // Act
-        const result = await (service as any).processUploadedFile(file, '1234567890123456789');
-        
+        const result = await (service as any).processUploadedFile(
+          file,
+          '1234567890123456789',
+        );
+
         // Assert
         expect(result.type).toBe(testCase.expectedType);
       }
@@ -510,7 +518,9 @@ describe('MediaService', () => {
 
       // Assert
       expect(result).toEqual(mockMedia);
-      expect(service.findById).toHaveBeenCalledWith(id, { relations: ['user'] });
+      expect(service.findById).toHaveBeenCalledWith(id, {
+        relations: ['user'],
+      });
     });
   });
 
@@ -539,8 +549,12 @@ describe('MediaService', () => {
     it('should activate inactive media', async () => {
       // Arrange
       const id = '1234567890123456789';
-      const inactiveMedia = createMockMedia({ status: 'inactive' as MediaStatus });
-      const activatedMedia = createMockMedia({ status: 'active' as MediaStatus });
+      const inactiveMedia = createMockMedia({
+        status: 'inactive' as MediaStatus,
+      });
+      const activatedMedia = createMockMedia({
+        status: 'active' as MediaStatus,
+      });
 
       jest.spyOn(service, 'findById').mockResolvedValue(inactiveMedia);
       jest.spyOn(service, 'update').mockResolvedValue(activatedMedia);
@@ -576,7 +590,9 @@ describe('MediaService', () => {
       // Arrange
       const id = '1234567890123456789';
       const activeMedia = createMockMedia({ status: 'active' as MediaStatus });
-      const deactivatedMedia = createMockMedia({ status: 'inactive' as MediaStatus });
+      const deactivatedMedia = createMockMedia({
+        status: 'inactive' as MediaStatus,
+      });
 
       jest.spyOn(service, 'findById').mockResolvedValue(activeMedia);
       jest.spyOn(service, 'update').mockResolvedValue(deactivatedMedia);
@@ -593,7 +609,9 @@ describe('MediaService', () => {
     it('should return media if already inactive', async () => {
       // Arrange
       const id = '1234567890123456789';
-      const inactiveMedia = createMockMedia({ status: 'inactive' as MediaStatus });
+      const inactiveMedia = createMockMedia({
+        status: 'inactive' as MediaStatus,
+      });
 
       jest.spyOn(service, 'findById').mockResolvedValue(inactiveMedia);
 
@@ -695,7 +713,9 @@ describe('MediaService', () => {
 
       // Assert
       expect(result).toEqual(mockPagination);
-      expect(service.listOffset).toHaveBeenCalledWith(pagination, { isPublic: true });
+      expect(service.listOffset).toHaveBeenCalledWith(pagination, {
+        isPublic: true,
+      });
     });
   });
 
@@ -813,7 +833,9 @@ describe('MediaService', () => {
       const mockPresignedUrl = 'https://example.com/presigned-upload-url';
       const mockPublicUrl = 'https://example.com/public-url';
 
-      mockR2Service.generatePresignedUploadUrl.mockResolvedValue(mockPresignedUrl);
+      mockR2Service.generatePresignedUploadUrl.mockResolvedValue(
+        mockPresignedUrl,
+      );
       mockR2Service.generatePublicUrl.mockReturnValue(mockPublicUrl);
 
       // Act
@@ -850,7 +872,9 @@ describe('MediaService', () => {
       const mockPresignedUrl = 'https://example.com/presigned-download-url';
 
       jest.spyOn(service, 'findById').mockResolvedValue(mockMedia);
-      mockR2Service.generatePresignedDownloadUrl.mockResolvedValue(mockPresignedUrl);
+      mockR2Service.generatePresignedDownloadUrl.mockResolvedValue(
+        mockPresignedUrl,
+      );
 
       // Act
       const result = await service.generatePresignedDownloadUrl(id, expiresIn);
@@ -870,7 +894,9 @@ describe('MediaService', () => {
       const mockPresignedUrl = 'https://example.com/presigned-download-url';
 
       jest.spyOn(service, 'findById').mockResolvedValue(mockMedia);
-      mockR2Service.generatePresignedDownloadUrl.mockResolvedValue(mockPresignedUrl);
+      mockR2Service.generatePresignedDownloadUrl.mockResolvedValue(
+        mockPresignedUrl,
+      );
 
       // Act
       const result = await service.generatePresignedDownloadUrl(id);
@@ -892,8 +918,12 @@ describe('MediaService', () => {
 
       jest.spyOn(service, 'findById').mockResolvedValue(imageMedia);
       mockR2Service.deleteFile.mockResolvedValue(undefined);
-      mockR2Service.generateThumbnailKey.mockReturnValue('media/thumb_test.jpg');
-      mockR2Service.generatePreviewKey.mockReturnValue('media/preview_test.jpg');
+      mockR2Service.generateThumbnailKey.mockReturnValue(
+        'media/thumb_test.jpg',
+      );
+      mockR2Service.generatePreviewKey.mockReturnValue(
+        'media/preview_test.jpg',
+      );
 
       // Act
       await service.deleteMediaFile(id);
@@ -901,8 +931,12 @@ describe('MediaService', () => {
       // Assert
       expect(service.findById).toHaveBeenCalledWith(id);
       expect(mockR2Service.deleteFile).toHaveBeenCalledWith(imageMedia.key);
-      expect(mockR2Service.deleteFile).toHaveBeenCalledWith('media/thumb_test.jpg');
-      expect(mockR2Service.deleteFile).toHaveBeenCalledWith('media/preview_test.jpg');
+      expect(mockR2Service.deleteFile).toHaveBeenCalledWith(
+        'media/thumb_test.jpg',
+      );
+      expect(mockR2Service.deleteFile).toHaveBeenCalledWith(
+        'media/preview_test.jpg',
+      );
     });
 
     it('should handle non-image media types', async () => {
@@ -932,8 +966,12 @@ describe('MediaService', () => {
         .mockResolvedValueOnce(undefined) // Main file deletion succeeds
         .mockRejectedValueOnce(new Error('Thumbnail not found')) // Thumbnail deletion fails
         .mockRejectedValueOnce(new Error('Preview not found')); // Preview deletion fails
-      mockR2Service.generateThumbnailKey.mockReturnValue('media/thumb_test.jpg');
-      mockR2Service.generatePreviewKey.mockReturnValue('media/preview_test.jpg');
+      mockR2Service.generateThumbnailKey.mockReturnValue(
+        'media/thumb_test.jpg',
+      );
+      mockR2Service.generatePreviewKey.mockReturnValue(
+        'media/preview_test.jpg',
+      );
 
       // Act
       await service.deleteMediaFile(id);
@@ -1011,7 +1049,11 @@ describe('MediaService', () => {
       const id = '1234567890123456789';
 
       jest.spyOn(service, 'deleteMediaFile').mockResolvedValue(undefined);
-      jest.spyOn(service, 'update').mockResolvedValue(createMockMedia({ status: 'deleted' as MediaStatus }));
+      jest
+        .spyOn(service, 'update')
+        .mockResolvedValue(
+          createMockMedia({ status: 'deleted' as MediaStatus }),
+        );
 
       // Act
       await service.deleteMedia(id);
@@ -1040,7 +1082,10 @@ describe('MediaService', () => {
         { mimeType: 'video/mp4', expectedType: 'video' },
         { mimeType: 'audio/mp3', expectedType: 'audio' },
         { mimeType: 'application/pdf', expectedType: 'document' },
-        { mimeType: 'application/vnd.ms-powerpoint', expectedType: 'presentation' },
+        {
+          mimeType: 'application/vnd.ms-powerpoint',
+          expectedType: 'presentation',
+        },
         { mimeType: 'application/vnd.ms-excel', expectedType: 'spreadsheet' },
         { mimeType: 'application/zip', expectedType: 'archive' },
         { mimeType: 'unknown/type', expectedType: 'other' },
