@@ -1,7 +1,12 @@
 import * as bcrypt from 'bcrypt';
-import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { ClientInfo } from 'src/common/decorators';
+import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { AuthPayload } from 'src/common/interface';
+import {
+  generateOtpCode,
+  generateOtpRequestId,
+  maskEmail,
+} from 'src/common/utils';
 import { buildResponse } from 'src/shared/helpers/build-response';
 import { CacheService } from 'src/shared/services';
 import {
@@ -12,19 +17,14 @@ import {
 } from 'src/users/dto';
 import { User } from 'src/users/entities';
 import { UsersService } from 'src/users/users.service';
-import { OtpRequestDto, OtpVerifyDto, FirebaseLoginDto } from './dto';
+import { FirebaseLoginDto, OtpRequestDto, OtpVerifyDto } from './dto';
 import { OtpData } from './interfaces';
-import {
-  generateOtpCode,
-  generateOtpRequestId,
-  maskEmail,
-} from 'src/common/utils';
 
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { RedisOtpStore, MailerEmailOtpSender } from './providers';
 import { FirebaseService } from 'src/shared/services/firebase/firebase.service';
+import { MailerEmailOtpSender, RedisOtpStore } from './providers';
 
 @Injectable()
 export class AuthService {
@@ -109,14 +109,14 @@ export class AuthService {
     }); // 7 days in seconds
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync<AuthPayload>(
+      this.jwtService.signAsync(
         { uid: id, ssid: session.id, role: user.role },
         {
           expiresIn: +accessTokenExpiresIn,
           algorithm: 'HS256',
         },
       ),
-      this.jwtService.signAsync<AuthPayload>(
+      this.jwtService.signAsync(
         { uid: id, ssid: session.id },
         {
           expiresIn: +refreshTokenExpiresIn,
@@ -207,7 +207,7 @@ export class AuthService {
       );
     }
     const user = await this.usersService.findById(session.userId);
-    const accessToken = await this.jwtService.signAsync<AuthPayload>(
+    const accessToken = await this.jwtService.signAsync(
       { uid: session.userId, ssid: session.id, role: user.role },
       {
         expiresIn: +accessTokenExpiresIn,
@@ -541,9 +541,10 @@ export class AuthService {
           firebaseUid: firebaseUser.uid,
           email: firebaseUser?.email || '',
           name:
-            firebaseUser?.name ||
+            (firebaseUser?.name as string) ||
             firebaseUser?.email?.split('@')[0] ||
-            firebaseUser?.uid,
+            firebaseUser?.uid ||
+            'Unknown User',
           emailVerified: firebaseUser.email_verified || false,
           photoUrl: firebaseUser.picture,
           oauthId: firebaseUser.uid,
