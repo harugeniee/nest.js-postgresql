@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { Auth } from 'src/common/decorators';
-import { RequirePermissions } from 'src/common/decorators/require-permissions.decorator';
+import { RequirePermissions } from 'src/common/decorators/permissions.decorator';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import {

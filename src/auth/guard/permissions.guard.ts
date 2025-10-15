@@ -11,7 +11,7 @@ import { Request } from 'express';
 import {
   PermissionCheckOptions,
   REQUIRE_PERMISSIONS_METADATA,
-} from 'src/common/decorators/require-permissions.decorator';
+} from 'src/common/decorators/permissions.decorator';
 import { AuthPayload } from 'src/common/interface';
 import { UserPermissionService } from 'src/permissions/services/user-permission.service';
 
