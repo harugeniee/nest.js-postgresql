@@ -1,6 +1,7 @@
 // Export all constants
 export * from './analytics.constants';
 export * from './article.constants';
+export * from './badge.constants';
 export * from './bookmark.constants';
 export * from './comment.constants';
 export * from './common.constants';

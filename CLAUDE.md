@@ -499,7 +499,7 @@ export class ArticlesController {
 **Summary**
 
 Build features by **manually** updating entities, repositories, services, controllers, and DTOs inside the correct domain module. Reuse `BaseService`, `TypeOrmBaseRepository`, `CacheService`, `ConditionBuilder`, and the provided pagination/cursor utilities.
-**No generators. No migrations. Yarn only.**
+**No generators. No migrations. No add Swagger docs. Yarn only.**
 Follow the established conventions to ensure a consistent, scalable, and maintainable codebase.
 
 ```
