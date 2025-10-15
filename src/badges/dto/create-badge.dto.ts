@@ -1,25 +1,25 @@
 // Swagger removed
 import { Type } from 'class-transformer';
 import {
-    IsBoolean,
-    IsDateString,
-    IsEnum,
-    IsHexColor,
-    IsNotEmpty,
-    IsNumber,
-    IsOptional,
-    IsString,
-    IsUrl,
-    MaxLength,
-    Min,
-    ValidateNested,
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsHexColor,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
 import {
-    BADGE_CONSTANTS,
-    BadgeCategory,
-    BadgeRarity,
-    BadgeStatus,
-    BadgeType,
+  BADGE_CONSTANTS,
+  BadgeCategory,
+  BadgeRarity,
+  BadgeStatus,
+  BadgeType,
 } from 'src/shared/constants';
 
 /**

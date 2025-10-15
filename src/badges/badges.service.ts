@@ -5,9 +5,11 @@ import { BaseService } from 'src/common/services/base.service';
 import {
   BADGE_CONSTANTS,
   BadgeAssignmentStatus,
+  BadgeCategory,
   BadgeEntityType,
+  BadgeRarity,
+  BadgeType,
 } from 'src/shared/constants';
-import { ConditionBuilder } from 'src/shared/helpers';
 import { CacheService } from 'src/shared/services/cache/cache.service';
 import { Repository } from 'typeorm';
 import { AssignBadgeDto } from './dto/assign-badge.dto';
@@ -17,6 +19,7 @@ import { RevokeBadgeDto } from './dto/revoke-badge.dto';
 import { UpdateBadgeDto } from './dto/update-badge.dto';
 import { BadgeAssignment } from './entities/badge-assignment.entity';
 import { Badge } from './entities/badge.entity';
+import { BadgeAssignmentService } from './services/badge-assignment.service';
 
 /**
  * Badge service extending BaseService for badge management
@@ -29,8 +32,7 @@ export class BadgesService extends BaseService<Badge> {
   constructor(
     @InjectRepository(Badge)
     private readonly badgeRepository: Repository<Badge>,
-    @InjectRepository(BadgeAssignment)
-    private readonly badgeAssignmentRepository: Repository<BadgeAssignment>,
+    private readonly badgeAssignmentService: BadgeAssignmentService,
     cacheService: CacheService,
   ) {
     super(
@@ -113,7 +115,7 @@ export class BadgesService extends BaseService<Badge> {
   async getBadgeByType(type: string): Promise<Badge | null> {
     this.logger.log(`Getting badge by type: ${type}`);
 
-    return this.findOne({ type: type as any });
+    return this.findOne({ type: type as BadgeType });
   }
 
   /**
@@ -122,13 +124,16 @@ export class BadgesService extends BaseService<Badge> {
   async getBadgesByCategory(category: string): Promise<Badge[]> {
     this.logger.log(`Getting badges by category: ${category}`);
 
-    return this.listOffset(
+    const result = await this.listOffset(
       {
         page: 1,
         limit: BADGE_CONSTANTS.MAX_BADGES_PER_ENTITY,
+        sortBy: 'createdAt',
+        order: 'DESC',
       },
-      { category: category as any },
+      { category: category as BadgeCategory },
     );
+    return result.result;
   }
 
   /**
@@ -137,13 +142,16 @@ export class BadgesService extends BaseService<Badge> {
   async getBadgesByRarity(rarity: string): Promise<Badge[]> {
     this.logger.log(`Getting badges by rarity: ${rarity}`);
 
-    return this.listOffset(
+    const result = await this.listOffset(
       {
         page: 1,
         limit: BADGE_CONSTANTS.MAX_BADGES_PER_ENTITY,
+        sortBy: 'createdAt',
+        order: 'DESC',
       },
-      { rarity: rarity as any },
+      { rarity: rarity as BadgeRarity },
     );
+    return result.result;
   }
 
   /**
@@ -152,13 +160,16 @@ export class BadgesService extends BaseService<Badge> {
   async getVisibleBadges(): Promise<Badge[]> {
     this.logger.log('Getting visible badges');
 
-    return this.listOffset(
+    const result = await this.listOffset(
       {
         page: 1,
         limit: BADGE_CONSTANTS.MAX_BADGES_PER_ENTITY,
+        sortBy: 'createdAt',
+        order: 'DESC',
       },
       { isVisible: true, status: 'active' as any },
     );
+    return result.result;
   }
 
   /**
@@ -167,13 +178,16 @@ export class BadgesService extends BaseService<Badge> {
   async getObtainableBadges(): Promise<Badge[]> {
     this.logger.log('Getting obtainable badges');
 
-    return this.listOffset(
+    const result = await this.listOffset(
       {
         page: 1,
         limit: BADGE_CONSTANTS.MAX_BADGES_PER_ENTITY,
+        sortBy: 'createdAt',
+        order: 'DESC',
       },
       { isObtainable: true, status: 'active' as any },
     );
+    return result.result;
   }
 
   /**
@@ -198,20 +212,18 @@ export class BadgesService extends BaseService<Badge> {
     }
 
     // Check if assignment already exists
-    const existingAssignment = await this.badgeAssignmentRepository.findOne({
-      where: {
-        badgeId: assignBadgeDto.badgeId,
-        entityType: assignBadgeDto.entityType,
-        entityId: assignBadgeDto.entityId,
-      },
+    const existingAssignment = await this.badgeAssignmentService.findOne({
+      badgeId: assignBadgeDto.badgeId,
+      entityType: assignBadgeDto.entityType,
+      entityId: assignBadgeDto.entityId,
     });
 
     if (existingAssignment && existingAssignment.isActive()) {
       throw new Error('Badge is already assigned to this entity');
     }
 
-    // Create new assignment
-    const assignment = this.badgeAssignmentRepository.create({
+    // Create new assignment using BadgeAssignmentService
+    const savedAssignment = await this.badgeAssignmentService.create({
       badgeId: assignBadgeDto.badgeId,
       entityType: assignBadgeDto.entityType,
       entityId: assignBadgeDto.entityId,
@@ -221,11 +233,8 @@ export class BadgesService extends BaseService<Badge> {
       metadata: assignBadgeDto.metadata,
       expiresAt: assignBadgeDto.expiresAt
         ? new Date(assignBadgeDto.expiresAt)
-        : null,
+        : undefined,
     });
-
-    const savedAssignment =
-      await this.badgeAssignmentRepository.save(assignment);
 
     // Update badge assignment count
     badge.incrementAssignmentCount();
@@ -245,10 +254,12 @@ export class BadgesService extends BaseService<Badge> {
   ): Promise<BadgeAssignment> {
     this.logger.log(`Revoking badge assignment: ${assignmentId}`);
 
-    const assignment = await this.badgeAssignmentRepository.findOne({
-      where: { id: assignmentId },
-      relations: ['badge'],
-    });
+    const assignment = await this.badgeAssignmentService.findById(
+      assignmentId,
+      {
+        relations: ['badge'],
+      },
+    );
 
     if (!assignment) {
       throw new NotFoundException('Badge assignment not found');
@@ -269,8 +280,10 @@ export class BadgesService extends BaseService<Badge> {
       };
     }
 
-    const savedAssignment =
-      await this.badgeAssignmentRepository.save(assignment);
+    const savedAssignment = await this.badgeAssignmentService.update(
+      assignmentId,
+      assignment,
+    );
 
     // Update badge assignment count
     if (assignment.badge) {
@@ -290,37 +303,25 @@ export class BadgesService extends BaseService<Badge> {
   ): Promise<{ result: BadgeAssignment[]; metaData: any }> {
     this.logger.log('Getting badge assignments with filters');
 
-    const where = ConditionBuilder.build(
-      {
-        badgeId: query.badgeId,
-        entityType: query.entityType,
-        entityId: query.entityId,
-        assignedBy: query.assignedBy,
-        revokedBy: query.revokedBy,
-        fromDate: query.assignedFrom,
-        toDate: query.assignedTo,
-        query: query.query,
-        fields: ['assignmentReason', 'revocationReason'],
-      },
-      'assignedAt',
-      {
-        status: query.statuses,
-        isVisible: query.isVisible,
-        isManuallyRevokable: query.isManuallyRevokable,
-      },
-    );
+    // Build extra filters for complex date range queries
+    const extraFilter: Record<string, unknown> = {
+      badgeId: query.badgeId,
+      status: query.statuses,
+      isVisible: query.isVisible,
+      isManuallyRevokable: query.isManuallyRevokable,
+    };
 
     // Add expiration date filters
     if (query.expiresFrom || query.expiresTo) {
       if (query.expiresFrom) {
-        where.expiresAt = {
-          ...where.expiresAt,
+        extraFilter.expiresAt = {
+          ...((extraFilter.expiresAt as Record<string, unknown>) || {}),
           $gte: new Date(query.expiresFrom),
         };
       }
       if (query.expiresTo) {
-        where.expiresAt = {
-          ...where.expiresAt,
+        extraFilter.expiresAt = {
+          ...((extraFilter.expiresAt as Record<string, unknown>) || {}),
           $lte: new Date(query.expiresTo),
         };
       }
@@ -329,35 +330,44 @@ export class BadgesService extends BaseService<Badge> {
     // Add revocation date filters
     if (query.revokedFrom || query.revokedTo) {
       if (query.revokedFrom) {
-        where.revokedAt = {
-          ...where.revokedAt,
+        extraFilter.revokedAt = {
+          ...((extraFilter.revokedAt as Record<string, unknown>) || {}),
           $gte: new Date(query.revokedFrom),
         };
       }
       if (query.revokedTo) {
-        where.revokedAt = {
-          ...where.revokedAt,
+        extraFilter.revokedAt = {
+          ...((extraFilter.revokedAt as Record<string, unknown>) || {}),
           $lte: new Date(query.revokedTo),
         };
       }
     }
 
-    const result = await this.badgeAssignmentRepository.findAndCount({
-      where,
-      relations: ['badge'],
-      order: { [query.sortBy || 'assignedAt']: query.order || 'DESC' },
-      skip: ((query.page || 1) - 1) * (query.limit || 20),
-      take: query.limit || 20,
-    });
+    // Use BadgeAssignmentService for pagination
+    const result = await this.badgeAssignmentService.listOffset(
+      {
+        page: query.page || 1,
+        limit: query.limit || 20,
+        sortBy: query.sortBy || 'assignedAt',
+        order: query.order || 'DESC',
+        query: query.query,
+        fields: ['assignmentReason', 'revocationReason'],
+        fromDate: query.assignedFrom ? new Date(query.assignedFrom) : undefined,
+        toDate: query.assignedTo ? new Date(query.assignedTo) : undefined,
+      },
+      {
+        entityType: query.entityType,
+        entityId: query.entityId,
+        assignedBy: query.assignedBy,
+        revokedBy: query.revokedBy,
+        ...extraFilter,
+      },
+      { relations: ['badge'] },
+    );
 
     return {
-      result: result[0],
-      metaData: {
-        currentPage: query.page || 1,
-        pageSize: query.limit || 20,
-        totalRecords: result[1],
-        totalPages: Math.ceil(result[1] / (query.limit || 20)),
-      },
+      result: result.result,
+      metaData: result.metaData,
     };
   }
 
@@ -370,15 +380,10 @@ export class BadgesService extends BaseService<Badge> {
   ): Promise<BadgeAssignment[]> {
     this.logger.log(`Getting badges for ${entityType}:${entityId}`);
 
-    return this.badgeAssignmentRepository.find({
-      where: {
-        entityType,
-        entityId,
-        status: BadgeAssignmentStatus.ACTIVE,
-      },
-      relations: ['badge'],
-      order: { assignedAt: 'DESC' },
-    });
+    return this.badgeAssignmentService.getActiveAssignments(
+      entityType,
+      entityId,
+    );
   }
 
   /**
@@ -389,8 +394,7 @@ export class BadgesService extends BaseService<Badge> {
   ): Promise<BadgeAssignment | null> {
     this.logger.log(`Getting badge assignment: ${assignmentId}`);
 
-    return this.badgeAssignmentRepository.findOne({
-      where: { id: assignmentId },
+    return this.badgeAssignmentService.findById(assignmentId, {
       relations: ['badge'],
     });
   }
@@ -407,15 +411,17 @@ export class BadgesService extends BaseService<Badge> {
       `Checking if ${entityType}:${entityId} has badge: ${badgeType}`,
     );
 
-    const assignment = await this.badgeAssignmentRepository.findOne({
-      where: {
+    const assignment = await this.badgeAssignmentService.findOne(
+      {
         entityType,
         entityId,
         status: BadgeAssignmentStatus.ACTIVE,
-        badge: { type: badgeType as any },
+        badge: { type: badgeType as BadgeType },
       },
-      relations: ['badge'],
-    });
+      {
+        relations: ['badge'],
+      },
+    );
 
     return !!assignment && assignment.isActive();
   }
@@ -441,9 +447,9 @@ export class BadgesService extends BaseService<Badge> {
     ] = await Promise.all([
       this.badgeRepository.count(),
       this.badgeRepository.count({ where: { status: 'active' as any } }),
-      this.badgeAssignmentRepository.count({
-        where: { status: BadgeAssignmentStatus.ACTIVE },
-      }),
+      this.badgeAssignmentService
+        .getAssignmentStatistics()
+        .then((stats) => stats.activeAssignments),
       this.badgeRepository
         .createQueryBuilder('badge')
         .select('badge.category', 'category')
@@ -458,7 +464,9 @@ export class BadgesService extends BaseService<Badge> {
         .getRawMany(),
     ]);
 
-    const badgesByCategory = categoryStats.reduce(
+    const badgesByCategory = (
+      categoryStats as Array<{ category: string; count: string }>
+    ).reduce(
       (acc, stat) => {
         acc[stat.category] = parseInt(stat.count);
         return acc;
@@ -466,7 +474,9 @@ export class BadgesService extends BaseService<Badge> {
       {} as Record<string, number>,
     );
 
-    const badgesByRarity = rarityStats.reduce(
+    const badgesByRarity = (
+      rarityStats as Array<{ rarity: string; count: string }>
+    ).reduce(
       (acc, stat) => {
         acc[stat.rarity] = parseInt(stat.count);
         return acc;
@@ -489,17 +499,13 @@ export class BadgesService extends BaseService<Badge> {
   async cleanupExpiredAssignments(): Promise<number> {
     this.logger.log('Cleaning up expired badge assignments');
 
-    const expiredAssignments = await this.badgeAssignmentRepository.find({
-      where: {
-        status: BadgeAssignmentStatus.ACTIVE,
-        expiresAt: { $lt: new Date() } as any,
-      },
-    });
+    const expiredAssignments =
+      await this.badgeAssignmentService.getExpiredAssignments();
 
     let cleanedCount = 0;
     for (const assignment of expiredAssignments) {
       assignment.status = BadgeAssignmentStatus.EXPIRED;
-      await this.badgeAssignmentRepository.save(assignment);
+      await this.badgeAssignmentService.update(assignment.id, assignment);
 
       // Update badge assignment count
       const badge = await this.badgeRepository.findOne({

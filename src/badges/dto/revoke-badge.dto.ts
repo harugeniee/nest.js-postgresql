@@ -1,10 +1,10 @@
 // Swagger removed
 import { Type } from 'class-transformer';
 import {
-    IsOptional,
-    IsString,
-    MaxLength,
-    ValidateNested,
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateNested,
 } from 'class-validator';
 
 /**

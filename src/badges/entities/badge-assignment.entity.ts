@@ -248,9 +248,9 @@ export class BadgeAssignment extends BaseEntityCustom {
    */
   reactivate(): void {
     this.status = BadgeAssignmentStatus.ACTIVE;
-    this.revokedAt = null;
-    this.revokedBy = null;
-    this.revocationReason = null;
+    this.revokedAt = undefined;
+    this.revokedBy = undefined;
+    this.revocationReason = undefined;
   }
 
   /**
@@ -264,6 +264,6 @@ export class BadgeAssignment extends BaseEntityCustom {
    * Clear expiration date
    */
   clearExpiration(): void {
-    this.expiresAt = null;
+    this.expiresAt = undefined;
   }
 }

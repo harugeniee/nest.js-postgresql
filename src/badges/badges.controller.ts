@@ -1,17 +1,18 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Param,
-    Patch,
-    Post,
-    Query,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
 } from '@nestjs/common';
 import { Auth } from 'src/common/decorators/auth.decorator';
-import { ReqUser } from 'src/common/interface/auth.interface';
+import { AuthPayload } from 'src/common/interface/auth.interface';
 import { SnowflakeIdPipe } from 'src/common/pipes/snowflake-id.pipe';
 import { BadgeEntityType } from 'src/shared/constants';
 import { BadgesService } from './badges.service';
@@ -130,9 +131,9 @@ export class BadgesController {
   @HttpCode(HttpStatus.CREATED)
   async assignBadge(
     @Body() assignBadgeDto: AssignBadgeDto,
-    @ReqUser() user: any,
+    @Request() req: Request & { user: AuthPayload },
   ): Promise<BadgeAssignment> {
-    return this.badgesService.assignBadge(assignBadgeDto, user.id);
+    return this.badgesService.assignBadge(assignBadgeDto, req.user.uid);
   }
 
   /**
@@ -143,12 +144,12 @@ export class BadgesController {
   async revokeBadge(
     @Param('assignmentId', SnowflakeIdPipe) assignmentId: string,
     @Body() revokeBadgeDto: RevokeBadgeDto,
-    @ReqUser() user: any,
+    @Request() req: Request & { user: AuthPayload },
   ): Promise<BadgeAssignment> {
     return this.badgesService.revokeBadge(
       assignmentId,
       revokeBadgeDto,
-      user.id,
+      req.user.uid,
     );
   }
 

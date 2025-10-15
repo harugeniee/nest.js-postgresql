@@ -1,43 +1,18 @@
 // Swagger removed
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
+import { IsArray, IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import { AdvancedPaginationDto } from 'src/common/dto';
 import {
-    IsArray,
-    IsBoolean,
-    IsEnum,
-    IsNumber,
-    IsOptional,
-    IsString,
-    Max,
-    Min,
-} from 'class-validator';
-import {
-    BadgeCategory,
-    BadgeRarity,
-    BadgeStatus,
-    BadgeType,
+  BadgeCategory,
+  BadgeRarity,
+  BadgeStatus,
+  BadgeType,
 } from 'src/shared/constants';
 
 /**
  * DTO for querying badges with filters and pagination
  */
-export class GetBadgeDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number = 1;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20;
-
-  @IsOptional()
-  @IsString()
-  query?: string;
-
+export class GetBadgeDto extends AdvancedPaginationDto {
   @IsOptional()
   @IsArray()
   @IsEnum(BadgeType, { each: true })
@@ -59,7 +34,7 @@ export class GetBadgeDto {
   statuses?: BadgeStatus[];
 
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }): boolean | undefined => {
     if (value === 'true') return true;
     if (value === 'false') return false;
     return value;
@@ -68,7 +43,7 @@ export class GetBadgeDto {
   isVisible?: boolean;
 
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }): boolean | undefined => {
     if (value === 'true') return true;
     if (value === 'false') return false;
     return value;
@@ -77,7 +52,7 @@ export class GetBadgeDto {
   isObtainable?: boolean;
 
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }): boolean | undefined => {
     if (value === 'true') return true;
     if (value === 'false') return false;
     return value;
@@ -86,19 +61,11 @@ export class GetBadgeDto {
   isAutoAssigned?: boolean;
 
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }): boolean | undefined => {
     if (value === 'true') return true;
     if (value === 'false') return false;
     return value;
   })
   @IsBoolean()
   isManuallyAssignable?: boolean;
-
-  @IsOptional()
-  @IsString()
-  sortBy?: string = 'displayOrder';
-
-  @IsOptional()
-  @IsString()
-  order?: 'ASC' | 'DESC' = 'ASC';
 }

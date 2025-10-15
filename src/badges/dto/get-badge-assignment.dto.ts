@@ -1,34 +1,19 @@
 // Swagger removed
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
-    IsArray,
-    IsBoolean,
-    IsEnum,
-    IsNumber,
-    IsOptional,
-    IsString,
-    Max,
-    Min,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
 } from 'class-validator';
+import { AdvancedPaginationDto } from 'src/common/dto';
 import { BadgeAssignmentStatus, BadgeEntityType } from 'src/shared/constants';
 
 /**
  * DTO for querying badge assignments with filters and pagination
  */
-export class GetBadgeAssignmentDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page?: number = 1;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20;
-
+export class GetBadgeAssignmentDto extends AdvancedPaginationDto {
   @IsOptional()
   @IsString()
   badgeId?: string;
@@ -47,7 +32,7 @@ export class GetBadgeAssignmentDto {
   statuses?: BadgeAssignmentStatus[];
 
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }): boolean | undefined => {
     if (value === 'true') return true;
     if (value === 'false') return false;
     return value;
@@ -56,7 +41,7 @@ export class GetBadgeAssignmentDto {
   isVisible?: boolean;
 
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }): boolean | undefined => {
     if (value === 'true') return true;
     if (value === 'false') return false;
     return value;
@@ -95,12 +80,4 @@ export class GetBadgeAssignmentDto {
   @IsOptional()
   @IsString()
   revokedTo?: string;
-
-  @IsOptional()
-  @IsString()
-  sortBy?: string = 'assignedAt';
-
-  @IsOptional()
-  @IsString()
-  order?: 'ASC' | 'DESC' = 'DESC';
 }

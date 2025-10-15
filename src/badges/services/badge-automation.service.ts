@@ -517,7 +517,7 @@ export class BadgeAutomationService {
         }
       } catch (error) {
         this.logger.warn(
-          `Failed to assign badge ${badgeType} to user ${userId}: ${error.message}`,
+          `Failed to assign badge ${badgeType} to user ${userId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
     }

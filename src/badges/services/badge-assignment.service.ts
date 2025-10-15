@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { BadgeAssignmentStatus, BadgeEntityType } from 'src/shared/constants';
+import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
+import { BaseService } from 'src/common/services/base.service';
+import {
+  BADGE_CONSTANTS,
+  BadgeAssignmentStatus,
+  BadgeEntityType,
+} from 'src/shared/constants';
+import { CacheService } from 'src/shared/services/cache/cache.service';
 import { Repository } from 'typeorm';
 import { BadgeAssignment } from '../entities/badge-assignment.entity';
 
@@ -9,13 +16,66 @@ import { BadgeAssignment } from '../entities/badge-assignment.entity';
  * Handles complex badge assignment operations and queries
  */
 @Injectable()
-export class BadgeAssignmentService {
+export class BadgeAssignmentService extends BaseService<BadgeAssignment> {
   private readonly logger = new Logger(BadgeAssignmentService.name);
 
   constructor(
     @InjectRepository(BadgeAssignment)
     private readonly badgeAssignmentRepository: Repository<BadgeAssignment>,
-  ) {}
+    cacheService: CacheService,
+  ) {
+    super(
+      new TypeOrmBaseRepository<BadgeAssignment>(badgeAssignmentRepository),
+      {
+        entityName: 'BadgeAssignment',
+        cache: {
+          enabled: true,
+          ttlSec: BADGE_CONSTANTS.CACHE_TTL_SEC,
+          swrSec: BADGE_CONSTANTS.CACHE_SWR_SEC,
+          prefix: 'badge_assignments',
+        },
+        defaultSearchField: 'assignmentReason',
+        relationsWhitelist: {
+          badge: true,
+        },
+        selectWhitelist: {
+          id: true,
+          badgeId: true,
+          entityType: true,
+          entityId: true,
+          status: true,
+          assignedAt: true,
+          expiresAt: true,
+          revokedAt: true,
+          assignedBy: true,
+          revokedBy: true,
+          assignmentReason: true,
+          revocationReason: true,
+          isVisible: true,
+          isManuallyRevokable: true,
+          metadata: true,
+          badge: {
+            id: true,
+            type: true,
+            name: true,
+            description: true,
+            category: true,
+            rarity: true,
+            iconUrl: true,
+            color: true,
+          },
+        },
+      },
+      cacheService,
+    );
+  }
+
+  /**
+   * Define which fields can be searched
+   */
+  protected getSearchableColumns(): (keyof BadgeAssignment)[] {
+    return ['assignmentReason', 'revocationReason'];
+  }
 
   /**
    * Get all active badge assignments for an entity
@@ -26,15 +86,21 @@ export class BadgeAssignmentService {
   ): Promise<BadgeAssignment[]> {
     this.logger.log(`Getting active assignments for ${entityType}:${entityId}`);
 
-    return this.badgeAssignmentRepository.find({
-      where: {
+    const result = await this.listOffset(
+      {
+        page: 1,
+        limit: 100,
+        sortBy: 'assignedAt',
+        order: 'DESC',
+      },
+      {
         entityType,
         entityId,
         status: BadgeAssignmentStatus.ACTIVE,
       },
-      relations: ['badge'],
-      order: { assignedAt: 'DESC' },
-    });
+      { relations: ['badge'] },
+    );
+    return result.result;
   }
 
   /**
@@ -43,11 +109,17 @@ export class BadgeAssignmentService {
   async getAssignmentsByBadge(badgeId: string): Promise<BadgeAssignment[]> {
     this.logger.log(`Getting assignments for badge: ${badgeId}`);
 
-    return this.badgeAssignmentRepository.find({
-      where: { badgeId },
-      relations: ['badge'],
-      order: { assignedAt: 'DESC' },
-    });
+    const result = await this.listOffset(
+      {
+        page: 1,
+        limit: 100,
+        sortBy: 'assignedAt',
+        order: 'DESC',
+      },
+      { badgeId },
+      { relations: ['badge'] },
+    );
+    return result.result;
   }
 
   /**
@@ -56,11 +128,17 @@ export class BadgeAssignmentService {
   async getAssignmentsByUser(userId: string): Promise<BadgeAssignment[]> {
     this.logger.log(`Getting assignments by user: ${userId}`);
 
-    return this.badgeAssignmentRepository.find({
-      where: { assignedBy: userId },
-      relations: ['badge'],
-      order: { assignedAt: 'DESC' },
-    });
+    const result = await this.listOffset(
+      {
+        page: 1,
+        limit: 100,
+        sortBy: 'assignedAt',
+        order: 'DESC',
+      },
+      { assignedBy: userId },
+      { relations: ['badge'] },
+    );
+    return result.result;
   }
 
   /**
@@ -69,13 +147,20 @@ export class BadgeAssignmentService {
   async getExpiredAssignments(): Promise<BadgeAssignment[]> {
     this.logger.log('Getting expired assignments');
 
-    return this.badgeAssignmentRepository.find({
-      where: {
+    const result = await this.listOffset(
+      {
+        page: 1,
+        limit: 100,
+        sortBy: 'assignedAt',
+        order: 'DESC',
+      },
+      {
         status: BadgeAssignmentStatus.ACTIVE,
         expiresAt: { $lt: new Date() } as any,
       },
-      relations: ['badge'],
-    });
+      { relations: ['badge'] },
+    );
+    return result.result;
   }
 
   /**
@@ -89,14 +174,20 @@ export class BadgeAssignmentService {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + days);
 
-    return this.badgeAssignmentRepository.find({
-      where: {
+    const result = await this.listOffset(
+      {
+        page: 1,
+        limit: 100,
+        sortBy: 'expiresAt',
+        order: 'ASC',
+      },
+      {
         status: BadgeAssignmentStatus.ACTIVE,
         expiresAt: { $lt: futureDate, $gt: new Date() } as any,
       },
-      relations: ['badge'],
-      order: { expiresAt: 'ASC' },
-    });
+      { relations: ['badge'] },
+    );
+    return result.result;
   }
 
   /**
@@ -149,7 +240,9 @@ export class BadgeAssignmentService {
         .getRawMany(),
     ]);
 
-    const assignmentsByEntityType = entityTypeStats.reduce(
+    const assignmentsByEntityType = (
+      entityTypeStats as Array<{ entityType: string; count: string }>
+    ).reduce(
       (acc, stat) => {
         acc[stat.entityType] = parseInt(stat.count);
         return acc;
@@ -157,7 +250,9 @@ export class BadgeAssignmentService {
       {} as Record<string, number>,
     );
 
-    const assignmentsByStatus = statusStats.reduce(
+    const assignmentsByStatus = (
+      statusStats as Array<{ status: string; count: string }>
+    ).reduce(
       (acc, stat) => {
         acc[stat.status] = parseInt(stat.count);
         return acc;
@@ -188,13 +283,11 @@ export class BadgeAssignmentService {
 
     let revokedCount = 0;
     for (const assignmentId of assignmentIds) {
-      const assignment = await this.badgeAssignmentRepository.findOne({
-        where: { id: assignmentId },
-      });
+      const assignment = await this.findById(assignmentId);
 
       if (assignment && assignment.isActive()) {
         assignment.revoke(revokedBy, reason);
-        await this.badgeAssignmentRepository.save(assignment);
+        await this.update(assignmentId, assignment);
         revokedCount++;
       }
     }
@@ -215,13 +308,11 @@ export class BadgeAssignmentService {
 
     let suspendedCount = 0;
     for (const assignmentId of assignmentIds) {
-      const assignment = await this.badgeAssignmentRepository.findOne({
-        where: { id: assignmentId },
-      });
+      const assignment = await this.findById(assignmentId);
 
       if (assignment && assignment.isActive()) {
         assignment.suspend(suspendedBy, reason);
-        await this.badgeAssignmentRepository.save(assignment);
+        await this.update(assignmentId, assignment);
         suspendedCount++;
       }
     }
@@ -238,13 +329,11 @@ export class BadgeAssignmentService {
 
     let reactivatedCount = 0;
     for (const assignmentId of assignmentIds) {
-      const assignment = await this.badgeAssignmentRepository.findOne({
-        where: { id: assignmentId },
-      });
+      const assignment = await this.findById(assignmentId);
 
       if (assignment && (assignment.isRevoked() || assignment.isSuspended())) {
         assignment.reactivate();
-        await this.badgeAssignmentRepository.save(assignment);
+        await this.update(assignmentId, assignment);
         reactivatedCount++;
       }
     }
@@ -265,19 +354,25 @@ export class BadgeAssignmentService {
       `Getting assignments from ${startDate.toISOString()} to ${endDate.toISOString()}`,
     );
 
-    const where: any = {
+    const extraFilter: Record<string, unknown> = {
       assignedAt: { $gte: startDate, $lte: endDate } as any,
     };
 
     if (entityType) {
-      where.entityType = entityType;
+      extraFilter.entityType = entityType;
     }
 
-    return this.badgeAssignmentRepository.find({
-      where,
-      relations: ['badge'],
-      order: { assignedAt: 'DESC' },
-    });
+    const result = await this.listOffset(
+      {
+        page: 1,
+        limit: 100,
+        sortBy: 'assignedAt',
+        order: 'DESC',
+      },
+      extraFilter,
+      { relations: ['badge'] },
+    );
+    return result.result;
   }
 
   /**
