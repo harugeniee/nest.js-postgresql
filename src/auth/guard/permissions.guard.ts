@@ -50,6 +50,10 @@ export class PermissionsGuard implements CanActivate {
       this.logger.warn('No user found in request for permission check');
       throw new UnauthorizedException({
         messageKey: 'auth.UNAUTHORIZED',
+        details: {
+          userId: user.uid,
+          message: 'User does not have the required permissions',
+        },
       });
     }
 
@@ -67,16 +71,16 @@ export class PermissionsGuard implements CanActivate {
         );
 
       if (!hasRequiredPermissions) {
-        this.logger.warn(
-          `User ${user.uid} denied access - insufficient permissions`,
-          {
-            userId: user.uid,
-            requiredPermissions: permissionOptions,
-          },
-        );
+        const details = {
+          userId: user.uid,
+          requiredPermissions: permissionOptions,
+          message: `User ${user.uid} denied access - insufficient permissions`,
+        };
+        this.logger.warn(details);
 
         throw new ForbiddenException({
           messageKey: 'auth.FORBIDDEN',
+          details: details,
         });
       }
 

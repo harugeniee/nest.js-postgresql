@@ -12,6 +12,7 @@ interface ExceptionResponse {
   code?: string;
   data?: unknown;
   message?: string;
+  details?: unknown;
 }
 
 interface WebSocketWithI18n extends Socket {
@@ -52,14 +53,14 @@ export class I18nWsExceptionFilter implements ExceptionFilter {
       message = translatedMessage;
     }
 
-    const detail = exceptionResponse?.message;
+    const details = exceptionResponse?.details;
 
     // Build error response for WebSocket
     const errorResponse = {
       success: false,
       type: 'error',
       message: message,
-      detail,
+      details,
       metadata: {
         messageKey,
         messageArgs,
