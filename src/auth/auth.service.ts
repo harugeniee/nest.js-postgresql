@@ -348,7 +348,7 @@ export class AuthService {
             messageKey: 'auth.OTP_NOT_FOUND',
             details: 'OTP code not found. Please request a new one.',
           },
-          HttpStatus.UNAUTHORIZED,
+          HttpStatus.NOT_FOUND,
         );
       }
 

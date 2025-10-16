@@ -31,7 +31,7 @@ export class ArticlesController {
     ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
     ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
   )
-  @RequirePermissions({ all: ['ARTICLE_CREATE'] })
+  // @RequirePermissions({ all: ['ARTICLE_CREATE'] })
   @Auth()
   create(
     @Body() createArticleDto: CreateArticleDto,
