@@ -14,7 +14,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     networks:
-      - nest-network
+      - manga_sbs
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 30s
@@ -31,7 +31,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - nest-network
+      - manga_sbs
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
@@ -54,7 +54,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - nest-network
+      - manga_sbs
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 30s
@@ -71,6 +71,8 @@ volumes:
     driver: local
 
 # Custom network for service communication
+# This network will be created first and shared with the main docker-compose.yml
 networks:
-  nest-network:
-    driver: bridge 
+  manga_sbs:
+    driver: bridge
+    name: manga_sbs 
