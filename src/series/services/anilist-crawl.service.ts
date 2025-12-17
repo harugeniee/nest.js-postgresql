@@ -2487,7 +2487,7 @@ export class AniListCrawlService {
    * Runs daily at 2 AM to fetch latest media data
    * @deprecated Use incrementalCrawl instead for gradual crawling
    */
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  // @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async scheduledCrawl(): Promise<void> {
     this.logger.log('Starting scheduled AniList crawl job');
 
