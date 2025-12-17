@@ -1,15 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Between, Repository } from 'typeorm';
 
+import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
+import { BaseService } from 'src/common/services/base.service';
+import { CacheService } from 'src/shared/services';
 import { ShareAggDaily } from './entities/share-agg-daily.entity';
-import { ShareLink } from './entities/share-link.entity';
 import { ShareClick } from './entities/share-click.entity';
 import { ShareConversion } from './entities/share-conversion.entity';
-import { BaseService } from 'src/common/services/base.service';
-import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
-import { CacheService } from 'src/shared/services';
+import { ShareLink } from './entities/share-link.entity';
 
 /**
  * Share aggregation service for daily metrics aggregation
@@ -58,7 +57,7 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
    * Daily aggregation job - runs at 2 AM every day
    * Aggregates metrics for the previous day
    */
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  // @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async runDailyAggregation(): Promise<void> {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -331,7 +330,7 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
    * Clean up old aggregation data
    * Remove aggregations older than 1 year
    */
-  @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
+  // @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
   async cleanupOldAggregations(): Promise<void> {
     const cutoffDate = new Date();
     cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
@@ -350,7 +349,7 @@ export class ShareAggregationService extends BaseService<ShareAggDaily> {
    * Clean up old click data
    * Remove clicks older than 90 days
    */
-  @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
+  // @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
   async cleanupOldClicks(): Promise<void> {
     const cutoffDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 

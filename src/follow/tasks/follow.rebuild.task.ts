@@ -98,7 +98,7 @@ export class FollowRebuildTask {
    * Clean up old edge records
    * Runs daily at 2 AM
    */
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  // @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async cleanupOldEdges(): Promise<void> {
     try {
       this.logger.log('🧹 Starting edge cleanup task');
@@ -122,7 +122,7 @@ export class FollowRebuildTask {
    * Validate bitset consistency
    * Runs daily at 3 AM
    */
-  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  // @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async validateConsistency(): Promise<void> {
     try {
       this.logger.log('🔍 Starting consistency validation task');
