@@ -93,6 +93,8 @@ jobs:
       
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@master
+        env:
+          PROD_ENV_CONTENT: ${{ secrets.PRODUCTION_ENV_FILE }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_SSH_USERNAME }}
@@ -120,10 +122,12 @@ jobs:
               docker network create --driver bridge "${{ env.DOCKER_NETWORK }}"
             fi
             
-            # Create .env file from single GitHub Secret (similar to GitLab CI env_file)
-            # Single secret PRODUCTION_ENV_FILE contains entire .env file content
+            # Create .env file from environment variable (safer method)
             ENV_FILE="/tmp/${{ env.CONTAINER_NAME }}.env"
-            echo "${{ secrets.PRODUCTION_ENV_FILE }}" > "${ENV_FILE}"
+            # Use heredoc without quotes to expand environment variable
+            cat > "${ENV_FILE}" << ENV_EOF
+            ${PROD_ENV_CONTENT}
+            ENV_EOF
             
             # Run new container with environment file (like GitLab CI env_file)
             # Join Docker network: manga_sbs (bridge driver)
