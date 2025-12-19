@@ -164,6 +164,8 @@ jobs:
             # Create .env file from base64 encoded content (safe method)
             # This avoids bash syntax errors with special characters in secret
             ENV_FILE="/tmp/${{ env.CONTAINER_NAME }}.env"
+            ENV_FILE_EXPANDED="/tmp/${{ env.CONTAINER_NAME }}.env.expanded"
+            
             # Decode base64 content to preserve exact format (critical for PEM keys and multi-line values)
             # Strip any whitespace/newlines from base64 string before decoding
             BASE64_STR=$(printf '%s' "${{ steps.encode_env.outputs.ENV_B64 }}" | tr -d ' \n\r\t')
@@ -178,6 +180,73 @@ jobs:
               echo "Error: .env file was not created"
               exit 1
             fi
+            
+            # Expand environment variables in .env file (e.g., ${VAR} -> actual value)
+            # This is needed because Docker --env-file doesn't expand variables
+            # and NestJS expandVariables only works when reading from file, not process.env
+            echo "Expanding environment variables in .env file..."
+            
+            # Use envsubst if available (cleanest method), otherwise use manual expansion
+            if command -v envsubst >/dev/null 2>&1; then
+              # First pass: Load variables without expansion
+              declare -A env_vars
+              while IFS= read -r line || [ -n "$line" ]; do
+                if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
+                  continue
+                fi
+                if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                  VAR_NAME="${BASH_REMATCH[1]// /}"
+                  VAR_VALUE="${BASH_REMATCH[2]}"
+                  env_vars["${VAR_NAME}"]="${VAR_VALUE}"
+                fi
+              done < "${ENV_FILE}"
+              
+              # Export variables for envsubst
+              for var_name in "${!env_vars[@]}"; do
+                export "${var_name}"="${env_vars[$var_name]}"
+              done
+              
+              # Use envsubst to expand variables
+              envsubst < "${ENV_FILE}" > "${ENV_FILE_EXPANDED}"
+            else
+              # Fallback: Manual expansion (2 passes)
+              # Pass 1: Load all variables
+              declare -A env_vars
+              while IFS= read -r line || [ -n "$line" ]; do
+                if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
+                  continue
+                fi
+                if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                  VAR_NAME="${BASH_REMATCH[1]// /}"
+                  VAR_VALUE="${BASH_REMATCH[2]}"
+                  env_vars["${VAR_NAME}"]="${VAR_VALUE}"
+                fi
+              done < "${ENV_FILE}"
+              
+              # Pass 2: Expand and write
+              while IFS= read -r line || [ -n "$line" ]; do
+                if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
+                  echo "$line" >> "${ENV_FILE_EXPANDED}"
+                  continue
+                fi
+                if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                  VAR_NAME="${BASH_REMATCH[1]}"
+                  VAR_VALUE="${BASH_REMATCH[2]}"
+                  # Expand recursively (handle nested ${VAR})
+                  EXPANDED_VALUE="${VAR_VALUE}"
+                  for var_key in "${!env_vars[@]}"; do
+                    EXPANDED_VALUE="${EXPANDED_VALUE//\$\{${var_key}\}/${env_vars[$var_key]}}"
+                  done
+                  echo "${VAR_NAME}=${EXPANDED_VALUE}" >> "${ENV_FILE_EXPANDED}"
+                else
+                  echo "$line" >> "${ENV_FILE_EXPANDED}"
+                fi
+              done < "${ENV_FILE}"
+            fi
+            
+            # Replace original file with expanded version
+            mv "${ENV_FILE_EXPANDED}" "${ENV_FILE}"
+            echo "Environment variables expanded successfully"
             
             # Check file size (should be > 0)
             FILE_SIZE=$(stat -f%z "${ENV_FILE}" 2>/dev/null || stat -c%s "${ENV_FILE}" 2>/dev/null || wc -c < "${ENV_FILE}" || echo "0")
