@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
+import { AdvancedPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
@@ -8,6 +8,7 @@ import { ReactionCount } from 'src/reactions/entities/reaction-count.entity';
 import { ReactionsService } from 'src/reactions/reactions.service';
 import { CacheService } from 'src/shared/services';
 import { DeepPartial, Repository } from 'typeorm';
+import { QueryCharacterCursorDto } from './dto';
 import { Character } from './entities/character.entity';
 
 @Injectable()
@@ -24,9 +25,14 @@ export class CharactersService extends BaseService<Character> {
         entityName: 'Character',
         cache: { enabled: true, ttlSec: 60, prefix: 'characters', swrSec: 30 },
         defaultSearchField: 'description',
-        relationsWhitelist: {},
+        relationsWhitelist: {
+          voiceActors: {
+            staff: true,
+          },
+        },
         selectWhitelist: {
           id: true,
+          seriesId: true,
           name: true,
           image: true,
           description: true,
@@ -117,9 +123,20 @@ export class CharactersService extends BaseService<Character> {
    * Get all characters with cursor pagination
    */
   async findAllCursor(
-    paginationDto: CursorPaginationDto,
+    queryDto: QueryCharacterCursorDto,
   ): Promise<IPaginationCursor<Character>> {
-    return this.listCursor(paginationDto);
+    const extraFilter: Record<string, unknown> = {};
+    const { seriesId } = queryDto;
+    if (seriesId) {
+      extraFilter.seriesId = seriesId;
+    }
+    return this.listCursor(queryDto, extraFilter, {
+      relations: {
+        voiceActors: {
+          staff: true,
+        },
+      },
+    });
   }
 
   /**

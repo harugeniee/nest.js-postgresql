@@ -446,7 +446,7 @@ export class WorkerController {
     try {
       // Parse job if it's a string
       if (typeof job === 'string') {
-        job = JSON.parse(job as string) as SeriesSaveJob;
+        job = JSON.parse(job) as SeriesSaveJob;
       }
 
       console.log('Series save job received:', job.jobId);
@@ -473,15 +473,13 @@ export class WorkerController {
     try {
       // Parse job if it's a string
       if (typeof job === 'string') {
-        job = JSON.parse(job as string) as SeriesCrawlJob;
+        job = JSON.parse(job) as SeriesCrawlJob;
       }
 
       console.log('Series crawl job received:', job.jobId);
       channel.ack(originalMsg);
 
       await this.workerService.processSeriesCrawl(job);
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     } catch (error: unknown) {
       console.log('Error processing series crawl:', error);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access

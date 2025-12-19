@@ -1,5 +1,5 @@
 import { IsIn, IsOptional, IsString } from 'class-validator';
-import { AdvancedPaginationDto } from 'src/common/dto';
+import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { CHARACTER_CONSTANTS } from 'src/shared/constants';
 
 /**
@@ -15,4 +15,17 @@ export class QueryCharacterDto extends AdvancedPaginationDto {
   @IsString()
   @IsIn(Object.values(CHARACTER_CONSTANTS.BLOOD_TYPES))
   bloodType?: string;
+}
+
+/**
+ * DTO for querying characters with cursor pagination
+ */
+export class QueryCharacterCursorDto extends CursorPaginationDto {
+  /**
+   * Filter by gender
+   * Optional - filter characters by gender
+   */
+  @IsOptional()
+  @IsString()
+  seriesId?: string;
 }

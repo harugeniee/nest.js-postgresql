@@ -16,6 +16,7 @@ import { SnowflakeIdPipe } from 'src/common/pipes';
 import { CharactersService } from './characters.service';
 import {
   CreateCharacterDto,
+  QueryCharacterCursorDto,
   QueryCharacterDto,
   UpdateCharacterDto,
 } from './dto';
@@ -47,8 +48,8 @@ export class CharactersController {
    * Get all characters with cursor pagination
    */
   @Get('cursor')
-  async findAllCursor(@Query() paginationDto: CursorPaginationDto) {
-    return this.charactersService.findAllCursor(paginationDto);
+  async findAllCursor(@Query() queryDto: QueryCharacterCursorDto) {
+    return this.charactersService.findAllCursor(queryDto);
   }
 
   /**
