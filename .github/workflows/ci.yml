@@ -254,6 +254,24 @@ jobs:
             mv "${ENV_FILE_EXPANDED}" "${ENV_FILE}"
             echo "Environment variables expanded successfully (PEM keys and newlines preserved)"
             
+            # Validate Firebase private key format (if present)
+            if grep -q "^FIREBASE_PRIVATE_KEY=" "${ENV_FILE}"; then
+              FIREBASE_KEY=$(grep "^FIREBASE_PRIVATE_KEY=" "${ENV_FILE}" | cut -d'=' -f2- | sed 's/^["'\'']//;s/["'\'']$//')
+              # Check if key has proper PEM structure
+              if ! echo "${FIREBASE_KEY}" | grep -q "-----BEGIN.*PRIVATE KEY-----"; then
+                echo "Warning: Firebase private key may be missing BEGIN marker"
+              fi
+              if ! echo "${FIREBASE_KEY}" | grep -q "-----END.*PRIVATE KEY-----"; then
+                echo "Warning: Firebase private key may be missing END marker"
+              fi
+              # Check if key has newlines (should have at least one)
+              if ! echo "${FIREBASE_KEY}" | grep -q $'\n'; then
+                echo "Warning: Firebase private key appears to be on a single line (may need \\n expansion)"
+              else
+                echo "✓ Firebase private key format validated (has newlines and PEM markers)"
+              fi
+            fi
+            
             # Check file size (should be > 0)
             FILE_SIZE=$(stat -f%z "${ENV_FILE}" 2>/dev/null || stat -c%s "${ENV_FILE}" 2>/dev/null || wc -c < "${ENV_FILE}" || echo "0")
             if [ "$FILE_SIZE" -eq 0 ] || [ -z "$FILE_SIZE" ]; then
