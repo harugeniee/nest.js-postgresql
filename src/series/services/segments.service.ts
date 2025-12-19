@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
@@ -10,6 +10,7 @@ import {
   FindOptionsRelations,
   FindOptionsSelect,
   FindOptionsWhere,
+  IsNull,
   Repository,
 } from 'typeorm';
 import { QuerySegmentCursorDto } from '../dto/query-segment-cursor.dto';
@@ -416,19 +417,35 @@ export class SegmentsService extends BaseService<Segments> {
    * @param seriesId Series ID
    * @param currentNumber Current segment number
    * @param currentSubNumber Optional current sub-number
+   * @param languageCode Optional language code to filter segments by same language
    * @returns Next segment or null if not found
    */
   async getNextSegment(
     seriesId: string,
     currentNumber: number,
     currentSubNumber?: number,
+    languageCode?: string | null,
   ): Promise<Segments | null> {
+    // Build where clause with optional languageCode filter
+    const where: FindOptionsWhere<Segments> = {
+      seriesId,
+      status: 'active',
+    };
+
+    // Filter by languageCode if provided
+    // If languageCode is null, filter for segments with null languageCode
+    // If languageCode is undefined, don't filter (backward compatibility)
+    if (languageCode !== undefined) {
+      if (languageCode === null) {
+        where.languageCode = IsNull();
+      } else {
+        where.languageCode = languageCode;
+      }
+    }
+
     // Find all active segments for the series, ordered by number and subNumber
     const segments = await this.segmentsRepository.find({
-      where: {
-        seriesId,
-        status: 'active',
-      },
+      where,
       order: {
         number: 'ASC',
         subNumber: 'ASC',
@@ -457,19 +474,35 @@ export class SegmentsService extends BaseService<Segments> {
    * @param seriesId Series ID
    * @param currentNumber Current segment number
    * @param currentSubNumber Optional current sub-number
+   * @param languageCode Optional language code to filter segments by same language
    * @returns Previous segment or null if not found
    */
   async getPreviousSegment(
     seriesId: string,
     currentNumber: number,
     currentSubNumber?: number,
+    languageCode?: string | null,
   ): Promise<Segments | null> {
+    // Build where clause with optional languageCode filter
+    const where: FindOptionsWhere<Segments> = {
+      seriesId,
+      status: 'active',
+    };
+
+    // Filter by languageCode if provided
+    // If languageCode is null, filter for segments with null languageCode
+    // If languageCode is undefined, don't filter (backward compatibility)
+    if (languageCode !== undefined) {
+      if (languageCode === null) {
+        where.languageCode = IsNull();
+      } else {
+        where.languageCode = languageCode;
+      }
+    }
+
     // Find all active segments for the series, ordered by number and subNumber (descending)
     const segments = await this.segmentsRepository.find({
-      where: {
-        seriesId,
-        status: 'active',
-      },
+      where,
       order: {
         number: 'DESC',
         subNumber: 'DESC',
@@ -491,5 +524,65 @@ export class SegmentsService extends BaseService<Segments> {
     }
 
     return null;
+  }
+
+  /**
+   * Get the next segment in a series by segment ID
+   * Automatically extracts languageCode and subNumber from the current segment
+   * to ensure the next segment is in the same language
+   * @param segmentId Current segment ID
+   * @returns Next segment (same language) or null if not found
+   * @throws NotFoundException if segment not found
+   */
+  async getNextSegmentById(segmentId: string): Promise<Segments | null> {
+    // Get the current segment by ID
+    const currentSegment = await this.findById(segmentId);
+
+    if (!currentSegment) {
+      throw new NotFoundException({
+        messageKey: 'segments.notFound',
+        suggestion: 'segments.checkId',
+      });
+    }
+
+    // Extract information from current segment
+    const seriesId = currentSegment.seriesId;
+    const number = currentSegment.number;
+    const subNumber = currentSegment.subNumber;
+    const languageCode = currentSegment.languageCode;
+
+    // Call getNextSegment with extracted languageCode
+    // Pass languageCode as-is (could be string, null, or undefined)
+    return this.getNextSegment(seriesId, number, subNumber, languageCode);
+  }
+
+  /**
+   * Get the previous segment in a series by segment ID
+   * Automatically extracts languageCode and subNumber from the current segment
+   * to ensure the previous segment is in the same language
+   * @param segmentId Current segment ID
+   * @returns Previous segment (same language) or null if not found
+   * @throws NotFoundException if segment not found
+   */
+  async getPreviousSegmentById(segmentId: string): Promise<Segments | null> {
+    // Get the current segment by ID
+    const currentSegment = await this.findById(segmentId);
+
+    if (!currentSegment) {
+      throw new NotFoundException({
+        messageKey: 'segments.notFound',
+        suggestion: 'segments.checkId',
+      });
+    }
+
+    // Extract information from current segment
+    const seriesId = currentSegment.seriesId;
+    const number = currentSegment.number;
+    const subNumber = currentSegment.subNumber;
+    const languageCode = currentSegment.languageCode;
+
+    // Call getPreviousSegment with extracted languageCode
+    // Pass languageCode as-is (could be string, null, or undefined)
+    return this.getPreviousSegment(seriesId, number, subNumber, languageCode);
   }
 }

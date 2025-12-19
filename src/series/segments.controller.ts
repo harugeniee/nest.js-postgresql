@@ -191,6 +191,30 @@ export class SegmentsController {
   }
 
   /**
+   * Get the next segment by segment ID
+   * Automatically extracts languageCode and subNumber from the current segment
+   * to return the next segment in the same language
+   * @param id Current segment ID (Snowflake ID)
+   * @returns Next segment (same language) or null if not found
+   */
+  @Get(':id/next')
+  async getNextSegmentById(@Param('id', SnowflakeIdPipe) id: string) {
+    return this.segmentsService.getNextSegmentById(id);
+  }
+
+  /**
+   * Get the previous segment by segment ID
+   * Automatically extracts languageCode and subNumber from the current segment
+   * to return the previous segment in the same language
+   * @param id Current segment ID (Snowflake ID)
+   * @returns Previous segment (same language) or null if not found
+   */
+  @Get(':id/previous')
+  async getPreviousSegmentById(@Param('id', SnowflakeIdPipe) id: string) {
+    return this.segmentsService.getPreviousSegmentById(id);
+  }
+
+  /**
    * Get a segment by ID
    * @param id Segment ID (Snowflake ID)
    * @returns Segment entity or null if not found
