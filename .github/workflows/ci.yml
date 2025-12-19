@@ -184,59 +184,65 @@ jobs:
             # Expand environment variables in .env file (e.g., ${VAR} -> actual value)
             # This is needed because Docker --env-file doesn't expand variables
             # and NestJS expandVariables only works when reading from file, not process.env
-            echo "Expanding environment variables in .env file..."
+            # IMPORTANT: Preserve newlines and escape sequences for PEM keys and multi-line values
+            echo "Expanding environment variables in .env file (preserving PEM keys and multi-line values)..."
             
-            # Use envsubst if available (cleanest method), otherwise use manual expansion
+            # Load variables first (preserving escape sequences like \n)
+            declare -A env_vars
+            while IFS= read -r line || [ -n "$line" ]; do
+              # Skip empty lines and comments
+              [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+              
+              # Extract variable name and value
+              if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                VAR_NAME="${BASH_REMATCH[1]// /}"
+                VAR_VALUE="${BASH_REMATCH[2]}"
+                
+                # Remove surrounding quotes if present, but preserve content
+                if [[ "$VAR_VALUE" =~ ^\"(.*)\"$ ]]; then
+                  VAR_VALUE="${BASH_REMATCH[1]}"
+                elif [[ "$VAR_VALUE" =~ ^\'(.*)\'$ ]]; then
+                  VAR_VALUE="${BASH_REMATCH[1]}"
+                fi
+                
+                # Store value (will interpret \n later when expanding)
+                env_vars["${VAR_NAME}"]="${VAR_VALUE}"
+              fi
+            done < "${ENV_FILE}"
+            
+            # Export variables for expansion (interpret escape sequences with printf %b)
+            for var_name in "${!env_vars[@]}"; do
+              # Use printf %b to interpret escape sequences like \n
+              EXPANDED_VAL=$(printf '%b' "${env_vars[$var_name]}")
+              export "${var_name}"="${EXPANDED_VAL}"
+            done
+            
+            # Expand variables in file using envsubst (preserves newlines better than manual expansion)
             if command -v envsubst >/dev/null 2>&1; then
-              # First pass: Load variables without expansion
-              declare -A env_vars
-              while IFS= read -r line || [ -n "$line" ]; do
-                if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
-                  continue
-                fi
-                if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
-                  VAR_NAME="${BASH_REMATCH[1]// /}"
-                  VAR_VALUE="${BASH_REMATCH[2]}"
-                  env_vars["${VAR_NAME}"]="${VAR_VALUE}"
-                fi
-              done < "${ENV_FILE}"
-              
-              # Export variables for envsubst
-              for var_name in "${!env_vars[@]}"; do
-                export "${var_name}"="${env_vars[$var_name]}"
-              done
-              
-              # Use envsubst to expand variables
               envsubst < "${ENV_FILE}" > "${ENV_FILE_EXPANDED}"
             else
-              # Fallback: Manual expansion (2 passes)
-              # Pass 1: Load all variables
-              declare -A env_vars
+              # Manual expansion fallback (preserve newlines)
               while IFS= read -r line || [ -n "$line" ]; do
-                if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
-                  continue
-                fi
-                if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
-                  VAR_NAME="${BASH_REMATCH[1]// /}"
-                  VAR_VALUE="${BASH_REMATCH[2]}"
-                  env_vars["${VAR_NAME}"]="${VAR_VALUE}"
-                fi
-              done < "${ENV_FILE}"
-              
-              # Pass 2: Expand and write
-              while IFS= read -r line || [ -n "$line" ]; do
+                # Skip empty lines and comments
                 if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
                   echo "$line" >> "${ENV_FILE_EXPANDED}"
                   continue
                 fi
+                
+                # Extract and expand
                 if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
                   VAR_NAME="${BASH_REMATCH[1]}"
                   VAR_VALUE="${BASH_REMATCH[2]}"
-                  # Expand recursively (handle nested ${VAR})
-                  EXPANDED_VALUE="${VAR_VALUE}"
-                  for var_key in "${!env_vars[@]}"; do
-                    EXPANDED_VALUE="${EXPANDED_VALUE//\$\{${var_key}\}/${env_vars[$var_key]}}"
-                  done
+                  
+                  # Remove quotes if present
+                  if [[ "$VAR_VALUE" =~ ^\"(.*)\"$ ]]; then
+                    VAR_VALUE="${BASH_REMATCH[1]}"
+                  elif [[ "$VAR_VALUE" =~ ^\'(.*)\'$ ]]; then
+                    VAR_VALUE="${BASH_REMATCH[1]}"
+                  fi
+                  
+                  # Expand ${VAR} references using eval (variables are exported)
+                  EXPANDED_VALUE=$(eval "printf '%b' \"${VAR_VALUE}\"")
                   echo "${VAR_NAME}=${EXPANDED_VALUE}" >> "${ENV_FILE_EXPANDED}"
                 else
                   echo "$line" >> "${ENV_FILE_EXPANDED}"
@@ -246,7 +252,7 @@ jobs:
             
             # Replace original file with expanded version
             mv "${ENV_FILE_EXPANDED}" "${ENV_FILE}"
-            echo "Environment variables expanded successfully"
+            echo "Environment variables expanded successfully (PEM keys and newlines preserved)"
             
             # Check file size (should be > 0)
             FILE_SIZE=$(stat -f%z "${ENV_FILE}" 2>/dev/null || stat -c%s "${ENV_FILE}" 2>/dev/null || wc -c < "${ENV_FILE}" || echo "0")
