@@ -38,6 +38,10 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy i18n translation files (required at runtime by nestjs-i18n)
+# The i18n module looks for translations at ../i18n/ relative to dist folder
+COPY --from=builder /app/src/i18n ./i18n
+
 # Copy only package.json (without devDependencies) for runtime metadata if needed
 # Remove yarn.lock as it's not needed in production
 COPY --from=builder /app/package.json ./package.json
