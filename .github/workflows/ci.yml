@@ -78,7 +78,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
       
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -100,35 +100,43 @@ jobs:
           port: 22
           script: |
             # Login to GitHub Container Registry
-            echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME }} --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
             
-            # Pull latest image
-            docker pull ghcr.io/${{ secrets.GHCR_USERNAME }}/${{ github.event.repository.name }}:latest
+            # Determine image tag (use branch name)
+            IMAGE_TAG="blog"
+            IMAGE_NAME="ghcr.io/${{ secrets.GHCR_USERNAME }}/${{ github.event.repository.name }}:${IMAGE_TAG}"
+            
+            # Pull image with branch tag
+            docker pull "${IMAGE_NAME}"
             
             # Stop old container (ignore errors if not exists)
-            docker stop ${{ env.CONTAINER_NAME }} || true
+            docker stop "${{ env.CONTAINER_NAME }}" 2>/dev/null || true
             
             # Remove old container (ignore errors if not exists)
-            docker rm ${{ env.CONTAINER_NAME }} || true
+            docker rm "${{ env.CONTAINER_NAME }}" 2>/dev/null || true
             
             # Create Docker network if it doesn't exist (bridge driver)
-            docker network inspect ${{ env.DOCKER_NETWORK }} >/dev/null 2>&1 || \
-              docker network create --driver bridge ${{ env.DOCKER_NETWORK }}
+            if ! docker network inspect "${{ env.DOCKER_NETWORK }}" >/dev/null 2>&1; then
+              docker network create --driver bridge "${{ env.DOCKER_NETWORK }}"
+            fi
             
             # Create .env file from single GitHub Secret (similar to GitLab CI env_file)
             # Single secret PRODUCTION_ENV_FILE contains entire .env file content
             ENV_FILE="/tmp/${{ env.CONTAINER_NAME }}.env"
-            echo "${{ secrets.PRODUCTION_ENV_FILE }}" > "$ENV_FILE"
+            echo "${{ secrets.PRODUCTION_ENV_FILE }}" > "${ENV_FILE}"
             
             # Run new container with environment file (like GitLab CI env_file)
             # Join Docker network: manga_sbs (bridge driver)
             docker run -d \
-              --name ${{ env.CONTAINER_NAME }} \
+              --name "${{ env.CONTAINER_NAME }}" \
               --restart unless-stopped \
-              --network ${{ env.DOCKER_NETWORK }} \
-              -p ${{ env.HOST_PORT }}:${{ env.CONTAINER_PORT }} \
-              --env-file "$ENV_FILE" \
-              ghcr.io/${{ secrets.GHCR_USERNAME }}/${{ github.event.repository.name }}:latest
+              --network "${{ env.DOCKER_NETWORK }}" \
+              -p "${{ env.HOST_PORT }}:${{ env.CONTAINER_PORT }}" \
+              --env-file "${ENV_FILE}" \
+              "${IMAGE_NAME}"
             
             # Clean up .env file after container starts (optional, for security)
-            rm -f "$ENV_FILE"
+            rm -f "${ENV_FILE}"
+            
+            # Verify container is running
+            docker ps | grep "${{ env.CONTAINER_NAME }}" || echo "Warning: Container may not be running"
