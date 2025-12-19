@@ -93,8 +93,6 @@ jobs:
       
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@master
-        env:
-          PROD_ENV_CONTENT: ${{ secrets.PRODUCTION_ENV_FILE }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_SSH_USERNAME }}
@@ -122,12 +120,33 @@ jobs:
               docker network create --driver bridge "${{ env.DOCKER_NETWORK }}"
             fi
             
-            # Create .env file from environment variable (safer method)
+            # Create .env file from secret (direct expansion method)
             ENV_FILE="/tmp/${{ env.CONTAINER_NAME }}.env"
-            # Use heredoc without quotes to expand environment variable
-            cat > "${ENV_FILE}" << ENV_EOF
-            ${PROD_ENV_CONTENT}
-            ENV_EOF
+            # Write secret content directly - GitHub Actions expands secrets before script execution
+            # Using heredoc without quotes allows secret expansion
+            cat > "${ENV_FILE}" << EOF
+            ${{ secrets.PRODUCTION_ENV_FILE }}
+            EOF
+            
+            # Verify .env file was created and has content
+            if [ ! -f "${ENV_FILE}" ]; then
+              echo "Error: .env file was not created"
+              exit 1
+            fi
+            
+            # Check file size (should be > 0)
+            FILE_SIZE=$(stat -f%z "${ENV_FILE}" 2>/dev/null || stat -c%s "${ENV_FILE}" 2>/dev/null || wc -c < "${ENV_FILE}" || echo "0")
+            if [ "$FILE_SIZE" -eq 0 ] || [ -z "$FILE_SIZE" ]; then
+              echo "Error: .env file appears to be empty (size check: ${FILE_SIZE})"
+              echo "File content preview (first 100 chars):"
+              head -c 100 "${ENV_FILE}" || echo "(cannot read file)"
+              exit 1
+            fi
+            
+            # Show first few lines of .env file for debugging (without values)
+            echo "Env file created successfully (size: ${FILE_SIZE} bytes). First few variable names:"
+            head -5 "${ENV_FILE}" | cut -d'=' -f1 | sed 's/^/  - /' || true
+            echo "Total lines in .env file: $(wc -l < "${ENV_FILE}" || echo "0")"
             
             # Run new container with environment file (like GitLab CI env_file)
             # Join Docker network: manga_sbs (bridge driver)
@@ -138,6 +157,9 @@ jobs:
               -p "${{ env.HOST_PORT }}:${{ env.CONTAINER_PORT }}" \
               --env-file "${ENV_FILE}" \
               "${IMAGE_NAME}"
+            
+            # Wait a moment for container to start
+            sleep 2
             
             # Clean up .env file after container starts (optional, for security)
             rm -f "${ENV_FILE}"
