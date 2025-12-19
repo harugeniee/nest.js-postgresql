@@ -123,10 +123,9 @@ jobs:
             # Create .env file from secret (direct expansion method)
             ENV_FILE="/tmp/${{ env.CONTAINER_NAME }}.env"
             # Write secret content directly - GitHub Actions expands secrets before script execution
-            # Using heredoc without quotes allows secret expansion
-            cat > "${ENV_FILE}" << EOF
-            ${{ secrets.PRODUCTION_ENV_FILE }}
-            EOF
+            # Using printf to preserve exact format (critical for PEM keys and multi-line values)
+            # This ensures no extra spaces or indentation are added
+            printf '%s' "${{ secrets.PRODUCTION_ENV_FILE }}" > "${ENV_FILE}"
             
             # Verify .env file was created and has content
             if [ ! -f "${ENV_FILE}" ]; then
