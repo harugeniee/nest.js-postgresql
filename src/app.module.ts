@@ -60,7 +60,9 @@ import { WorkerModule } from './workers/worker.module';
     ConfigModule.forRoot({
       validationSchema: configValidationSchema,
       isGlobal: true,
-      envFilePath: '.env',
+      // Only use .env file if it exists (for local development)
+      // In Docker/production, use --env-file which sets environment variables directly
+      envFilePath: process.env.NODE_ENV === 'production' ? undefined : '.env',
       expandVariables: true,
       cache: true,
       load: [

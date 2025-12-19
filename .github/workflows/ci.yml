@@ -234,18 +234,31 @@ jobs:
             echo "Total lines in .env file: $(wc -l < "${ENV_FILE}" || echo "0")"
             echo "Required variables (DATABASE_URL, REDIS_URL, RABBITMQ_URL) are present and non-empty"
             
+            # Test that environment variables are properly set (dry run)
+            # This helps catch env var issues before the app starts
+            echo "Verifying environment variables are set correctly..."
+            docker run --rm --env-file "${ENV_FILE}" "${IMAGE_NAME}" \
+              sh -c 'test -n "$DATABASE_URL" && test -n "$REDIS_URL" && test -n "$RABBITMQ_URL" && echo "✓ All required environment variables are set" || (echo "✗ Missing required environment variables" && exit 1)' || {
+              echo "Error: Required environment variables are not set in container"
+              echo "Checking .env file content (variable names only):"
+              head -10 "${ENV_FILE}" | cut -d'=' -f1 || true
+              exit 1
+            }
+            
             # Run new container with environment file (like GitLab CI env_file)
             # Join Docker network: manga_sbs (bridge driver)
+            # Set NODE_ENV=production to ensure ConfigModule uses process.env instead of .env file
             docker run -d \
               --name "${{ env.CONTAINER_NAME }}" \
               --restart unless-stopped \
               --network "${{ env.DOCKER_NETWORK }}" \
               -p "${{ env.HOST_PORT }}:${{ env.CONTAINER_PORT }}" \
+              -e NODE_ENV=production \
               --env-file "${ENV_FILE}" \
               "${IMAGE_NAME}"
             
             # Wait a moment for container to start
-            sleep 2
+            sleep 3
             
             # Clean up .env file after container starts (optional, for security)
             rm -f "${ENV_FILE}"
