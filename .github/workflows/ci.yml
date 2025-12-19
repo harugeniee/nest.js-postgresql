@@ -93,10 +93,20 @@ jobs:
       
       - name: Encode environment file to base64
         id: encode_env
+        env:
+          ENV_CONTENT: ${{ secrets.PRODUCTION_ENV_FILE }}
         run: |
-          echo "${{ secrets.PRODUCTION_ENV_FILE }}" | base64 -w 0 | tr -d '\n' > /tmp/env_base64.txt
+          # Write secret directly to file using printf to avoid shell interpretation issues
+          # This handles multi-line content, special characters, and newlines safely
+          # Use %b to interpret escape sequences, or %s to preserve exactly as-is
+          printf '%s' "$ENV_CONTENT" > /tmp/env_raw.txt
+          # Encode to base64 (remove newlines for single-line output)
+          # Try GNU base64 first (with -w 0), fallback to standard base64 + tr
+          base64 -w 0 /tmp/env_raw.txt > /tmp/env_base64.txt 2>/dev/null || base64 /tmp/env_raw.txt | tr -d '\n' > /tmp/env_base64.txt
           ENV_B64=$(cat /tmp/env_base64.txt)
           echo "ENV_B64=${ENV_B64}" >> $GITHUB_OUTPUT
+          # Clean up temporary file
+          rm -f /tmp/env_raw.txt
       
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@master
