@@ -96,15 +96,39 @@ jobs:
         env:
           ENV_CONTENT: ${{ secrets.PRODUCTION_ENV_FILE }}
         run: |
+          # Validate that secret is not empty
+          if [ -z "$ENV_CONTENT" ]; then
+            echo "Error: PRODUCTION_ENV_FILE secret is empty or not set"
+            exit 1
+          fi
+          
           # Write secret directly to file using printf to avoid shell interpretation issues
           # This handles multi-line content, special characters, and newlines safely
-          # Use %b to interpret escape sequences, or %s to preserve exactly as-is
+          # Use %s to preserve exactly as-is (no interpretation)
           printf '%s' "$ENV_CONTENT" > /tmp/env_raw.txt
+          
+          # Verify file was created and has content
+          if [ ! -s /tmp/env_raw.txt ]; then
+            echo "Error: Failed to write environment content to file"
+            exit 1
+          fi
+          
           # Encode to base64 (remove newlines for single-line output)
           # Try GNU base64 first (with -w 0), fallback to standard base64 + tr
           base64 -w 0 /tmp/env_raw.txt > /tmp/env_base64.txt 2>/dev/null || base64 /tmp/env_raw.txt | tr -d '\n' > /tmp/env_base64.txt
+          
+          # Verify base64 encoding succeeded
+          if [ ! -s /tmp/env_base64.txt ]; then
+            echo "Error: Failed to encode environment file to base64"
+            exit 1
+          fi
+          
           ENV_B64=$(cat /tmp/env_base64.txt)
           echo "ENV_B64=${ENV_B64}" >> $GITHUB_OUTPUT
+          
+          # Log success (without exposing content)
+          echo "Environment file encoded successfully (original size: $(wc -c < /tmp/env_raw.txt) bytes, base64 size: $(wc -c < /tmp/env_base64.txt) bytes)"
+          
           # Clean up temporary file
           rm -f /tmp/env_raw.txt
       
@@ -141,7 +165,13 @@ jobs:
             # This avoids bash syntax errors with special characters in secret
             ENV_FILE="/tmp/${{ env.CONTAINER_NAME }}.env"
             # Decode base64 content to preserve exact format (critical for PEM keys and multi-line values)
-            echo "${{ steps.encode_env.outputs.ENV_B64 }}" | base64 -d > "${ENV_FILE}"
+            # Strip any whitespace/newlines from base64 string before decoding
+            BASE64_STR=$(printf '%s' "${{ steps.encode_env.outputs.ENV_B64 }}" | tr -d ' \n\r\t')
+            printf '%s' "${BASE64_STR}" | base64 -d > "${ENV_FILE}" 2>/dev/null || {
+              echo "Error: Failed to decode base64 content"
+              echo "Base64 string length: ${#BASE64_STR}"
+              exit 1
+            }
             
             # Verify .env file was created and has content
             if [ ! -f "${ENV_FILE}" ]; then
@@ -158,10 +188,51 @@ jobs:
               exit 1
             fi
             
+            # Validate that required environment variables exist and are not empty
+            REQUIRED_VARS=("DATABASE_URL" "REDIS_URL" "RABBITMQ_URL")
+            MISSING_VARS=()
+            for VAR in "${REQUIRED_VARS[@]}"; do
+              if ! grep -q "^${VAR}=" "${ENV_FILE}" 2>/dev/null; then
+                MISSING_VARS+=("${VAR}")
+              else
+                # Check if the value is empty (VAR= or VAR=  with whitespace)
+                VAR_VALUE=$(grep "^${VAR}=" "${ENV_FILE}" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                if [ -z "${VAR_VALUE}" ]; then
+                  MISSING_VARS+=("${VAR} (empty value)")
+                fi
+              fi
+            done
+            
+            if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+              echo "Error: Missing or empty required environment variables:"
+              printf '  - %s\n' "${MISSING_VARS[@]}"
+              echo "First few lines of .env file (variable names only):"
+              head -10 "${ENV_FILE}" | cut -d'=' -f1 | sed 's/^/  - /' || true
+              exit 1
+            fi
+            
+            # Validate URL format for required variables (basic check)
+            INVALID_URLS=()
+            for VAR in "${REQUIRED_VARS[@]}"; do
+              VAR_VALUE=$(grep "^${VAR}=" "${ENV_FILE}" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+              # Check if URL starts with a valid protocol (postgres://, postgresql://, redis://, amqp://, etc.)
+              if ! echo "${VAR_VALUE}" | grep -qE '^[a-zA-Z][a-zA-Z0-9+.-]*://'; then
+                INVALID_URLS+=("${VAR} (invalid URI format)")
+              fi
+            done
+            
+            if [ ${#INVALID_URLS[@]} -gt 0 ]; then
+              echo "Error: Invalid URI format for required environment variables:"
+              printf '  - %s\n' "${INVALID_URLS[@]}"
+              echo "Note: URLs must start with a protocol (e.g., postgres://, redis://, amqp://)"
+              exit 1
+            fi
+            
             # Show first few lines of .env file for debugging (without values)
             echo "Env file created successfully (size: ${FILE_SIZE} bytes). First few variable names:"
             head -5 "${ENV_FILE}" | cut -d'=' -f1 | sed 's/^/  - /' || true
             echo "Total lines in .env file: $(wc -l < "${ENV_FILE}" || echo "0")"
+            echo "Required variables (DATABASE_URL, REDIS_URL, RABBITMQ_URL) are present and non-empty"
             
             # Run new container with environment file (like GitLab CI env_file)
             # Join Docker network: manga_sbs (bridge driver)
