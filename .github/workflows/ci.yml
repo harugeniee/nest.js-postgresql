@@ -41,12 +41,12 @@ jobs:
           path: dist/
           retention-days: 1
 
-  # Deploy to Production (main branch only)
+  # Deploy to Production (blog branch only)
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/blog'
     
     env:
       CONTAINER_NAME: nest-app
