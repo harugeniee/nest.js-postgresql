@@ -91,47 +91,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
-      - name: Encode environment file to base64
-        id: encode_env
-        env:
-          ENV_CONTENT: ${{ secrets.PRODUCTION_ENV_FILE }}
-        run: |
-          # Validate that secret is not empty
-          if [ -z "$ENV_CONTENT" ]; then
-            echo "Error: PRODUCTION_ENV_FILE secret is empty or not set"
-            exit 1
-          fi
-          
-          # Write secret directly to file using printf to avoid shell interpretation issues
-          # This handles multi-line content, special characters, and newlines safely
-          # Use %s to preserve exactly as-is (no interpretation)
-          printf '%s' "$ENV_CONTENT" > /tmp/env_raw.txt
-          
-          # Verify file was created and has content
-          if [ ! -s /tmp/env_raw.txt ]; then
-            echo "Error: Failed to write environment content to file"
-            exit 1
-          fi
-          
-          # Encode to base64 (remove newlines for single-line output)
-          # Try GNU base64 first (with -w 0), fallback to standard base64 + tr
-          base64 -w 0 /tmp/env_raw.txt > /tmp/env_base64.txt 2>/dev/null || base64 /tmp/env_raw.txt | tr -d '\n' > /tmp/env_base64.txt
-          
-          # Verify base64 encoding succeeded
-          if [ ! -s /tmp/env_base64.txt ]; then
-            echo "Error: Failed to encode environment file to base64"
-            exit 1
-          fi
-          
-          ENV_B64=$(cat /tmp/env_base64.txt)
-          echo "ENV_B64=${ENV_B64}" >> $GITHUB_OUTPUT
-          
-          # Log success (without exposing content)
-          echo "Environment file encoded successfully (original size: $(wc -c < /tmp/env_raw.txt) bytes, base64 size: $(wc -c < /tmp/env_base64.txt) bytes)"
-          
-          # Clean up temporary file
-          rm -f /tmp/env_raw.txt
-      
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@master
         with:
@@ -156,205 +115,22 @@ jobs:
             # Remove old container (ignore errors if not exists)
             docker rm "${{ env.CONTAINER_NAME }}" 2>/dev/null || true
             
+            # Prepare deployment directory
+            DEPLOY_DIR="$HOME/nest.js-postgresql"
+            echo "Preparing deployment directory: ${DEPLOY_DIR}"
+            
+            # Create directory if it doesn't exist
+            mkdir -p "${DEPLOY_DIR}"
+            
             # Create Docker network if it doesn't exist (bridge driver)
             if ! docker network inspect "${{ env.DOCKER_NETWORK }}" >/dev/null 2>&1; then
               docker network create --driver bridge "${{ env.DOCKER_NETWORK }}"
             fi
             
-            # Create .env file from base64 encoded content (safe method)
-            # This avoids bash syntax errors with special characters in secret
-            ENV_FILE="/tmp/${{ env.CONTAINER_NAME }}.env"
-            ENV_FILE_EXPANDED="/tmp/${{ env.CONTAINER_NAME }}.env.expanded"
+            # Start containers
+            echo "Starting containers..."
+            cd "${DEPLOY_DIR}"
+            docker compose up -d --build
             
-            # Decode base64 content to preserve exact format (critical for PEM keys and multi-line values)
-            # Strip any whitespace/newlines from base64 string before decoding
-            BASE64_STR=$(printf '%s' "${{ steps.encode_env.outputs.ENV_B64 }}" | tr -d ' \n\r\t')
-            printf '%s' "${BASE64_STR}" | base64 -d > "${ENV_FILE}" 2>/dev/null || {
-              echo "Error: Failed to decode base64 content"
-              echo "Base64 string length: ${#BASE64_STR}"
-              exit 1
-            }
-            
-            # Verify .env file was created and has content
-            if [ ! -f "${ENV_FILE}" ]; then
-              echo "Error: .env file was not created"
-              exit 1
-            fi
-            
-            # Expand environment variables in .env file (e.g., ${VAR} -> actual value)
-            # This is needed because Docker --env-file doesn't expand variables
-            # and NestJS expandVariables only works when reading from file, not process.env
-            # IMPORTANT: Preserve newlines and escape sequences for PEM keys and multi-line values
-            echo "Expanding environment variables in .env file (preserving PEM keys and multi-line values)..."
-            
-            # Load variables first (preserving escape sequences like \n)
-            declare -A env_vars
-            while IFS= read -r line || [ -n "$line" ]; do
-              # Skip empty lines and comments
-              [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-              
-              # Extract variable name and value
-              if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
-                VAR_NAME="${BASH_REMATCH[1]// /}"
-                VAR_VALUE="${BASH_REMATCH[2]}"
-                
-                # Remove surrounding quotes if present, but preserve content
-                if [[ "$VAR_VALUE" =~ ^\"(.*)\"$ ]]; then
-                  VAR_VALUE="${BASH_REMATCH[1]}"
-                elif [[ "$VAR_VALUE" =~ ^\'(.*)\'$ ]]; then
-                  VAR_VALUE="${BASH_REMATCH[1]}"
-                fi
-                
-                # Store value (will interpret \n later when expanding)
-                env_vars["${VAR_NAME}"]="${VAR_VALUE}"
-              fi
-            done < "${ENV_FILE}"
-            
-            # Export variables for expansion (interpret escape sequences with printf %b)
-            for var_name in "${!env_vars[@]}"; do
-              # Use printf %b to interpret escape sequences like \n
-              EXPANDED_VAL=$(printf '%b' "${env_vars[$var_name]}")
-              export "${var_name}"="${EXPANDED_VAL}"
-            done
-            
-            # Expand variables in file using envsubst (preserves newlines better than manual expansion)
-            if command -v envsubst >/dev/null 2>&1; then
-              envsubst < "${ENV_FILE}" > "${ENV_FILE_EXPANDED}"
-            else
-              # Manual expansion fallback (preserve newlines)
-              while IFS= read -r line || [ -n "$line" ]; do
-                # Skip empty lines and comments
-                if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
-                  echo "$line" >> "${ENV_FILE_EXPANDED}"
-                  continue
-                fi
-                
-                # Extract and expand
-                if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
-                  VAR_NAME="${BASH_REMATCH[1]}"
-                  VAR_VALUE="${BASH_REMATCH[2]}"
-                  
-                  # Remove quotes if present
-                  if [[ "$VAR_VALUE" =~ ^\"(.*)\"$ ]]; then
-                    VAR_VALUE="${BASH_REMATCH[1]}"
-                  elif [[ "$VAR_VALUE" =~ ^\'(.*)\'$ ]]; then
-                    VAR_VALUE="${BASH_REMATCH[1]}"
-                  fi
-                  
-                  # Expand ${VAR} references using eval (variables are exported)
-                  EXPANDED_VALUE=$(eval "printf '%b' \"${VAR_VALUE}\"")
-                  echo "${VAR_NAME}=${EXPANDED_VALUE}" >> "${ENV_FILE_EXPANDED}"
-                else
-                  echo "$line" >> "${ENV_FILE_EXPANDED}"
-                fi
-              done < "${ENV_FILE}"
-            fi
-            
-            # Replace original file with expanded version
-            mv "${ENV_FILE_EXPANDED}" "${ENV_FILE}"
-            echo "Environment variables expanded successfully (PEM keys and newlines preserved)"
-            
-            # Validate Firebase private key format (if present)
-            if grep -q "^FIREBASE_PRIVATE_KEY=" "${ENV_FILE}"; then
-              FIREBASE_KEY=$(grep "^FIREBASE_PRIVATE_KEY=" "${ENV_FILE}" | cut -d'=' -f2- | sed 's/^["'\'']//;s/["'\'']$//')
-              # Check if key has proper PEM structure
-              if ! echo "${FIREBASE_KEY}" | grep -q "-----BEGIN.*PRIVATE KEY-----"; then
-                echo "Warning: Firebase private key may be missing BEGIN marker"
-              fi
-              if ! echo "${FIREBASE_KEY}" | grep -q "-----END.*PRIVATE KEY-----"; then
-                echo "Warning: Firebase private key may be missing END marker"
-              fi
-              # Check if key has newlines (should have at least one)
-              if ! echo "${FIREBASE_KEY}" | grep -q $'\n'; then
-                echo "Warning: Firebase private key appears to be on a single line (may need \\n expansion)"
-              else
-                echo "✓ Firebase private key format validated (has newlines and PEM markers)"
-              fi
-            fi
-            
-            # Check file size (should be > 0)
-            FILE_SIZE=$(stat -f%z "${ENV_FILE}" 2>/dev/null || stat -c%s "${ENV_FILE}" 2>/dev/null || wc -c < "${ENV_FILE}" || echo "0")
-            if [ "$FILE_SIZE" -eq 0 ] || [ -z "$FILE_SIZE" ]; then
-              echo "Error: .env file appears to be empty (size check: ${FILE_SIZE})"
-              echo "File content preview (first 100 chars):"
-              head -c 100 "${ENV_FILE}" || echo "(cannot read file)"
-              exit 1
-            fi
-            
-            # Validate that required environment variables exist and are not empty
-            REQUIRED_VARS=("DATABASE_URL" "REDIS_URL" "RABBITMQ_URL")
-            MISSING_VARS=()
-            for VAR in "${REQUIRED_VARS[@]}"; do
-              if ! grep -q "^${VAR}=" "${ENV_FILE}" 2>/dev/null; then
-                MISSING_VARS+=("${VAR}")
-              else
-                # Check if the value is empty (VAR= or VAR=  with whitespace)
-                VAR_VALUE=$(grep "^${VAR}=" "${ENV_FILE}" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                if [ -z "${VAR_VALUE}" ]; then
-                  MISSING_VARS+=("${VAR} (empty value)")
-                fi
-              fi
-            done
-            
-            if [ ${#MISSING_VARS[@]} -gt 0 ]; then
-              echo "Error: Missing or empty required environment variables:"
-              printf '  - %s\n' "${MISSING_VARS[@]}"
-              echo "First few lines of .env file (variable names only):"
-              head -10 "${ENV_FILE}" | cut -d'=' -f1 | sed 's/^/  - /' || true
-              exit 1
-            fi
-            
-            # Validate URL format for required variables (basic check)
-            INVALID_URLS=()
-            for VAR in "${REQUIRED_VARS[@]}"; do
-              VAR_VALUE=$(grep "^${VAR}=" "${ENV_FILE}" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-              # Check if URL starts with a valid protocol (postgres://, postgresql://, redis://, amqp://, etc.)
-              if ! echo "${VAR_VALUE}" | grep -qE '^[a-zA-Z][a-zA-Z0-9+.-]*://'; then
-                INVALID_URLS+=("${VAR} (invalid URI format)")
-              fi
-            done
-            
-            if [ ${#INVALID_URLS[@]} -gt 0 ]; then
-              echo "Error: Invalid URI format for required environment variables:"
-              printf '  - %s\n' "${INVALID_URLS[@]}"
-              echo "Note: URLs must start with a protocol (e.g., postgres://, redis://, amqp://)"
-              exit 1
-            fi
-            
-            # Show first few lines of .env file for debugging (without values)
-            echo "Env file created successfully (size: ${FILE_SIZE} bytes). First few variable names:"
-            head -5 "${ENV_FILE}" | cut -d'=' -f1 | sed 's/^/  - /' || true
-            echo "Total lines in .env file: $(wc -l < "${ENV_FILE}" || echo "0")"
-            echo "Required variables (DATABASE_URL, REDIS_URL, RABBITMQ_URL) are present and non-empty"
-            
-            # Test that environment variables are properly set (dry run)
-            # This helps catch env var issues before the app starts
-            echo "Verifying environment variables are set correctly..."
-            docker run --rm --env-file "${ENV_FILE}" "${IMAGE_NAME}" \
-              sh -c 'test -n "$DATABASE_URL" && test -n "$REDIS_URL" && test -n "$RABBITMQ_URL" && echo "✓ All required environment variables are set" || (echo "✗ Missing required environment variables" && exit 1)' || {
-              echo "Error: Required environment variables are not set in container"
-              echo "Checking .env file content (variable names only):"
-              head -10 "${ENV_FILE}" | cut -d'=' -f1 || true
-              exit 1
-            }
-            
-            # Run new container with environment file (like GitLab CI env_file)
-            # Join Docker network: manga_sbs (bridge driver)
-            # Set NODE_ENV=production to ensure ConfigModule uses process.env instead of .env file
-            docker run -d \
-              --name "${{ env.CONTAINER_NAME }}" \
-              --restart unless-stopped \
-              --network "${{ env.DOCKER_NETWORK }}" \
-              -p "${{ env.HOST_PORT }}:${{ env.CONTAINER_PORT }}" \
-              -e NODE_ENV=production \
-              --env-file "${ENV_FILE}" \
-              "${IMAGE_NAME}"
-            
-            # Wait a moment for container to start
-            sleep 3
-            
-            # Clean up .env file after container starts (optional, for security)
-            rm -f "${ENV_FILE}"
-            
-            # Verify container is running
-            docker ps | grep "${{ env.CONTAINER_NAME }}" || echo "Warning: Container may not be running"
+            echo "Deployment complete!"
+            echo "Containers running: $(docker ps | grep '${{ env.CONTAINER_NAME }}' || echo 'none')"
