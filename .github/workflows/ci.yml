@@ -132,7 +132,9 @@ jobs:
             cd "${DEPLOY_DIR}"
             # Export IMAGE_NAME so docker-compose can use it
             export IMAGE_NAME="${IMAGE_NAME}"
-            docker compose up -d --build
+            # Use pulled image instead of building (image already pulled above)
+            # Remove --build flag to use existing image
+            docker compose up -d
             
             echo "Deployment complete!"
             echo "Containers running: $(docker ps | grep '${{ env.CONTAINER_NAME }}' || echo 'none')"
