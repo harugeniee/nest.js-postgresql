@@ -1,6 +1,12 @@
 services:
   # NestJS Application Service
   app:
+    # Image from GitHub Container Registry (ghcr.io)
+    # Format: ghcr.io/username/repo-name:tag
+    # IMAGE_NAME is set in CI deployment script as environment variable before running docker compose
+    # If IMAGE_NAME is not set, docker-compose will build from Dockerfile instead
+    # Default fallback ensures local development still works
+    image: ${IMAGE_NAME:-nest-app:latest}
     build:
       context: .
       dockerfile: Dockerfile

@@ -130,6 +130,8 @@ jobs:
             # Start containers
             echo "Starting containers..."
             cd "${DEPLOY_DIR}"
+            # Export IMAGE_NAME so docker-compose can use it
+            export IMAGE_NAME="${IMAGE_NAME}"
             docker compose up -d --build
             
             echo "Deployment complete!"
