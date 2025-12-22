@@ -60,23 +60,35 @@ export class ImageScramblerService {
    * Scramble image if scrambler is enabled and file is an image
    * @param buffer Original image buffer
    * @param mimeType MIME type of the file
+   * @param forceScramble Optional flag to control scrambling behavior:
+   *   - true: Force scrambling (if config enabled and file is image)
+   *   - false: Skip scrambling (ignore config)
+   *   - undefined: Default behavior - scramble if config enabled (same as true)
    * @returns ScrambleResult if scrambling was performed, null otherwise
    */
   async scrambleIfNeeded(
     buffer: Buffer,
     mimeType: string,
+    forceScramble?: boolean,
   ): Promise<ScrambleResult | null> {
+    // Return null if file is not an image
+    if (!mimeType || !mimeType.startsWith('image/')) {
+      return null;
+    }
+
     // Get scrambler configuration
     const scramblerConfig =
       this.configService.get<ImageScramblerConfig>('app.imageScrambler');
 
-    // Return null if scrambler is disabled
-    if (!scramblerConfig?.enabled) {
+    // If forceScramble is explicitly false, skip scrambling regardless of config
+    if (forceScramble === false) {
       return null;
     }
 
-    // Return null if file is not an image
-    if (!mimeType || !mimeType.startsWith('image/')) {
+    // Default behavior: scramble if config is enabled
+    // This applies when forceScramble is undefined (default) or true
+    // Return null if scrambler config is disabled (we need config to perform scrambling)
+    if (!scramblerConfig?.enabled) {
       return null;
     }
 

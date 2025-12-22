@@ -36,6 +36,7 @@ export class MediaController {
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Request() req: Request & { user: AuthPayload },
     @Query('folder') customFolder?: string,
+    @Query('scramble') scrambleParam?: string,
   ) {
     if (!files || files.length === 0) {
       throw new HttpException(
@@ -46,7 +47,31 @@ export class MediaController {
       );
     }
 
-    return this.mediaService.uploadMedia(files, req.user.uid, customFolder);
+    // Parse scramble parameter from query string to boolean
+    // Only accept 'true', 'false', or undefined (default behavior)
+    let scramble: boolean | undefined;
+    if (scrambleParam !== undefined) {
+      const normalizedParam = scrambleParam.toLowerCase().trim();
+      if (normalizedParam === 'true') {
+        scramble = true;
+      } else if (normalizedParam === 'false') {
+        scramble = false;
+      } else {
+        throw new HttpException(
+          {
+            messageKey: 'media.INVALID_SCRAMBLE_PARAMETER',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+
+    return this.mediaService.uploadMedia(
+      files,
+      req.user.uid,
+      customFolder,
+      scramble,
+    );
   }
 
   @Get()

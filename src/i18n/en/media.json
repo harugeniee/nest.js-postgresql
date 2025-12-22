@@ -27,5 +27,6 @@
   "FILE_TOO_LARGE": "File size is too large",
   "UPLOAD_LIMIT_EXCEEDED": "Upload limit exceeded",
   "STORAGE_ERROR": "Storage service error",
-  "PROCESSING_ERROR": "File processing error"
+  "PROCESSING_ERROR": "File processing error",
+  "INVALID_SCRAMBLE_PARAMETER": "Invalid scramble parameter. Must be 'true' or 'false'"
 }

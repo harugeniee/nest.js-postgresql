@@ -27,5 +27,6 @@
   "FILE_TOO_LARGE": "Kích thước file quá lớn",
   "UPLOAD_LIMIT_EXCEEDED": "Vượt quá giới hạn upload",
   "STORAGE_ERROR": "Lỗi dịch vụ lưu trữ",
-  "PROCESSING_ERROR": "Lỗi xử lý file"
+  "PROCESSING_ERROR": "Lỗi xử lý file",
+  "INVALID_SCRAMBLE_PARAMETER": "Tham số scramble không hợp lệ. Phải là 'true' hoặc 'false'"
 }

@@ -141,12 +141,14 @@ export class MediaService extends BaseService<Media> {
    * @param files Array of uploaded files
    * @param userId User ID uploading the files
    * @param customFolder Optional custom folder path (will be sanitized)
+   * @param scramble Optional flag to control image scrambling (true = scramble, false = don't scramble, undefined = use config)
    * @returns Array of created media entities
    */
   async uploadMedia(
     files: Array<Express.Multer.File>,
     userId: string,
     customFolder?: string,
+    scramble?: boolean,
   ): Promise<Media[]> {
     try {
       if (!files || files.length === 0) {
@@ -171,6 +173,7 @@ export class MediaService extends BaseService<Media> {
             file,
             userId,
             sanitizedFolder,
+            scramble,
           );
           mediaData.push(processedFile);
         } catch (error: any) {
@@ -204,12 +207,14 @@ export class MediaService extends BaseService<Media> {
    * @param file Uploaded file
    * @param userId User ID uploading the file
    * @param folder Custom folder path (already sanitized)
+   * @param scramble Optional flag to control image scrambling (true = scramble, false = don't scramble, undefined = use config)
    * @returns CreateMediaDto for creating media entity
    */
   private async processUploadedFile(
     file: Express.Multer.File,
     userId: string,
     folder?: string,
+    scramble?: boolean,
   ): Promise<CreateMediaDto> {
     // Validate file size
     if (file.size > MEDIA_CONSTANTS.SIZE_LIMITS.MAX) {
@@ -240,6 +245,7 @@ export class MediaService extends BaseService<Media> {
         ? await this.imageScramblerService.scrambleIfNeeded(
             file.buffer,
             file.mimetype,
+            scramble,
           )
         : null;
       if (scrambleResult) {
