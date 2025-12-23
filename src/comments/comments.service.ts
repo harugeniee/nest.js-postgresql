@@ -243,32 +243,7 @@ export class CommentsService extends BaseService<Comment> {
         }));
         await queryRunner.manager.save(CommentMention, mentions);
       }
-
-      // Fetch the complete comment with relations
-      const completeComment = await this.findOne(
-        { id: comment.id },
-        {
-          relations: [
-            'user',
-            'parent',
-            'media',
-            'media.media',
-            'media.sticker',
-            'media.sticker.media',
-            'mentions',
-            'mentions.user',
-          ],
-        },
-      );
-
-      if (!completeComment) {
-        throw new HttpException(
-          { messageKey: 'comment.COMMENT_NOT_FOUND' },
-          HttpStatus.NOT_FOUND,
-        );
-      }
-
-      return completeComment;
+      return comment;
     });
   }
 
