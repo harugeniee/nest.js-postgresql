@@ -1,21 +1,21 @@
-import { User } from 'src/users/entities/user.entity';
-import {
-  Entity,
-  Column,
-  Index,
-  ManyToOne,
-  JoinColumn,
-  OneToMany,
-} from 'typeorm';
-import { BaseEntityCustom } from 'src/shared/entities/base.entity';
-import { CommentMention } from 'src/comments/entities/comment-mention.entity';
 import { CommentMedia } from 'src/comments/entities/comment-media.entity';
+import { CommentMention } from 'src/comments/entities/comment-mention.entity';
 import {
   COMMENT_CONSTANTS,
   CommentFlag,
   CommentType,
   CommentVisibility,
 } from 'src/shared/constants';
+import { BaseEntityCustom } from 'src/shared/entities/base.entity';
+import { User } from 'src/users/entities/user.entity';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm';
 
 /**
  * Comment Entity

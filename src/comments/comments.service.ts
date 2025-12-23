@@ -28,6 +28,7 @@ import {
   BatchCommentsDto,
   CreateCommentDto,
   CreateCommentMediaItemDto,
+  QueryCommentsCursorDto,
   QueryCommentsDto,
   UpdateCommentDto,
 } from './dto';
@@ -36,6 +37,9 @@ import { Comment, CommentMedia, CommentMention } from './entities';
 @Injectable()
 export class CommentsService extends BaseService<Comment> {
   private readonly logger = new Logger(CommentsService.name);
+
+  // Store parentId temporarily for afterDelete hook
+  private deletedCommentParentId: string | null = null;
 
   constructor(
     @InjectRepository(Comment)
@@ -60,6 +64,46 @@ export class CommentsService extends BaseService<Comment> {
           replies: true,
           media: { media: true, sticker: { media: true } },
           mentions: { user: true },
+        },
+        selectWhitelist: {
+          id: true,
+          userId: true,
+          subjectType: true,
+          subjectId: true,
+          parentId: true,
+          content: true,
+          type: true,
+          pinned: true,
+          edited: true,
+          editedAt: true,
+          visibility: true,
+          flags: true,
+          metadata: true,
+          replyCount: true,
+          createdAt: true,
+          updatedAt: true,
+          user: {
+            id: true,
+            name: true,
+            username: true,
+            photoUrl: true,
+          },
+          parent: {
+            id: true,
+            content: true,
+            type: true,
+            pinned: true,
+            edited: true,
+            editedAt: true,
+          },
+          replies: {
+            id: true,
+            content: true,
+            type: true,
+            pinned: true,
+            edited: true,
+            editedAt: true,
+          },
         },
         emitEvents: false, // Disable EventEmitter, use RabbitMQ instead
       },
@@ -185,6 +229,8 @@ export class CommentsService extends BaseService<Comment> {
         HttpStatus.NOT_FOUND,
       );
     }
+    // Store parentId for afterDelete hook to decrement replyCount
+    this.deletedCommentParentId = comment.parentId || null;
   }
 
   /**
@@ -192,6 +238,13 @@ export class CommentsService extends BaseService<Comment> {
    * @param id - Comment ID
    */
   protected async afterDelete(id: string): Promise<void> {
+    // If this was a reply, decrement the parent comment's replyCount
+    if (this.deletedCommentParentId) {
+      await this.updateReplyCount(this.deletedCommentParentId, false);
+      // Reset the stored parentId
+      this.deletedCommentParentId = null;
+    }
+
     // Send event to RabbitMQ
     await this.rabbitMQService.sendDataToRabbitMQAsync(
       JOB_NAME.COMMENT_DELETED,
@@ -225,6 +278,16 @@ export class CommentsService extends BaseService<Comment> {
         },
         { queryRunner },
       );
+
+      // If this is a reply (has parentId), increment the parent comment's replyCount
+      if (dto.parentId) {
+        await queryRunner.manager.increment(
+          Comment,
+          { id: dto.parentId },
+          'replyCount',
+          1,
+        );
+      }
 
       // Process media attachments (including stickers) if provided
       if (dto.media && Array.isArray(dto.media) && dto.media.length > 0) {
@@ -424,7 +487,7 @@ export class CommentsService extends BaseService<Comment> {
    * @returns Cursor-paginated comments
    */
   async getCommentsCursor(
-    dto: QueryCommentsDto & CursorPaginationDto,
+    dto: QueryCommentsCursorDto,
   ): Promise<IPaginationCursor<Comment>> {
     const {
       subjectType,

@@ -18,7 +18,7 @@ import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { CommentsService } from './comments.service';
-import { BatchCommentsDto } from './dto/batch-comments.dto';
+import { BatchCommentsDto, QueryCommentsCursorDto } from './dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { QueryCommentsDto } from './dto/query-comments.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
@@ -51,6 +51,18 @@ export class CommentsController {
   @Auth()
   async getComments(@Query() dto: QueryCommentsDto) {
     return this.commentsService.list(dto);
+  }
+
+  /**
+   * Get comments with cursor-based pagination
+   * Better for real-time feeds and infinite scroll
+   * @param dto Cursor pagination parameters with comment filters
+   * @returns Cursor-paginated list of comments
+   */
+  @Get('cursor')
+  // @Auth()
+  async getCommentsCursor(@Query() dto: QueryCommentsCursorDto) {
+    return this.commentsService.getCommentsCursor(dto);
   }
 
   /**
