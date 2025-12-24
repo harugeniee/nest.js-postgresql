@@ -56,6 +56,7 @@ export class CommentsController {
   /**
    * Get comments with cursor-based pagination
    * Better for real-time feeds and infinite scroll
+   * IMPORTANT: This route must be defined BEFORE @Get(':id') to avoid route conflicts
    * @param dto Cursor pagination parameters with comment filters
    * @returns Cursor-paginated list of comments
    */
@@ -66,16 +67,8 @@ export class CommentsController {
   }
 
   /**
-   * Get comments for multiple subjects in batch
-   * POST /comments/batch
-   */
-  @Post('batch')
-  async getCommentsBatch(@Body() dto: BatchCommentsDto) {
-    return this.commentsService.getBatch(dto);
-  }
-
-  /**
    * Get comment statistics for a subject
+   * IMPORTANT: This route must be defined BEFORE @Get(':id') to avoid route conflicts
    * GET /comments/stats
    */
   @Get('stats')
@@ -94,7 +87,17 @@ export class CommentsController {
   }
 
   /**
+   * Get comments for multiple subjects in batch
+   * POST /comments/batch
+   */
+  @Post('batch')
+  async getCommentsBatch(@Body() dto: BatchCommentsDto) {
+    return this.commentsService.getBatch(dto);
+  }
+
+  /**
    * Get replies for a specific comment
+   * IMPORTANT: This route must be defined BEFORE @Get(':id') to avoid route conflicts
    * GET /comments/:id/replies
    */
   @Get(':id/replies')
@@ -127,6 +130,7 @@ export class CommentsController {
 
   /**
    * Get a single comment by ID
+   * IMPORTANT: This route must be defined LAST among all GET routes to avoid conflicts
    * GET /comments/:id
    */
   @Get(':id')
