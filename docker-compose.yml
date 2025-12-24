@@ -7,10 +7,6 @@ services:
     # If IMAGE_NAME is not set, docker-compose will build from Dockerfile instead
     # Default fallback ensures local development still works
     image: ${IMAGE_NAME:-nest-app:latest}
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
     container_name: ${CONTAINER_NAME:-nest-app}
     restart: unless-stopped
     env_file:
