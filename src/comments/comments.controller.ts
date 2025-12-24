@@ -61,6 +61,7 @@ export class CommentsController {
    * @returns Cursor-paginated list of comments
    */
   @Get('cursor')
+  // @Auth()
   async getCommentsCursor(@Query() dto: QueryCommentsCursorDto) {
     return this.commentsService.getCommentsCursor(dto);
   }
