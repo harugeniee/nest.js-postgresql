@@ -1,4 +1,10 @@
-import { IsOptional, IsString, IsNumber, IsBoolean } from 'class-validator';
+import {
+  IsBoolean,
+  IsBooleanString,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { AdvancedPaginationDto } from 'src/common/dto/advanced-pagination.dto';
 import { CursorPaginationDto } from 'src/common/dto/cursor-pagination.dto';
 
@@ -88,4 +94,8 @@ export class QueryCommentsCursorDto extends CursorPaginationDto {
   @IsOptional()
   @IsBoolean()
   includeMentions?: boolean = true;
+
+  @IsOptional()
+  @IsBooleanString()
+  includeReplies?: string = 'false';
 }

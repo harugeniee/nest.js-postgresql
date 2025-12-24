@@ -275,6 +275,8 @@ export class CommentsService extends BaseService<Comment> {
           metadata: dto.metadata,
           flags: dto.flags || [],
           visibility: dto.visibility || COMMENT_CONSTANTS.VISIBILITY.PUBLIC,
+          mentions: dto.mentions,
+          media: dto.media,
         },
         { queryRunner },
       );
@@ -289,23 +291,6 @@ export class CommentsService extends BaseService<Comment> {
         );
       }
 
-      // Process media attachments (including stickers) if provided
-      if (dto.media && Array.isArray(dto.media) && dto.media.length > 0) {
-        await this.processCommentMedia(comment.id, dto.media, queryRunner);
-      }
-
-      // Process mentions and create mention records
-      if (
-        dto.mentions &&
-        Array.isArray(dto.mentions) &&
-        dto.mentions.length > 0
-      ) {
-        const mentions = dto.mentions.map((mentionDto) => ({
-          ...mentionDto,
-          commentId: comment.id,
-        }));
-        await queryRunner.manager.save(CommentMention, mentions);
-      }
       return comment;
     });
   }
@@ -500,6 +485,7 @@ export class CommentsService extends BaseService<Comment> {
       visibility,
       includeMedia = true,
       includeMentions = true,
+      includeReplies,
       ...paginationDto
     } = dto;
 
@@ -519,7 +505,8 @@ export class CommentsService extends BaseService<Comment> {
     if (type) whereCondition.type = type as CommentType;
     if (pinned !== undefined) whereCondition.pinned = pinned;
     if (edited !== undefined) whereCondition.edited = edited;
-
+    if (includeReplies === 'false') whereCondition.parentId = IsNull();
+    else if (includeReplies === 'true') whereCondition.parentId = Not(IsNull());
     // Build relations
     const relations = ['user'];
     if (includeMedia)

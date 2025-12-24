@@ -1,20 +1,20 @@
+import { Type } from 'class-transformer';
 import {
-  IsString,
-  IsOptional,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsNumber,
   IsObject,
-  ValidateNested,
-  IsEnum,
+  IsOptional,
+  IsString,
   MaxLength,
   MinLength,
   Validate,
+  ValidateNested,
+  ValidationArguments,
   ValidatorConstraint,
   ValidatorConstraintInterface,
-  ValidationArguments,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import {
   COMMENT_CONSTANTS,
   CommentFlag,
@@ -96,7 +96,7 @@ export class CreateCommentDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateCommentMentionDto)
-  mentions?: CreateCommentMentionDto[];
+  mentions?: Record<string, any>[];
 
   @IsOptional()
   @IsObject()
