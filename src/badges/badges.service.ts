@@ -8,6 +8,7 @@ import {
   BadgeCategory,
   BadgeEntityType,
   BadgeRarity,
+  BadgeStatus,
   BadgeType,
 } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services/cache/cache.service';
@@ -69,6 +70,16 @@ export class BadgesService extends BaseService<Badge> {
           assignmentCount: true,
           createdAt: true,
           updatedAt: true,
+          assignments: {
+            id: true,
+            entityType: true,
+            entityId: true,
+            status: true,
+            assignedAt: true,
+            expiresAt: true,
+            revokedAt: true,
+            createdAt: true,
+          },
         },
       },
       cacheService,
@@ -348,7 +359,10 @@ export class BadgesService extends BaseService<Badge> {
       {
         page: query.page || 1,
         limit: query.limit || 20,
-        sortBy: query.sortBy || 'assignedAt',
+        sortBy:
+          query.sortBy === 'createdAt'
+            ? 'assignedAt'
+            : query.sortBy || 'assignedAt',
         order: query.order || 'DESC',
         query: query.query,
         fields: ['assignmentReason', 'revocationReason'],
@@ -446,7 +460,7 @@ export class BadgesService extends BaseService<Badge> {
       rarityStats,
     ] = await Promise.all([
       this.badgeRepository.count(),
-      this.badgeRepository.count({ where: { status: 'active' as any } }),
+      this.badgeRepository.count({ where: { status: BadgeStatus.ACTIVE } }),
       this.badgeAssignmentService
         .getAssignmentStatistics()
         .then((stats) => stats.activeAssignments),

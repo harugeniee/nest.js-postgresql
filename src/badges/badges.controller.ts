@@ -54,14 +54,6 @@ export class BadgesController {
   }
 
   /**
-   * Get badge by ID
-   */
-  @Get(':id')
-  async findOne(@Param('id', SnowflakeIdPipe) id: string): Promise<Badge> {
-    return this.badgesService.findById(id);
-  }
-
-  /**
    * Get badge by type
    */
   @Get('type/:type')
@@ -102,28 +94,6 @@ export class BadgesController {
   }
 
   /**
-   * Update badge
-   */
-  @Patch(':id')
-  @Auth(['admin'])
-  async update(
-    @Param('id', SnowflakeIdPipe) id: string,
-    @Body() updateBadgeDto: UpdateBadgeDto,
-  ): Promise<Badge> {
-    return this.badgesService.updateBadge(id, updateBadgeDto);
-  }
-
-  /**
-   * Delete badge
-   */
-  @Delete(':id')
-  @Auth(['admin'])
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', SnowflakeIdPipe) id: string): Promise<void> {
-    return this.badgesService.remove(id);
-  }
-
-  /**
    * Assign badge to entity
    */
   @Post('assign')
@@ -154,6 +124,17 @@ export class BadgesController {
   }
 
   /**
+   * Get badge assignment by ID
+   */
+  @Get('assignments/:assignmentId')
+  @Auth(['admin', 'moderator'])
+  async getBadgeAssignment(
+    @Param('assignmentId', SnowflakeIdPipe) assignmentId: string,
+  ): Promise<BadgeAssignment | null> {
+    return this.badgesService.getBadgeAssignment(assignmentId);
+  }
+
+  /**
    * Get badge assignments with filters
    */
   @Get('assignments')
@@ -174,17 +155,6 @@ export class BadgesController {
     @Param('entityId', SnowflakeIdPipe) entityId: string,
   ): Promise<BadgeAssignment[]> {
     return this.badgesService.getEntityBadges(entityType, entityId);
-  }
-
-  /**
-   * Get badge assignment by ID
-   */
-  @Get('assignments/:assignmentId')
-  @Auth(['admin', 'moderator'])
-  async getBadgeAssignment(
-    @Param('assignmentId', SnowflakeIdPipe) assignmentId: string,
-  ): Promise<BadgeAssignment | null> {
-    return this.badgesService.getBadgeAssignment(assignmentId);
   }
 
   /**
@@ -223,5 +193,35 @@ export class BadgesController {
   async cleanupExpiredAssignments(): Promise<{ cleanedCount: number }> {
     const cleanedCount = await this.badgesService.cleanupExpiredAssignments();
     return { cleanedCount };
+  }
+
+  /**
+   * Update badge
+   */
+  @Patch(':id')
+  @Auth(['admin'])
+  async update(
+    @Param('id', SnowflakeIdPipe) id: string,
+    @Body() updateBadgeDto: UpdateBadgeDto,
+  ): Promise<Badge> {
+    return this.badgesService.updateBadge(id, updateBadgeDto);
+  }
+
+  /**
+   * Delete badge
+   */
+  @Delete(':id')
+  @Auth(['admin'])
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(@Param('id', SnowflakeIdPipe) id: string): Promise<void> {
+    return this.badgesService.remove(id);
+  }
+
+  /**
+   * Get badge by ID
+   */
+  @Get(':id')
+  async findOne(@Param('id', SnowflakeIdPipe) id: string): Promise<Badge> {
+    return this.badgesService.findById(id);
   }
 }

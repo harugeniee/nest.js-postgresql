@@ -40,6 +40,7 @@ export class BadgeAssignmentService extends BaseService<BadgeAssignment> {
         },
         selectWhitelist: {
           id: true,
+          createdAt: true,
           badgeId: true,
           entityType: true,
           entityId: true,
