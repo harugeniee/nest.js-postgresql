@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHmac, hkdfSync } from 'crypto';
 import { Readable } from 'stream';
-import { MoreThan, Repository } from 'typeorm';
+import { FindOptionsRelations, MoreThan, Repository } from 'typeorm';
 
 import { AdvancedPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
@@ -66,6 +66,9 @@ export class MediaService extends BaseService<Media> {
           downloadCount: true,
           viewCount: true,
           metadata: true,
+          createdAt: true,
+          updatedAt: true,
+          userId: true,
           user: {
             id: true,
             name: true,
@@ -335,7 +338,10 @@ export class MediaService extends BaseService<Media> {
    * @returns Paginated media results
    */
   async getMedia(query: MediaQueryDto): Promise<IPagination<Media>> {
-    const { minSize, maxSize } = query;
+    const { minSize, maxSize, userId } = query;
+    const relations: FindOptionsRelations<Media> = {
+      user: true,
+    };
 
     // Build extra filters for BaseService
     const extraFilter: Record<string, unknown> = {};
@@ -354,8 +360,14 @@ export class MediaService extends BaseService<Media> {
       };
     }
 
+    if (userId !== undefined) {
+      extraFilter.userId = userId;
+    }
+
     // Use BaseService listOffset method
-    return await this.listOffset(query, extraFilter);
+    return await this.listOffset(query, extraFilter, {
+      relations,
+    });
   }
 
   /**
