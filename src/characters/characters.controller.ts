@@ -10,11 +10,12 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
 import { Auth } from 'src/common/decorators';
-import { CursorPaginationDto } from 'src/common/dto';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { CharactersService } from './characters.service';
 import {
+  CharacterStatsDto,
   CreateCharacterDto,
   QueryCharacterCursorDto,
   QueryCharacterDto,
@@ -50,6 +51,22 @@ export class CharactersController {
   @Get('cursor')
   async findAllCursor(@Query() queryDto: QueryCharacterCursorDto) {
     return this.charactersService.findAllCursor(queryDto);
+  }
+
+  /**
+   * Get character statistics overview
+   * Returns comprehensive statistics about characters including counts by status,
+   * gender, blood type, voice actors, reactions, and top series
+   */
+  @Get('stats/overview')
+  @ApiOperation({
+    summary: 'Get character statistics overview',
+    description:
+      'Returns comprehensive statistics about characters including counts by status, gender, blood type, voice actors, reactions, and top series',
+  })
+  async getCharacterStatistics(): Promise<CharacterStatsDto> {
+    const stats = await this.charactersService.getCharacterStatistics();
+    return stats;
   }
 
   /**

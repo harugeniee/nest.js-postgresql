@@ -39,6 +39,13 @@ export const CHARACTER_CONSTANTS = {
     AB: 'AB',
     O: 'O',
   },
+
+  // Cache settings
+  CACHE: {
+    TTL_SEC: 300, // 5 minutes
+    PREFIX: 'characters',
+    STATS_TTL_SEC: 3600, // 1 hour
+  },
 } as const;
 
 // Type definitions for better TypeScript support

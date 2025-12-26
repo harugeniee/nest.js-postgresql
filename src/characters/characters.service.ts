@@ -6,16 +6,22 @@ import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo
 import { BaseService } from 'src/common/services';
 import { ReactionCount } from 'src/reactions/entities/reaction-count.entity';
 import { ReactionsService } from 'src/reactions/reactions.service';
+import { CHARACTER_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
-import { DeepPartial, Repository } from 'typeorm';
-import { QueryCharacterCursorDto } from './dto';
+import { DeepPartial, Repository, IsNull, Not } from 'typeorm';
+import { CharacterStatsDto, QueryCharacterCursorDto } from './dto';
 import { Character } from './entities/character.entity';
+import { CharacterStaff } from './entities/character-staff.entity';
 
 @Injectable()
 export class CharactersService extends BaseService<Character> {
   constructor(
     @InjectRepository(Character)
     private readonly characterRepository: Repository<Character>,
+    @InjectRepository(CharacterStaff)
+    private readonly characterStaffRepository: Repository<CharacterStaff>,
+    @InjectRepository(ReactionCount)
+    private readonly reactionCountRepository: Repository<ReactionCount>,
     cacheService: CacheService,
     private readonly reactionsService: ReactionsService,
   ) {
@@ -193,5 +199,164 @@ export class CharactersService extends BaseService<Character> {
       ...character,
       reactionCounts,
     } as Character & { reactionCounts?: ReactionCount[] };
+  }
+
+  /**
+   * Get comprehensive character statistics
+   * Returns aggregated statistics about characters including counts by status, gender, blood type,
+   * voice actors, reactions, and top series
+   * @returns Character statistics DTO
+   */
+  async getCharacterStatistics(): Promise<CharacterStatsDto> {
+    const cacheKey = 'characters:stats:overview';
+    const cached = await this.cacheService?.get(cacheKey);
+    if (cached) {
+      return cached as CharacterStatsDto;
+    }
+
+    // Execute all queries in parallel for better performance
+    const [
+      totalCharacters,
+      activeCharacters,
+      statusStats,
+      genderStats,
+      bloodTypeStats,
+      charactersWithImages,
+      charactersWithVoiceActors,
+      totalVoiceActors,
+      totalReactions,
+      seriesStats,
+    ] = await Promise.all([
+      // Total characters count
+      this.characterRepository.count(),
+
+      // Active characters count
+      this.characterRepository.count({
+        where: { status: CHARACTER_CONSTANTS.STATUS.ACTIVE },
+      }),
+
+      // Characters by status
+      this.characterRepository
+        .createQueryBuilder('character')
+        .select('character.status', 'status')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('character.status')
+        .getRawMany(),
+
+      // Characters by gender
+      this.characterRepository
+        .createQueryBuilder('character')
+        .select('character.gender', 'gender')
+        .addSelect('COUNT(*)', 'count')
+        .where('character.gender IS NOT NULL')
+        .groupBy('character.gender')
+        .getRawMany(),
+
+      // Characters by blood type
+      this.characterRepository
+        .createQueryBuilder('character')
+        .select('character.bloodType', 'bloodType')
+        .addSelect('COUNT(*)', 'count')
+        .where('character.bloodType IS NOT NULL')
+        .groupBy('character.bloodType')
+        .getRawMany(),
+
+      // Characters with images
+      this.characterRepository.count({
+        where: { imageId: Not(IsNull()) },
+      }),
+
+      // Characters with voice actors (distinct character IDs from character_staff)
+      this.characterStaffRepository
+        .createQueryBuilder('cs')
+        .select('COUNT(DISTINCT cs.characterId)', 'count')
+        .getRawOne()
+        .then((result) => parseInt(result?.count || '0', 10)),
+
+      // Total voice actor relationships
+      this.characterStaffRepository.count(),
+
+      // Total reactions for all characters
+      this.reactionCountRepository
+        .createQueryBuilder('rc')
+        .select('SUM(rc.count)', 'total')
+        .where('rc.subjectType = :subjectType', { subjectType: 'character' })
+        .getRawOne()
+        .then((result) => parseInt(result?.total || '0', 10)),
+
+      // Top series by character count
+      this.characterRepository
+        .createQueryBuilder('character')
+        .select('character.seriesId', 'seriesId')
+        .addSelect('COUNT(*)', 'count')
+        .where('character.seriesId IS NOT NULL')
+        .groupBy('character.seriesId')
+        .orderBy('COUNT(*)', 'DESC')
+        .limit(10)
+        .getRawMany(),
+    ]);
+
+    // Transform status stats to Record<string, number>
+    const charactersByStatus = (
+      statusStats as Array<{ status: string; count: string }>
+    ).reduce(
+      (acc, stat) => {
+        acc[stat.status] = parseInt(stat.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Transform gender stats to Record<string, number>
+    const charactersByGender = (
+      genderStats as Array<{ gender: string; count: string }>
+    ).reduce(
+      (acc, stat) => {
+        acc[stat.gender] = parseInt(stat.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Transform blood type stats to Record<string, number>
+    const charactersByBloodType = (
+      bloodTypeStats as Array<{ bloodType: string; count: string }>
+    ).reduce(
+      (acc, stat) => {
+        acc[stat.bloodType] = parseInt(stat.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Transform series stats to Array<{ seriesId: string; count: number }>
+    const charactersBySeries = (
+      seriesStats as Array<{ seriesId: string; count: string }>
+    ).map((stat) => ({
+      seriesId: stat.seriesId,
+      count: parseInt(stat.count, 10),
+    }));
+
+    const stats: CharacterStatsDto = {
+      totalCharacters,
+      activeCharacters,
+      charactersByStatus,
+      charactersByGender,
+      charactersByBloodType,
+      charactersWithImages,
+      charactersWithVoiceActors,
+      totalVoiceActors,
+      totalReactions,
+      charactersBySeries,
+    };
+
+    // Cache the results
+    await this.cacheService?.set(
+      cacheKey,
+      stats,
+      CHARACTER_CONSTANTS.CACHE.STATS_TTL_SEC,
+    );
+
+    return stats;
   }
 }
