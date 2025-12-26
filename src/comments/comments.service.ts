@@ -26,6 +26,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import {
   BatchCommentsDto,
+  CommentStatsOverviewDto,
   CreateCommentDto,
   CreateCommentMediaItemDto,
   QueryCommentsCursorDto,
@@ -743,6 +744,220 @@ export class CommentsService extends BaseService<Comment> {
       recentComments,
     };
 
+    await this.cacheService?.set(
+      cacheKey,
+      stats,
+      COMMENT_CONSTANTS.CACHE.STATS_TTL_SEC,
+    );
+
+    return stats;
+  }
+
+  /**
+   * Get comprehensive comment statistics overview
+   * Returns aggregated statistics about comments across the entire platform
+   * @returns Comment statistics overview DTO
+   */
+  async getCommentStatisticsOverview(): Promise<CommentStatsOverviewDto> {
+    const cacheKey = 'comments:stats:overview';
+    const cached = await this.cacheService?.get(cacheKey);
+    if (cached) {
+      return cached as CommentStatsOverviewDto;
+    }
+
+    // Execute all queries in parallel for better performance
+    const [
+      totalComments,
+      totalTopLevelComments,
+      totalReplies,
+      pinnedComments,
+      editedComments,
+      typeStats,
+      visibilityStats,
+      subjectTypeStats,
+      commentsWithMedia,
+      totalMediaAttachments,
+      commentsWithMentions,
+      totalMentions,
+      recentComments,
+      topLevelCommentsWithReplies,
+      topCommentedSubjects,
+    ] = await Promise.all([
+      // Total comments count
+      this.commentRepository.count(),
+
+      // Top-level comments count (parentId is null)
+      this.commentRepository.count({
+        where: { parentId: IsNull() },
+      }),
+
+      // Replies count (parentId is not null)
+      this.commentRepository.count({
+        where: { parentId: Not(IsNull()) },
+      }),
+
+      // Pinned comments count
+      this.commentRepository.count({
+        where: { pinned: true },
+      }),
+
+      // Edited comments count
+      this.commentRepository.count({
+        where: { edited: true },
+      }),
+
+      // Comments by type
+      this.commentRepository
+        .createQueryBuilder('comment')
+        .select('comment.type', 'type')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('comment.type')
+        .getRawMany(),
+
+      // Comments by visibility
+      this.commentRepository
+        .createQueryBuilder('comment')
+        .select('comment.visibility', 'visibility')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('comment.visibility')
+        .getRawMany(),
+
+      // Comments by subject type
+      this.commentRepository
+        .createQueryBuilder('comment')
+        .select('comment.subjectType', 'subjectType')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('comment.subjectType')
+        .getRawMany(),
+
+      // Comments with media (distinct comment IDs from comment_media)
+      this.commentMediaRepository
+        .createQueryBuilder('cm')
+        .select('COUNT(DISTINCT cm.commentId)', 'count')
+        .getRawOne()
+        .then((result) => parseInt(result?.count || '0', 10)),
+
+      // Total media attachments
+      this.commentMediaRepository.count(),
+
+      // Comments with mentions (distinct comment IDs from comment_mentions)
+      this.commentMentionRepository
+        .createQueryBuilder('cm')
+        .select('COUNT(DISTINCT cm.commentId)', 'count')
+        .getRawOne()
+        .then((result) => parseInt(result?.count || '0', 10)),
+
+      // Total mentions
+      this.commentMentionRepository.count(),
+
+      // Recent comments (last 24 hours)
+      this.commentRepository.count({
+        where: {
+          createdAt: MoreThan(
+            new Date(Date.now() - 24 * 60 * 60 * 1000),
+          ),
+        },
+      }),
+
+      // Top-level comments with replies (for average calculation)
+      this.commentRepository
+        .createQueryBuilder('comment')
+        .select('comment.replyCount', 'replyCount')
+        .where('comment.parentId IS NULL')
+        .andWhere('comment.replyCount > 0')
+        .getMany(),
+
+      // Top commented subjects
+      this.commentRepository
+        .createQueryBuilder('comment')
+        .select('comment.subjectType', 'subjectType')
+        .addSelect('comment.subjectId', 'subjectId')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('comment.subjectType')
+        .addGroupBy('comment.subjectId')
+        .orderBy('COUNT(*)', 'DESC')
+        .limit(10)
+        .getRawMany(),
+    ]);
+
+    // Transform type stats to Record<string, number>
+    const commentsByType = (
+      typeStats as Array<{ type: string; count: string }>
+    ).reduce(
+      (acc, stat) => {
+        acc[stat.type] = parseInt(stat.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Transform visibility stats to Record<string, number>
+    const commentsByVisibility = (
+      visibilityStats as Array<{ visibility: string; count: string }>
+    ).reduce(
+      (acc, stat) => {
+        acc[stat.visibility] = parseInt(stat.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Transform subject type stats to Record<string, number>
+    const commentsBySubjectType = (
+      subjectTypeStats as Array<{ subjectType: string; count: string }>
+    ).reduce(
+      (acc, stat) => {
+        acc[stat.subjectType] = parseInt(stat.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Calculate average reply count
+    const averageReplyCount =
+      topLevelCommentsWithReplies.length > 0
+        ? Math.round(
+            (topLevelCommentsWithReplies.reduce(
+              (sum, comment) => sum + comment.replyCount,
+              0,
+            ) /
+              topLevelCommentsWithReplies.length) *
+              100,
+          ) / 100
+        : 0;
+
+    // Transform top commented subjects to Array<{ subjectType: string; subjectId: string; count: number }>
+    const topCommentedSubjectsList = (
+      topCommentedSubjects as Array<{
+        subjectType: string;
+        subjectId: string;
+        count: string;
+      }>
+    ).map((stat) => ({
+      subjectType: stat.subjectType,
+      subjectId: stat.subjectId,
+      count: parseInt(stat.count, 10),
+    }));
+
+    const stats: CommentStatsOverviewDto = {
+      totalComments,
+      totalTopLevelComments,
+      totalReplies,
+      pinnedComments,
+      editedComments,
+      commentsByType,
+      commentsByVisibility,
+      commentsBySubjectType,
+      commentsWithMedia,
+      totalMediaAttachments,
+      commentsWithMentions,
+      totalMentions,
+      recentComments,
+      averageReplyCount,
+      topCommentedSubjects: topCommentedSubjectsList,
+    };
+
+    // Cache the results
     await this.cacheService?.set(
       cacheKey,
       stats,

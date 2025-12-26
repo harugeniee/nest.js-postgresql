@@ -12,13 +12,18 @@ import {
   Request,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
 import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { CommentsService } from './comments.service';
-import { BatchCommentsDto, QueryCommentsCursorDto } from './dto';
+import {
+  BatchCommentsDto,
+  CommentStatsOverviewDto,
+  QueryCommentsCursorDto,
+} from './dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { QueryCommentsDto } from './dto/query-comments.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
@@ -64,6 +69,22 @@ export class CommentsController {
   // @Auth()
   async getCommentsCursor(@Query() dto: QueryCommentsCursorDto) {
     return this.commentsService.getCommentsCursor(dto);
+  }
+
+  /**
+   * Get comment statistics overview
+   * Returns comprehensive platform-wide statistics about comments including counts by type,
+   * visibility, subject type, media attachments, mentions, and top commented subjects
+   * IMPORTANT: This route must be defined BEFORE @Get('stats') to avoid route conflicts
+   */
+  @Get('stats/overview')
+  @ApiOperation({
+    summary: 'Get comment statistics overview',
+    description:
+      'Returns comprehensive platform-wide statistics about comments including counts by type, visibility, subject type, media attachments, mentions, and top commented subjects',
+  })
+  async getCommentStatisticsOverview(): Promise<CommentStatsOverviewDto> {
+    return this.commentsService.getCommentStatisticsOverview();
   }
 
   /**

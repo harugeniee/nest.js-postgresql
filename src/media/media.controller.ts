@@ -14,11 +14,13 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiOperation } from '@nestjs/swagger';
 
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import {
   MediaQueryDto,
+  MediaStatsOverviewDto,
   PresignedDownloadQueryDto,
   PresignedUploadDto,
   UpdateMediaDto,
@@ -78,6 +80,22 @@ export class MediaController {
   @Auth()
   async getMedia(@Query() query: MediaQueryDto) {
     return this.mediaService.getMedia(query);
+  }
+
+  /**
+   * Get media statistics overview
+   * Returns comprehensive platform-wide statistics about media files including counts by type,
+   * status, storage provider, usage metrics, and top performers
+   * IMPORTANT: This route must be defined BEFORE @Get(':id') to avoid route conflicts
+   */
+  @Get('stats/overview')
+  @ApiOperation({
+    summary: 'Get media statistics overview',
+    description:
+      'Returns comprehensive platform-wide statistics about media files including counts by type, status, storage provider, usage metrics, and top performers',
+  })
+  async getMediaStatisticsOverview(): Promise<MediaStatsOverviewDto> {
+    return this.mediaService.getMediaStatisticsOverview();
   }
 
   @Get(':id')

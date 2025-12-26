@@ -3,3 +3,4 @@ export * from './update-media.dto';
 export * from './media-query.dto';
 export * from './presigned-upload.dto';
 export * from './presigned-download.dto';
+export * from './media-stats-overview.dto';

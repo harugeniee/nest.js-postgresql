@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHmac, hkdfSync } from 'crypto';
 import { Readable } from 'stream';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 
 import { AdvancedPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
@@ -12,7 +12,12 @@ import { BaseService } from 'src/common/services';
 import { MEDIA_CONSTANTS, MediaStatus, MediaType } from 'src/shared/constants';
 import { CacheService, R2Service } from 'src/shared/services';
 
-import { CreateMediaDto, MediaQueryDto, UpdateMediaDto } from './dto';
+import {
+  CreateMediaDto,
+  MediaQueryDto,
+  MediaStatsOverviewDto,
+  UpdateMediaDto,
+} from './dto';
 import { Media } from './entities/media.entity';
 import {
   ImageScrambleMetadata,
@@ -733,5 +738,312 @@ export class MediaService extends BaseService<Media> {
       tileCols: scramblerMeta.tileCols,
       version: scramblerMeta.version ?? scramblerConfig.version,
     };
+  }
+
+  /**
+   * Get media statistics overview
+   * Returns comprehensive platform-wide statistics about media files
+   * @returns Media statistics overview
+   */
+  async getMediaStatisticsOverview(): Promise<MediaStatsOverviewDto> {
+    const cacheKey = 'media:stats:overview';
+    const cached = await this.cacheService?.get(cacheKey);
+    if (cached) {
+      return cached as MediaStatsOverviewDto;
+    }
+
+    // Execute all queries in parallel for better performance
+    const [
+      totalMedia,
+      totalActiveMedia,
+      statusStats,
+      typeStats,
+      storageProviderStats,
+      publicMedia,
+      privateMedia,
+      storageSizeStats,
+      viewDownloadStats,
+      recentUploads,
+      scrambledImagesCount,
+      mimeTypeStats,
+      topUploadersRaw,
+      mostViewedMediaRaw,
+      mostDownloadedMediaRaw,
+    ] = await Promise.all([
+      // Total media count
+      this.mediaRepository.count(),
+
+      // Active media count
+      this.mediaRepository.count({
+        where: { status: MEDIA_CONSTANTS.STATUS.ACTIVE },
+      }),
+
+      // Media by status
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .select('media.status', 'status')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('media.status')
+        .getRawMany(),
+
+      // Media by type
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .select('media.type', 'type')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('media.type')
+        .getRawMany(),
+
+      // Media by storage provider
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .select('media.storageProvider', 'storageProvider')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('media.storageProvider')
+        .getRawMany(),
+
+      // Public media count
+      this.mediaRepository.count({
+        where: { isPublic: true },
+      }),
+
+      // Private media count
+      this.mediaRepository.count({
+        where: { isPublic: false },
+      }),
+
+      // Storage size aggregations (SUM and AVG)
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .select('COALESCE(SUM(media.size), 0)', 'totalSize')
+        .addSelect('COALESCE(AVG(media.size), 0)', 'avgSize')
+        .where('media.size IS NOT NULL')
+        .getRawOne(),
+
+      // View and download count aggregations
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .select('COALESCE(SUM(media.viewCount), 0)', 'totalViews')
+        .addSelect('COALESCE(SUM(media.downloadCount), 0)', 'totalDownloads')
+        .getRawOne(),
+
+      // Recent uploads (last 24 hours)
+      this.mediaRepository.count({
+        where: {
+          createdAt: MoreThan(
+            new Date(Date.now() - 24 * 60 * 60 * 1000),
+          ),
+        },
+      }),
+
+      // Scrambled images count (check metadata JSON for scrambled flag)
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .where('media.type = :type', {
+          type: MEDIA_CONSTANTS.TYPES.IMAGE,
+        })
+        .andWhere('media.metadata IS NOT NULL')
+        .andWhere("media.metadata::text LIKE '%\"scrambled\":\"true\"%'")
+        .getCount(),
+
+      // Top MIME types
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .select('media.mimeType', 'mimeType')
+        .addSelect('COUNT(*)', 'count')
+        .where('media.mimeType IS NOT NULL')
+        .groupBy('media.mimeType')
+        .orderBy('COUNT(*)', 'DESC')
+        .limit(10)
+        .getRawMany(),
+
+      // Top uploaders (join with user table)
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .select('media.userId', 'userId')
+        .addSelect('user.username', 'username')
+        .addSelect('COUNT(*)', 'count')
+        .leftJoin('media.user', 'user')
+        .where('media.userId IS NOT NULL')
+        .groupBy('media.userId')
+        .addGroupBy('user.username')
+        .orderBy('COUNT(*)', 'DESC')
+        .limit(10)
+        .getRawMany(),
+
+      // Most viewed media
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .select('media.id', 'id')
+        .addSelect('media.name', 'name')
+        .addSelect('media.viewCount', 'viewCount')
+        .where('media.viewCount IS NOT NULL')
+        .andWhere('media.viewCount > 0')
+        .orderBy('media.viewCount', 'DESC')
+        .limit(10)
+        .getRawMany(),
+
+      // Most downloaded media
+      this.mediaRepository
+        .createQueryBuilder('media')
+        .select('media.id', 'id')
+        .addSelect('media.name', 'name')
+        .addSelect('media.downloadCount', 'downloadCount')
+        .where('media.downloadCount IS NOT NULL')
+        .andWhere('media.downloadCount > 0')
+        .orderBy('media.downloadCount', 'DESC')
+        .limit(10)
+        .getRawMany(),
+    ]);
+
+    // Transform status stats to Record<string, number>
+    const mediaByStatus = (
+      statusStats as Array<{ status: string; count: string }>
+    ).reduce(
+      (acc, stat) => {
+        acc[stat.status] = parseInt(stat.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Transform type stats to Record<string, number>
+    const mediaByType = (
+      typeStats as Array<{ type: string; count: string }>
+    ).reduce(
+      (acc, stat) => {
+        acc[stat.type] = parseInt(stat.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Transform storage provider stats to Record<string, number>
+    const mediaByStorageProvider = (
+      storageProviderStats as Array<{ storageProvider: string; count: string }>
+    ).reduce(
+      (acc, stat) => {
+        acc[stat.storageProvider || 'unknown'] = parseInt(stat.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Extract storage size stats
+    const totalStorageSize = parseInt(
+      (storageSizeStats as { totalSize: string })?.totalSize || '0',
+      10,
+    );
+    const averageFileSize = Math.round(
+      parseFloat(
+        (storageSizeStats as { avgSize: string })?.avgSize || '0',
+      ),
+    );
+
+    // Extract view and download stats
+    const totalViews = parseInt(
+      (viewDownloadStats as { totalViews: string })?.totalViews || '0',
+      10,
+    );
+    const totalDownloads = parseInt(
+      (viewDownloadStats as { totalDownloads: string })?.totalDownloads || '0',
+      10,
+    );
+
+    // Transform MIME type stats
+    const mediaByMimeType = (
+      mimeTypeStats as Array<{ mimeType: string; count: string }>
+    ).map((stat) => ({
+      mimeType: stat.mimeType,
+      count: parseInt(stat.count, 10),
+    }));
+
+    // Transform top uploaders
+    const topUploaders = (
+      topUploadersRaw as Array<{
+        userId: string;
+        username: string;
+        count: string;
+      }>
+    ).map((stat) => ({
+      userId: stat.userId,
+      username: stat.username || 'Unknown',
+      count: parseInt(stat.count, 10),
+    }));
+
+    // Transform most viewed media
+    const mostViewedMedia = (
+      mostViewedMediaRaw as Array<{
+        id: string;
+        name: string;
+        viewCount: number;
+      }>
+    ).map((stat) => ({
+      id: stat.id,
+      name: stat.name || 'Unknown',
+      viewCount: stat.viewCount || 0,
+    }));
+
+    // Transform most downloaded media
+    const mostDownloadedMedia = (
+      mostDownloadedMediaRaw as Array<{
+        id: string;
+        name: string;
+        downloadCount: number;
+      }>
+    ).map((stat) => ({
+      id: stat.id,
+      name: stat.name || 'Unknown',
+      downloadCount: stat.downloadCount || 0,
+    }));
+
+    const stats: MediaStatsOverviewDto = {
+      totalMedia,
+      totalActiveMedia,
+      mediaByType,
+      mediaByStatus,
+      mediaByStorageProvider,
+      publicMedia,
+      privateMedia,
+      totalStorageSize,
+      averageFileSize,
+      totalViews,
+      totalDownloads,
+      recentUploads,
+      scrambledImages: scrambledImagesCount,
+      mediaByMimeType,
+      topUploaders,
+      mostViewedMedia,
+      mostDownloadedMedia,
+    };
+
+    // Cache the results for 5 minutes (300 seconds)
+    await this.cacheService?.set(cacheKey, stats, 300);
+
+    return stats;
+  }
+
+  /**
+   * Lifecycle hook: after media creation
+   * Invalidates stats cache when new media is created
+   */
+  protected async afterCreate(entity: Media): Promise<void> {
+    await this.cacheService?.delete('media:stats:overview');
+  }
+
+  /**
+   * Lifecycle hook: after media update
+   * Invalidates stats cache when media is updated
+   */
+  protected async afterUpdate(entity: Media): Promise<void> {
+    await this.cacheService?.delete('media:stats:overview');
+  }
+
+  /**
+   * Lifecycle hook: after media deletion
+   * Invalidates stats cache when media is deleted
+   */
+  protected async afterDelete(id: string): Promise<void> {
+    await this.cacheService?.delete('media:stats:overview');
   }
 }

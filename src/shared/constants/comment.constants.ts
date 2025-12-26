@@ -95,7 +95,7 @@ export const COMMENT_CONSTANTS = {
     TTL_SEC: 300, // 5 minutes
     SWR_SEC: 60, // 1 minute
     PREFIX: 'comments',
-    STATS_TTL_SEC: 300, // 5 minutes
+    STATS_TTL_SEC: 3600, // 1 hour
   },
 
   // Rate limiting
