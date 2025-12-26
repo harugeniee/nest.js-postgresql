@@ -8,10 +8,16 @@ import { ReactionCount } from 'src/reactions/entities/reaction-count.entity';
 import { ReactionsService } from 'src/reactions/reactions.service';
 import { CHARACTER_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
-import { DeepPartial, Repository, IsNull, Not } from 'typeorm';
+import {
+  DeepPartial,
+  FindOptionsRelations,
+  IsNull,
+  Not,
+  Repository,
+} from 'typeorm';
 import { CharacterStatsDto, QueryCharacterCursorDto } from './dto';
-import { Character } from './entities/character.entity';
 import { CharacterStaff } from './entities/character-staff.entity';
+import { Character } from './entities/character.entity';
 
 @Injectable()
 export class CharactersService extends BaseService<Character> {
@@ -35,6 +41,7 @@ export class CharactersService extends BaseService<Character> {
           voiceActors: {
             staff: true,
           },
+          series: true,
         },
         selectWhitelist: {
           id: true,
@@ -51,6 +58,17 @@ export class CharactersService extends BaseService<Character> {
           metadata: true,
           createdAt: true,
           updatedAt: true,
+          series: {
+            id: true,
+            title: true,
+          },
+          voiceActors: {
+            id: true,
+            staff: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
       cacheService,
@@ -122,7 +140,15 @@ export class CharactersService extends BaseService<Character> {
   async findAll(
     paginationDto: AdvancedPaginationDto,
   ): Promise<IPagination<Character>> {
-    return this.listOffset(paginationDto);
+    const relations: FindOptionsRelations<Character> = {
+      series: true,
+      voiceActors: {
+        staff: true,
+      },
+    };
+    return this.listOffset(paginationDto, undefined, {
+      relations,
+    });
   }
 
   /**
