@@ -853,9 +853,7 @@ export class CommentsService extends BaseService<Comment> {
       // Recent comments (last 24 hours)
       this.commentRepository.count({
         where: {
-          createdAt: MoreThan(
-            new Date(Date.now() - 24 * 60 * 60 * 1000),
-          ),
+          createdAt: MoreThan(new Date(Date.now() - 24 * 60 * 60 * 1000)),
         },
       }),
 

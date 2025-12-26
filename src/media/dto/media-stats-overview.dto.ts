@@ -215,4 +215,3 @@ export class MediaStatsOverviewDto {
     downloadCount: number;
   }>;
 }
-

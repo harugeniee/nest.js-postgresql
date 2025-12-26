@@ -830,9 +830,7 @@ export class MediaService extends BaseService<Media> {
       // Recent uploads (last 24 hours)
       this.mediaRepository.count({
         where: {
-          createdAt: MoreThan(
-            new Date(Date.now() - 24 * 60 * 60 * 1000),
-          ),
+          createdAt: MoreThan(new Date(Date.now() - 24 * 60 * 60 * 1000)),
         },
       }),
 
@@ -843,7 +841,7 @@ export class MediaService extends BaseService<Media> {
           type: MEDIA_CONSTANTS.TYPES.IMAGE,
         })
         .andWhere('media.metadata IS NOT NULL')
-        .andWhere("media.metadata::text LIKE '%\"scrambled\":\"true\"%'")
+        .andWhere('media.metadata::text LIKE \'%"scrambled":"true"%\'')
         .getCount(),
 
       // Top MIME types
@@ -935,9 +933,7 @@ export class MediaService extends BaseService<Media> {
       10,
     );
     const averageFileSize = Math.round(
-      parseFloat(
-        (storageSizeStats as { avgSize: string })?.avgSize || '0',
-      ),
+      parseFloat((storageSizeStats as { avgSize: string })?.avgSize || '0'),
     );
 
     // Extract view and download stats
