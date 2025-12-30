@@ -10,10 +10,12 @@ import { Studio, StudioSeries } from 'src/studios/entities';
 import { Tag } from 'src/tags/entities/tag.entity';
 import { CacheModule, RabbitmqModule } from 'src/shared/services';
 import { Genre, Segments, Series, SeriesGenre } from './entities';
+import { GenresController } from './genres.controller';
 import { SeriesController } from './series.controller';
 import { SegmentsController } from './segments.controller';
 import { SeriesService } from './series.service';
 import { AniListCrawlService } from './services/anilist-crawl.service';
+import { GenresService } from './services/genres.service';
 import { SegmentsService } from './services/segments.service';
 
 @Module({
@@ -39,8 +41,13 @@ import { SegmentsService } from './services/segments.service';
     CacheModule,
     RabbitmqModule,
   ],
-  controllers: [SeriesController, SegmentsController],
-  providers: [SeriesService, AniListCrawlService, SegmentsService],
-  exports: [SeriesService, AniListCrawlService, SegmentsService],
+  controllers: [SeriesController, GenresController, SegmentsController],
+  providers: [
+    SeriesService,
+    GenresService,
+    AniListCrawlService,
+    SegmentsService,
+  ],
+  exports: [SeriesService, GenresService, AniListCrawlService, SegmentsService],
 })
 export class SeriesModule {}
