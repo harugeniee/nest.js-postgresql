@@ -15,6 +15,14 @@ export class QueryCharacterDto extends AdvancedPaginationDto {
   @IsString()
   @IsIn(Object.values(CHARACTER_CONSTANTS.BLOOD_TYPES))
   bloodType?: string;
+
+  /**
+   * Filter by series ID
+   * Optional - filter characters by series ID
+   */
+  @IsOptional()
+  @IsString()
+  seriesId?: string;
 }
 
 /**
@@ -22,8 +30,8 @@ export class QueryCharacterDto extends AdvancedPaginationDto {
  */
 export class QueryCharacterCursorDto extends CursorPaginationDto {
   /**
-   * Filter by gender
-   * Optional - filter characters by gender
+   * Filter by series ID
+   * Optional - filter characters by series ID
    */
   @IsOptional()
   @IsString()

@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { AdvancedPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
@@ -11,11 +10,16 @@ import { CacheService } from 'src/shared/services';
 import {
   DeepPartial,
   FindOptionsRelations,
+  FindOptionsWhere,
   IsNull,
   Not,
   Repository,
 } from 'typeorm';
-import { CharacterStatsDto, QueryCharacterCursorDto } from './dto';
+import {
+  CharacterStatsDto,
+  QueryCharacterCursorDto,
+  QueryCharacterDto,
+} from './dto';
 import { CharacterStaff } from './entities/character-staff.entity';
 import { Character } from './entities/character.entity';
 
@@ -137,16 +141,25 @@ export class CharactersService extends BaseService<Character> {
   /**
    * Get all characters with offset pagination
    */
-  async findAll(
-    paginationDto: AdvancedPaginationDto,
-  ): Promise<IPagination<Character>> {
+  async findAll(queryDto: QueryCharacterDto): Promise<IPagination<Character>> {
     const relations: FindOptionsRelations<Character> = {
       series: true,
       voiceActors: {
         staff: true,
       },
     };
-    return this.listOffset(paginationDto, undefined, {
+
+    const extraFilter: FindOptionsWhere<Character> = {};
+    if (queryDto.gender) {
+      extraFilter.gender = queryDto.gender;
+    }
+    if (queryDto.bloodType) {
+      extraFilter.bloodType = queryDto.bloodType;
+    }
+    if (queryDto.seriesId) {
+      extraFilter.seriesId = queryDto.seriesId;
+    }
+    return this.listOffset(queryDto, extraFilter, {
       relations,
     });
   }
