@@ -23,6 +23,7 @@ import { BookmarksModule } from './bookmarks/bookmarks.module';
 import { CharactersModule } from './characters/characters.module';
 import { CommentsModule } from './comments/comments.module';
 import { FollowModule } from './follow/follow.module';
+import { KeyValueModule } from './key-value/key-value.module';
 import { MediaModule } from './media/media.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -117,6 +118,7 @@ import { WorkerModule } from './workers/worker.module';
     ArticlesModule,
     ReactionsModule,
     CommentsModule,
+    KeyValueModule,
     StickersModule,
     ReportsModule,
     BookmarksModule,
