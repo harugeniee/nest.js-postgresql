@@ -24,15 +24,29 @@ export class StudiosService extends BaseService<Studio> {
         entityName: 'Studio',
         cache: { enabled: true, ttlSec: 60, prefix: 'studios', swrSec: 30 },
         defaultSearchField: 'name',
-        relationsWhitelist: {},
+        relationsWhitelist: {
+          seriesRoles: {
+            series: true,
+          },
+        },
         selectWhitelist: {
           id: true,
           name: true,
           type: true,
           siteUrl: true,
           status: true,
+          metadata: true,
           createdAt: true,
           updatedAt: true,
+          seriesRoles: {
+            id: true,
+            role: true,
+            seriesId: true,
+            series: {
+              id: true,
+              title: true,
+            },
+          },
         },
       },
       cacheService,
@@ -102,7 +116,32 @@ export class StudiosService extends BaseService<Studio> {
   async findAll(
     paginationDto: AdvancedPaginationDto,
   ): Promise<IPagination<Studio>> {
-    return this.listOffset(paginationDto);
+    return this.listOffset(paginationDto, undefined, {
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        siteUrl: true,
+        status: true,
+        metadata: true,
+        createdAt: true,
+        updatedAt: true,
+        seriesRoles: {
+          id: true,
+          role: true,
+          seriesId: true,
+          series: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+      relations: {
+        seriesRoles: {
+          series: true,
+        },
+      },
+    });
   }
 
   /**
@@ -141,6 +180,43 @@ export class StudiosService extends BaseService<Studio> {
     kind: string,
   ): Promise<boolean> {
     return this.reactionsService.hasReacted(userId, 'studio', studioId, kind);
+  }
+
+  /**
+   * Override findById to include seriesRoles relation by default
+   * @param id Studio ID
+   * @param opts Optional find options
+   * @returns Studio with seriesRoles
+   */
+  async findById(
+    id: string,
+    opts?: { relations?: string[]; select?: Record<string, unknown> },
+  ): Promise<Studio> {
+    const relations = opts?.relations || ['seriesRoles', 'seriesRoles.series'];
+    const select =
+      opts?.select ||
+      ({
+        id: true,
+        name: true,
+        myAnimeListId: true,
+        aniListId: true,
+        type: true,
+        siteUrl: true,
+        status: true,
+        metadata: true,
+        createdAt: true,
+        updatedAt: true,
+        seriesRoles: {
+          id: true,
+          role: true,
+          seriesId: true,
+          series: {
+            id: true,
+            title: true,
+          },
+        },
+      } as Record<string, unknown>);
+    return super.findById(id, { relations, select });
   }
 
   /**
