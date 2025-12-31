@@ -23,4 +23,11 @@ import { AnalyticsMetricService } from './services/analytics-metric.service';
   providers: [AnalyticsService, AnalyticsInterceptor, AnalyticsMetricService],
   exports: [AnalyticsService, AnalyticsInterceptor, AnalyticsMetricService],
 })
-export class AnalyticsModule {}
+export class AnalyticsModule {
+  static forRoot(): any {
+    return {
+      module: AnalyticsModule,
+      global: true,
+    };
+  }
+}

@@ -127,7 +127,7 @@ import { WorkerModule } from './workers/worker.module';
     TagsModule,
     NotificationsModule,
     FollowModule,
-    AnalyticsModule,
+    AnalyticsModule.forRoot(),
     ShareModule,
     StaffsModule,
     StudiosModule,

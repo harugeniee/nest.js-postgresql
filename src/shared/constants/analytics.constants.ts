@@ -57,10 +57,6 @@ export const ANALYTICS_EVENT_TYPES = {
   // Reaction events
   REACTION_SET: 'reaction_set',
 
-  // Bookmark events
-  BOOKMARK_CREATE: 'bookmark_create',
-
-  // Comment events
   COMMENT_CREATE: 'comment_create',
   COMMENT_UPDATE: 'comment_update',
   COMMENT_DELETE: 'comment_delete',
