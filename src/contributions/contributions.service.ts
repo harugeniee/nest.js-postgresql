@@ -1,22 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CharactersService } from 'src/characters/characters.service';
+import { AdvancedPaginationDto } from 'src/common/dto';
+import type { IPagination } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services/base.service';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { SeriesService } from 'src/series/series.service';
 import { SegmentsService } from 'src/series/services/segments.service';
-import {
-  CONTRIBUTION_CONSTANTS,
-  NOTIFICATION_TYPES,
-  USER_CONSTANTS,
-} from 'src/shared/constants';
+import { CONTRIBUTION_CONSTANTS } from 'src/shared/constants/contribution.constants';
+import { NOTIFICATION_TYPES } from 'src/shared/constants/notification.constants';
+import { USER_CONSTANTS } from 'src/shared/constants/user.constants';
 import { CacheService } from 'src/shared/services/cache/cache.service';
 import { StaffsService } from 'src/staffs/staffs.service';
 import { User } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
 import { Repository } from 'typeorm';
-import { CreateContributionDto } from './dto';
+import { CreateContributionDto, QueryContributionDto } from './dto';
 import { Contribution } from './entities/contribution.entity';
 
 /**
@@ -197,14 +197,16 @@ export class ContributionsService extends BaseService<Contribution> {
    * Get pending contributions (for admin review)
    */
   async findPending(
-    queryDto: any,
-  ): Promise<{ result: Contribution[]; metaData: any }> {
+    queryDto: QueryContributionDto,
+  ): Promise<IPagination<Contribution>> {
+    const pendingStatus = CONTRIBUTION_CONSTANTS.STATUS.PENDING;
+    const paginationDto: AdvancedPaginationDto = {
+      ...queryDto,
+      status: pendingStatus,
+    };
     return this.listOffset(
-      {
-        ...queryDto,
-        status: CONTRIBUTION_CONSTANTS.STATUS.PENDING,
-      },
-      { status: CONTRIBUTION_CONSTANTS.STATUS.PENDING },
+      paginationDto,
+      { status: pendingStatus },
       {
         relations: ['contributor'],
         select: this.opts.selectWhitelist,
@@ -217,13 +219,10 @@ export class ContributionsService extends BaseService<Contribution> {
    */
   async findByContributor(
     contributorId: string,
-    queryDto: any,
-  ): Promise<{ result: Contribution[]; metaData: any }> {
+    queryDto: QueryContributionDto,
+  ): Promise<IPagination<Contribution>> {
     return this.listOffset(
-      {
-        ...queryDto,
-        contributorId,
-      },
+      queryDto,
       { contributorId },
       {
         relations: ['contributor', 'reviewer'],
@@ -287,21 +286,32 @@ export class ContributionsService extends BaseService<Contribution> {
     contribution: Contribution,
   ): Promise<void> {
     try {
-      const isApproved =
-        contribution.status === CONTRIBUTION_CONSTANTS.STATUS.APPROVED;
+      const approvedStatus = CONTRIBUTION_CONSTANTS.STATUS.APPROVED;
+      const isApproved = contribution.status === approvedStatus;
+
       const title = isApproved
         ? 'Contribution Approved'
         : 'Contribution Rejected';
-      const message = isApproved
-        ? `Your ${contribution.action} contribution for ${contribution.entityType} has been approved.`
-        : `Your ${contribution.action} contribution for ${contribution.entityType} has been rejected.${contribution.rejectionReason ? ` Reason: ${contribution.rejectionReason}` : ''}`;
+
+      let message: string;
+      if (isApproved) {
+        message = `Your ${contribution.action} contribution for ${contribution.entityType} has been approved.`;
+      } else {
+        const baseMessage = `Your ${contribution.action} contribution for ${contribution.entityType} has been rejected.`;
+        const reasonText = contribution.rejectionReason
+          ? ` Reason: ${contribution.rejectionReason}`
+          : '';
+        message = baseMessage + reasonText;
+      }
+
+      const notificationType = isApproved
+        ? NOTIFICATION_TYPES.CONTENT_APPROVED
+        : NOTIFICATION_TYPES.CONTENT_REJECTED;
 
       await this.notificationsService.createNotification(
         contribution.contributorId,
         {
-          type: isApproved
-            ? NOTIFICATION_TYPES.CONTENT_APPROVED
-            : NOTIFICATION_TYPES.CONTENT_REJECTED,
+          type: notificationType,
           title,
           message,
           actionUrl: `/contributions/${contribution.id}`,

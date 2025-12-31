@@ -1,16 +1,21 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
-import { ContributionsService } from '../contributions.service';
+import { CharactersService } from 'src/characters/characters.service';
+import type { Character } from 'src/characters/entities/character.entity';
+import type { Segments } from 'src/series/entities/segments.entity';
+import type { Series } from 'src/series/entities/series.entity';
 import { SeriesService } from 'src/series/series.service';
 import { SegmentsService } from 'src/series/services/segments.service';
-import { CharactersService } from 'src/characters/characters.service';
-import { StaffsService } from 'src/staffs/staffs.service';
-import { Contribution } from '../entities/contribution.entity';
 import { CONTRIBUTION_CONSTANTS } from 'src/shared/constants/contribution.constants';
+import type { Staff } from 'src/staffs/entities/staff.entity';
+import { StaffsService } from 'src/staffs/staffs.service';
+import type { DeepPartial } from 'typeorm';
+import { ContributionsService } from '../contributions.service';
+import { Contribution } from '../entities/contribution.entity';
 
 /**
  * Contribution Processor Service
@@ -161,23 +166,33 @@ export class ContributionProcessorService {
     const { entityType, proposedData } = contribution;
 
     switch (entityType) {
-      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.SERIES:
-        const series = await this.seriesService.create(proposedData as any);
+      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.SERIES: {
+        const series = await this.seriesService.create(
+          proposedData as DeepPartial<Series>,
+        );
         return series.id;
+      }
 
-      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.SEGMENT:
-        const segment = await this.segmentsService.create(proposedData as any);
+      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.SEGMENT: {
+        const segment = await this.segmentsService.create(
+          proposedData as DeepPartial<Segments>,
+        );
         return segment.id;
+      }
 
-      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.CHARACTER:
+      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.CHARACTER: {
         const character = await this.charactersService.create(
-          proposedData as any,
+          proposedData as DeepPartial<Character>,
         );
         return character.id;
+      }
 
-      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.STAFF:
-        const staff = await this.staffsService.create(proposedData as any);
+      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.STAFF: {
+        const staff = await this.staffsService.create(
+          proposedData as DeepPartial<Staff>,
+        );
         return staff.id;
+      }
 
       default:
         throw new BadRequestException(`Unsupported entity type: ${entityType}`);
@@ -199,25 +214,33 @@ export class ContributionProcessorService {
     let entityExists = false;
 
     switch (entityType) {
-      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.SERIES:
+      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.SERIES: {
         const existingSeries = await this.seriesService.findById(entityId);
         if (!existingSeries) {
           throw new NotFoundException(`Series with ID ${entityId} not found`);
         }
-        await this.seriesService.update(entityId, proposedData as any);
+        await this.seriesService.update(
+          entityId,
+          proposedData as DeepPartial<Series>,
+        );
         entityExists = true;
         break;
+      }
 
-      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.SEGMENT:
+      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.SEGMENT: {
         const existingSegment = await this.segmentsService.findById(entityId);
         if (!existingSegment) {
           throw new NotFoundException(`Segment with ID ${entityId} not found`);
         }
-        await this.segmentsService.update(entityId, proposedData as any);
+        await this.segmentsService.update(
+          entityId,
+          proposedData as DeepPartial<Segments>,
+        );
         entityExists = true;
         break;
+      }
 
-      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.CHARACTER:
+      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.CHARACTER: {
         const existingCharacter =
           await this.charactersService.findById(entityId);
         if (!existingCharacter) {
@@ -225,18 +248,26 @@ export class ContributionProcessorService {
             `Character with ID ${entityId} not found`,
           );
         }
-        await this.charactersService.update(entityId, proposedData as any);
+        await this.charactersService.update(
+          entityId,
+          proposedData as DeepPartial<Character>,
+        );
         entityExists = true;
         break;
+      }
 
-      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.STAFF:
+      case CONTRIBUTION_CONSTANTS.ENTITY_TYPE.STAFF: {
         const existingStaff = await this.staffsService.findById(entityId);
         if (!existingStaff) {
           throw new NotFoundException(`Staff with ID ${entityId} not found`);
         }
-        await this.staffsService.update(entityId, proposedData as any);
+        await this.staffsService.update(
+          entityId,
+          proposedData as DeepPartial<Staff>,
+        );
         entityExists = true;
         break;
+      }
 
       default:
         throw new BadRequestException(`Unsupported entity type: ${entityType}`);
