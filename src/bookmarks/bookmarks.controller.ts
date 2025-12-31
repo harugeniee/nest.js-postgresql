@@ -11,10 +11,14 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { USER_CONSTANTS } from 'src/shared/constants';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { BookmarksService } from './bookmarks.service';
 import {
   CreateBookmarkDto,
@@ -43,6 +47,12 @@ export class BookmarksController {
    * Create a new bookmark
    */
   @Post()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.BOOKMARK_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.BOOKMARK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   createBookmark(
     @Request() req: Request & { user: AuthPayload },
     @Body() createBookmarkDto: CreateBookmarkDto,
@@ -57,6 +67,12 @@ export class BookmarksController {
    * Get user's bookmarks with filtering and pagination
    */
   @Get()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.BOOKMARK_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.BOOKMARK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   getUserBookmarks(
     @Request() req: Request & { user: AuthPayload },
     @Query() query: QueryBookmarksDto,
@@ -68,6 +84,12 @@ export class BookmarksController {
    * Get a specific bookmark
    */
   @Get(':id')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.BOOKMARK_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.BOOKMARK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   getBookmark(
     @Request() req: Request & { user: AuthPayload },
     @Param('id', new SnowflakeIdPipe()) id: string,
@@ -86,6 +108,12 @@ export class BookmarksController {
    * Update a bookmark
    */
   @Put(':id')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.BOOKMARK_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.BOOKMARK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   updateBookmark(
     @Request() req: Request & { user: AuthPayload },
     @Param('id', new SnowflakeIdPipe()) id: string,
@@ -103,6 +131,12 @@ export class BookmarksController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.BOOKMARK_DELETE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.BOOKMARK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   removeBookmark(
     @Request() req: Request & { user: AuthPayload },
     @Param('id', new SnowflakeIdPipe()) id: string,

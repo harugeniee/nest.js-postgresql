@@ -10,10 +10,14 @@ import {
   Post,
   Query,
   Request,
+  UseInterceptors,
 } from '@nestjs/common';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { ContributionsService } from './contributions.service';
 import {
   CreateContributionDto,
@@ -45,6 +49,12 @@ export class ContributionsController {
   @Post()
   @Auth()
   @HttpCode(HttpStatus.CREATED)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.CONTRIBUTION_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.CONTRIBUTION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async create(
     @Body() createContributionDto: CreateContributionDto,
     @Request() req: Request & { user: AuthPayload },
@@ -63,6 +73,12 @@ export class ContributionsController {
    */
   @Get()
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.CONTRIBUTION_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.CONTRIBUTION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async findAll(@Query() queryDto: QueryContributionDto) {
     return this.contributionsService.listOffset(queryDto);
   }
@@ -75,6 +91,12 @@ export class ContributionsController {
    */
   @Get('pending')
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.CONTRIBUTION_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.CONTRIBUTION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async findPending(@Query() queryDto: QueryContributionDto) {
     return this.contributionsService.findPending(queryDto);
   }
@@ -88,6 +110,12 @@ export class ContributionsController {
    */
   @Get('my')
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.CONTRIBUTION_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.CONTRIBUTION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async findMy(
     @Query() queryDto: QueryContributionDto,
     @Request() req: Request & { user: AuthPayload },
@@ -103,6 +131,12 @@ export class ContributionsController {
    */
   @Get(':id')
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.CONTRIBUTION_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.CONTRIBUTION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async findOne(@Param('id', SnowflakeIdPipe) id: string) {
     return this.contributionsService.findById(id, {
       relations: ['contributor', 'reviewer'],
@@ -119,6 +153,12 @@ export class ContributionsController {
    */
   @Patch(':id/approve')
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.CONTRIBUTION_APPROVE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.CONTRIBUTION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async approve(
     @Param('id', SnowflakeIdPipe) id: string,
     @Body() reviewDto: ReviewContributionDto,
@@ -141,6 +181,12 @@ export class ContributionsController {
    */
   @Patch(':id/reject')
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.CONTRIBUTION_REJECT,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.CONTRIBUTION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async reject(
     @Param('id', SnowflakeIdPipe) id: string,
     @Body() reviewDto: ReviewContributionDto,

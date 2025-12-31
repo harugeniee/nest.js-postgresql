@@ -15,6 +15,9 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiOperation } from '@nestjs/swagger';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
@@ -33,6 +36,12 @@ export class MediaController {
 
   @Post()
   @UseInterceptors(FilesInterceptor('files'))
+  @UseInterceptors(AnalyticsInterceptor)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.MEDIA_UPLOAD,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.MEDIA,
+  )
   @Auth()
   async uploadMedia(
     @UploadedFiles() files: Array<Express.Multer.File>,
@@ -78,6 +87,12 @@ export class MediaController {
 
   @Get()
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.MEDIA_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.MEDIA,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getMedia(@Query() query: MediaQueryDto) {
     return this.mediaService.getMedia(query);
   }
@@ -100,11 +115,23 @@ export class MediaController {
 
   @Get(':id')
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.MEDIA_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.MEDIA,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getMediaById(@Param('id') id: string) {
     return this.mediaService.getMediaById(id);
   }
 
   @Put(':id')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.MEDIA_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.MEDIA,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async updateMedia(
     @Param('id') id: string,
     @Body() updateMediaDto: UpdateMediaDto,
@@ -113,6 +140,12 @@ export class MediaController {
   }
 
   @Delete(':id')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.MEDIA_DELETE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.MEDIA,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async deleteMedia(@Param('id') id: string) {
     return this.mediaService.deleteMedia(id);
   }

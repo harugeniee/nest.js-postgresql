@@ -10,7 +10,11 @@ import {
   Patch,
   Post,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { Auth } from 'src/common/decorators';
 import { CursorPaginationDto } from 'src/common/dto';
 import { SnowflakeIdPipe } from 'src/common/pipes';
@@ -32,6 +36,12 @@ export class SeriesController {
   @Post()
   @Auth()
   @HttpCode(HttpStatus.CREATED)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.SERIES_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.SERIES,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async create(@Body() createSeriesDto: CreateSeriesDto) {
     return this.seriesService.create(createSeriesDto);
   }
@@ -40,6 +50,12 @@ export class SeriesController {
    * Get all series with offset pagination
    */
   @Get()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.SERIES_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.SERIES,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async findAll(@Query() queryDto: QuerySeriesDto) {
     return this.seriesService.findAll(queryDto);
   }
@@ -48,6 +64,12 @@ export class SeriesController {
    * Get all series with cursor pagination
    */
   @Get('cursor')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.SERIES_LIST_CURSOR,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.SERIES,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async findAllCursor(@Query() paginationDto: CursorPaginationDto) {
     return this.seriesService.findAllCursor(paginationDto);
   }
@@ -153,6 +175,12 @@ export class SeriesController {
    * Get a series by ID
    */
   @Get(':id')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.SERIES_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.SERIES,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async findOne(@Param('id', SnowflakeIdPipe) id: string) {
     return this.seriesService.findById(id);
   }
@@ -163,6 +191,12 @@ export class SeriesController {
    */
   @Patch(':id')
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.SERIES_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.SERIES,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async update(
     @Param('id', SnowflakeIdPipe) id: string,
     @Body() updateSeriesDto: UpdateSeriesDto,
@@ -177,6 +211,12 @@ export class SeriesController {
   @Delete(':id')
   @Auth()
   @HttpCode(HttpStatus.NO_CONTENT)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.SERIES_DELETE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.SERIES,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async remove(@Param('id', SnowflakeIdPipe) id: string) {
     return this.seriesService.softDelete(id);
   }

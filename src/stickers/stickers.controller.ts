@@ -9,6 +9,7 @@ import {
   Param,
   Query,
   Request,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,6 +17,9 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
@@ -47,6 +51,12 @@ export class StickersController {
   @ApiResponse({ status: 400, description: 'Invalid data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Media not found' })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async createSticker(
     @Body() dto: CreateStickerDto,
     @Request() req: Request & { user: AuthPayload },
@@ -57,6 +67,12 @@ export class StickersController {
   @Get()
   @ApiOperation({ summary: 'Get stickers (public available stickers only)' })
   @ApiResponse({ status: 200, description: 'Stickers retrieved successfully' })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getStickers(@Query() query: QueryStickersDto) {
     return this.stickersService.getAvailableStickers(query);
   }
@@ -75,6 +91,12 @@ export class StickersController {
   @ApiOperation({ summary: 'Get sticker by ID' })
   @ApiResponse({ status: 200, description: 'Sticker retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Sticker not found' })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getSticker(@Param('id') id: string) {
     return this.stickersService.findById(id, {
       relations: ['media', 'creator', 'updater'],
@@ -88,6 +110,12 @@ export class StickersController {
   @ApiResponse({ status: 200, description: 'Sticker updated successfully' })
   @ApiResponse({ status: 404, description: 'Sticker not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async updateSticker(
     @Param('id') id: string,
     @Body() dto: UpdateStickerDto,
@@ -103,6 +131,12 @@ export class StickersController {
   @ApiResponse({ status: 200, description: 'Sticker deleted successfully' })
   @ApiResponse({ status: 404, description: 'Sticker not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_DELETE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async deleteSticker(@Param('id') id: string) {
     await this.stickersService.deleteSticker(id);
     return { message: 'Sticker deleted successfully' };
@@ -124,6 +158,12 @@ export class StickerPacksController {
   })
   @ApiResponse({ status: 400, description: 'Invalid data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_PACK_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER_PACK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async createStickerPack(
     @Body() dto: CreateStickerPackDto,
     @Request() req: Request & { user: AuthPayload },
@@ -137,6 +177,12 @@ export class StickerPacksController {
     status: 200,
     description: 'Sticker packs retrieved successfully',
   })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_PACK_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER_PACK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getStickerPacks(@Query() query: QueryStickerPacksDto) {
     return this.stickersService.getPublishedStickerPacks(query);
   }
@@ -171,6 +217,12 @@ export class StickerPacksController {
     description: 'Sticker pack retrieved successfully',
   })
   @ApiResponse({ status: 404, description: 'Sticker pack not found' })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_PACK_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER_PACK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getStickerPack(@Param('id') id: string) {
     return await this.stickersService.getStickerPackById(id);
   }
@@ -185,6 +237,12 @@ export class StickerPacksController {
   })
   @ApiResponse({ status: 404, description: 'Sticker pack not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_PACK_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER_PACK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async updateStickerPack(
     @Param('id') id: string,
     @Body() dto: UpdateStickerPackDto,
@@ -203,6 +261,12 @@ export class StickerPacksController {
   })
   @ApiResponse({ status: 404, description: 'Sticker pack not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.STICKER_PACK_DELETE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.STICKER_PACK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async deleteStickerPack(@Param('id') id: string) {
     await this.stickersService.deleteStickerPack(id);
     return { message: 'Sticker pack deleted successfully' };

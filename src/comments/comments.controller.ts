@@ -15,6 +15,7 @@ import {
 import { ApiOperation } from '@nestjs/swagger';
 import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
@@ -54,6 +55,12 @@ export class CommentsController {
    */
   @Get()
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.COMMENT_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.COMMENT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getComments(@Query() dto: QueryCommentsDto) {
     return this.commentsService.list(dto);
   }
@@ -67,6 +74,12 @@ export class CommentsController {
    */
   @Get('cursor')
   // @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.COMMENT_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.COMMENT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getCommentsCursor(@Query() dto: QueryCommentsCursorDto) {
     return this.commentsService.getCommentsCursor(dto);
   }
@@ -155,6 +168,12 @@ export class CommentsController {
    * GET /comments/:id
    */
   @Get(':id')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.COMMENT_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.COMMENT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getComment(
     @Param('id', new SnowflakeIdPipe()) commentId: string,
     @Query('includeReplies') includeReplies?: string,
@@ -176,6 +195,12 @@ export class CommentsController {
    */
   @Put(':id')
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.COMMENT_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.COMMENT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async updateComment(
     @Param('id', new SnowflakeIdPipe()) commentId: string,
     @Request() req: Request & { user: AuthPayload },
@@ -191,6 +216,12 @@ export class CommentsController {
    */
   @Delete(':id')
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.COMMENT_DELETE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.COMMENT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async deleteComment(
     @Param('id', new SnowflakeIdPipe()) commentId: string,
     @Request() req: Request & { user: AuthPayload },

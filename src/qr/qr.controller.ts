@@ -22,7 +22,11 @@ import {
   Req,
   Res,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 
 import {
   ApproveTicketDto,
@@ -75,6 +79,12 @@ export class QrController {
    */
   @Post('tickets')
   @HttpCode(HttpStatus.CREATED)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.QR_TICKET_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.QR_TICKET,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async createTicket(
     @Body() createTicketDto: CreateTicketDto,
     @Req() req: Request,
@@ -138,6 +148,12 @@ export class QrController {
   @Post('tickets/:ticketId/scan')
   @UseGuards(JwtAccessTokenGuard)
   @HttpCode(HttpStatus.OK)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.QR_TICKET_SCAN,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.QR_TICKET,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async scanTicket(
     @Param('ticketId') ticketId: string,
     @Req() req: Request & { user: AuthPayload },
@@ -179,6 +195,12 @@ export class QrController {
   @Post('tickets/:ticketId/approve')
   @UseGuards(JwtAccessTokenGuard)
   @HttpCode(HttpStatus.OK)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.QR_TICKET_APPROVE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.QR_TICKET,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async approveTicket(
     @Param('ticketId') ticketId: string,
     @Body() approveTicketDto: ApproveTicketDto,
@@ -218,6 +240,12 @@ export class QrController {
   @Post('tickets/:ticketId/reject')
   @UseGuards(JwtAccessTokenGuard)
   @HttpCode(HttpStatus.OK)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.QR_TICKET_REJECT,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.QR_TICKET,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async rejectTicket(
     @Param('ticketId') ticketId: string,
     @Req() req: Request & { user: AuthPayload },

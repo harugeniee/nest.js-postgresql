@@ -62,7 +62,106 @@ export const ANALYTICS_EVENT_TYPES = {
 
   // Comment events
   COMMENT_CREATE: 'comment_create',
+  COMMENT_UPDATE: 'comment_update',
+  COMMENT_DELETE: 'comment_delete',
+  COMMENT_VIEW: 'comment_view',
+  COMMENT_LIST: 'comment_list',
   COMMENT_LIKE: 'comment_like',
+
+  // Bookmark events
+  BOOKMARK_CREATE: 'bookmark_create',
+  BOOKMARK_UPDATE: 'bookmark_update',
+  BOOKMARK_DELETE: 'bookmark_delete',
+  BOOKMARK_VIEW: 'bookmark_view',
+  BOOKMARK_LIST: 'bookmark_list',
+
+  // Contribution events
+  CONTRIBUTION_CREATE: 'contribution_create',
+  CONTRIBUTION_APPROVE: 'contribution_approve',
+  CONTRIBUTION_REJECT: 'contribution_reject',
+  CONTRIBUTION_VIEW: 'contribution_view',
+  CONTRIBUTION_LIST: 'contribution_list',
+
+  // Tag events
+  TAG_CREATE: 'tag_create',
+  TAG_UPDATE: 'tag_update',
+  TAG_DELETE: 'tag_delete',
+  TAG_VIEW: 'tag_view',
+  TAG_LIST: 'tag_list',
+
+  // Media events
+  MEDIA_UPLOAD: 'media_upload',
+  MEDIA_UPDATE: 'media_update',
+  MEDIA_DELETE: 'media_delete',
+  MEDIA_VIEW: 'media_view',
+  MEDIA_LIST: 'media_list',
+
+  // Notification events
+  NOTIFICATION_CREATE: 'notification_create',
+  NOTIFICATION_UPDATE: 'notification_update',
+  NOTIFICATION_DELETE: 'notification_delete',
+  NOTIFICATION_READ: 'notification_read',
+  NOTIFICATION_READ_ALL: 'notification_read_all',
+  NOTIFICATION_LIST: 'notification_list',
+  NOTIFICATION_VIEW: 'notification_view',
+
+  // User events (additional)
+  USER_REGISTER: 'user_register',
+  USER_VIEW: 'user_view',
+  USER_LIST: 'user_list',
+
+  // Report events
+  REPORT_CREATE: 'report_create',
+  REPORT_UPDATE: 'report_update',
+  REPORT_RESOLVE: 'report_resolve',
+  REPORT_DISMISS: 'report_dismiss',
+  REPORT_ESCALATE: 'report_escalate',
+  REPORT_ASSIGN: 'report_assign',
+  REPORT_VIEW: 'report_view',
+  REPORT_LIST: 'report_list',
+
+  // QR Ticket events
+  QR_TICKET_CREATE: 'qr_ticket_create',
+  QR_TICKET_SCAN: 'qr_ticket_scan',
+  QR_TICKET_APPROVE: 'qr_ticket_approve',
+  QR_TICKET_REJECT: 'qr_ticket_reject',
+
+  // Auth events
+  AUTH_LOGIN: 'auth_login',
+  AUTH_LOGOUT: 'auth_logout',
+  AUTH_LOGOUT_ALL: 'auth_logout_all',
+  AUTH_REGISTER: 'auth_register',
+
+  // Series events
+  SERIES_CREATE: 'series_create',
+  SERIES_UPDATE: 'series_update',
+  SERIES_DELETE: 'series_delete',
+  SERIES_VIEW: 'series_view',
+  SERIES_LIST: 'series_list',
+  SERIES_LIST_CURSOR: 'series_list_cursor',
+
+  // Organization events
+  ORGANIZATION_CREATE: 'organization_create',
+  ORGANIZATION_UPDATE: 'organization_update',
+  ORGANIZATION_DELETE: 'organization_delete',
+  ORGANIZATION_VIEW: 'organization_view',
+  ORGANIZATION_LIST: 'organization_list',
+
+  // Sticker events
+  STICKER_CREATE: 'sticker_create',
+  STICKER_UPDATE: 'sticker_update',
+  STICKER_DELETE: 'sticker_delete',
+  STICKER_VIEW: 'sticker_view',
+  STICKER_LIST: 'sticker_list',
+  STICKER_PACK_CREATE: 'sticker_pack_create',
+  STICKER_PACK_UPDATE: 'sticker_pack_update',
+  STICKER_PACK_DELETE: 'sticker_pack_delete',
+  STICKER_PACK_VIEW: 'sticker_pack_view',
+  STICKER_PACK_LIST: 'sticker_pack_list',
+
+  // Share link events
+  SHARE_LINK_CREATE: 'share_link_create',
+  SHARE_LINK_VIEW: 'share_link_view',
 
   // System events
   PAGE_VIEW: 'page_view',
@@ -95,6 +194,14 @@ export const ANALYTICS_SUBJECT_TYPES = {
   BOOKMARK_FOLDER: 'bookmark_folder',
   QR_TICKET: 'qr_ticket',
   REACTION: 'reaction',
+  CONTRIBUTION: 'contribution',
+  TAG: 'tag',
+  ORGANIZATION: 'organization',
+  SERIES: 'series',
+  SHARE_LINK: 'share_link',
+  BOOKMARK: 'bookmark',
+  NOTIFICATION: 'notification',
+  REPORT: 'report',
 } as const;
 
 /**

@@ -3,6 +3,9 @@ import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { USER_CONSTANTS } from 'src/shared/constants';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { RegisterDto } from 'src/users/dto/register.dto';
 import { UsersService } from 'src/users/users.service';
 
@@ -14,6 +17,7 @@ import {
   Post,
   Query,
   Request,
+  UseInterceptors,
 } from '@nestjs/common';
 
 @Controller('users')
@@ -27,6 +31,12 @@ export class UsersController {
 
   @Get(['@me', 'me'])
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.USER_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.USER,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.USER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getMe(@Request() req: Request & { user: AuthPayload }) {
     return await this.usersService.findOne(
       { id: req.user.uid },
@@ -38,12 +48,24 @@ export class UsersController {
 
   @Get()
   @Auth(USER_CONSTANTS.ROLES.ADMIN)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.USER_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.USER,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.USER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getUsers(@Query() paginationDto: AdvancedPaginationDto) {
     return await this.usersService.findAll(paginationDto);
   }
 
   @Get('cursor')
   @Auth(USER_CONSTANTS.ROLES.ADMIN)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.USER_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.USER,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.USER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getUsersCursor(@Query() paginationDto: CursorPaginationDto) {
     return await this.usersService.findAllCursor(paginationDto);
   }
@@ -54,6 +76,12 @@ export class UsersController {
    * @param id The ID of the user to retrieve.
    * @returns The user with the specified ID.
    */
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.USER_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.USER,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.USER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getUserById(@Param('id', new SnowflakeIdPipe()) id: string) {
     return await this.usersService.findById(id);
   }

@@ -7,7 +7,11 @@ import {
   Param,
   Query,
   Request,
+  UseInterceptors,
 } from '@nestjs/common';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { ReportsService } from './reports.service';
 import {
   CreateReportDto,
@@ -46,6 +50,12 @@ export class ReportsController {
    */
   @Post()
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.REPORT_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.REPORT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   createReport(
     @Request() req: Request & { user: AuthPayload },
     @Body() dto: CreateReportDto,
@@ -59,6 +69,12 @@ export class ReportsController {
   @Get()
   @Auth()
   @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.REPORT_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.REPORT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   getReports(@Query() dto: QueryReportsDto) {
     return this.reportsService.list(dto);
   }
@@ -69,6 +85,12 @@ export class ReportsController {
   @Get(':id')
   @Auth()
   @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.REPORT_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.REPORT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   getReport(@Param('id', new SnowflakeIdPipe()) reportId: string) {
     return this.reportsService.getById(reportId);
   }
@@ -79,6 +101,12 @@ export class ReportsController {
   @Put(':id')
   @Auth()
   @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.REPORT_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.REPORT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   updateReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
@@ -92,6 +120,12 @@ export class ReportsController {
    */
   @Post(':id/assign')
   @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.REPORT_ASSIGN,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.REPORT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   assignReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
@@ -105,6 +139,12 @@ export class ReportsController {
    */
   @Post(':id/resolve')
   @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.REPORT_RESOLVE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.REPORT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   resolveReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
@@ -118,6 +158,12 @@ export class ReportsController {
    */
   @Post(':id/dismiss')
   @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.REPORT_DISMISS,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.REPORT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   dismissReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },
@@ -135,6 +181,12 @@ export class ReportsController {
    */
   @Post(':id/escalate')
   @Auth([USER_CONSTANTS.ROLES.MODERATOR, USER_CONSTANTS.ROLES.ADMIN])
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.REPORT_ESCALATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.REPORT,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   escalateReport(
     @Param('id', new SnowflakeIdPipe()) reportId: string,
     @Request() req: Request & { user: AuthPayload },

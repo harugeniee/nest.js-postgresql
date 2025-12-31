@@ -10,8 +10,12 @@ import {
   Post,
   Query,
   Req,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { Auth, RequirePermissions } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
@@ -40,6 +44,12 @@ export class OrganizationsController {
   @Post()
   @Auth()
   @HttpCode(HttpStatus.CREATED)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.ORGANIZATION_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SOCIAL,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.ORGANIZATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async create(
     @Body() createOrganizationDto: CreateOrganizationDto,
     @Req() req: Request & { user: AuthPayload },
@@ -55,6 +65,12 @@ export class OrganizationsController {
    * Public endpoint - anyone can view public organizations
    */
   @Get()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.ORGANIZATION_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SOCIAL,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.ORGANIZATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async findAll(@Query() query: GetOrganizationDto) {
     return this.organizationsService.findAll(query);
   }
@@ -64,6 +80,12 @@ export class OrganizationsController {
    * Public endpoint - anyone can view public organizations
    */
   @Get(':id')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.ORGANIZATION_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SOCIAL,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.ORGANIZATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async findOne(@Param('id', SnowflakeIdPipe) id: string) {
     return this.organizationsService.findById(id);
   }
@@ -88,6 +110,12 @@ export class OrganizationsController {
     autoDetectScope: true,
   })
   @Auth()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.ORGANIZATION_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SOCIAL,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.ORGANIZATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async update(
     @Param('id', SnowflakeIdPipe) id: string,
     @Body() updateOrganizationDto: UpdateOrganizationDto,
@@ -110,6 +138,12 @@ export class OrganizationsController {
   })
   @Auth()
   @HttpCode(HttpStatus.NO_CONTENT)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.ORGANIZATION_DELETE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SOCIAL,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.ORGANIZATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async remove(@Param('id', SnowflakeIdPipe) id: string): Promise<void> {
     return this.organizationsService.remove(id);
   }

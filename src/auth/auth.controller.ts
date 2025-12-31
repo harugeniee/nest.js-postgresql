@@ -2,6 +2,9 @@ import { Auth, ClientInfo } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { CreateDeviceTokenDto, LoginDto, RegisterDto } from 'src/users/dto';
 import { UpdatePasswordDto } from 'src/users/dto/update-password.dto';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { FirebaseLoginDto, OtpRequestDto, OtpVerifyDto } from './dto';
 
 import {
@@ -16,6 +19,7 @@ import {
   Query,
   Request,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
@@ -29,6 +33,12 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.AUTH_REGISTER,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.USER,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.USER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async register(
     @Body() registerDto: RegisterDto,
     @ClientInfo() clientInfo: ClientInfo,
@@ -38,6 +48,12 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.AUTH_LOGIN,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.USER,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.USER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async login(
     @Body() loginDto: LoginDto,
     @ClientInfo() clientInfo: ClientInfo,
@@ -56,6 +72,12 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAccessTokenGuard)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.AUTH_LOGOUT,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.USER,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.USER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async logout(@Request() req: Request & { user: AuthPayload }) {
     const authPayload = req.user;
     return this.authService.logout(authPayload);
@@ -64,6 +86,12 @@ export class AuthController {
   @Post('logout-all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAccessTokenGuard)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.AUTH_LOGOUT_ALL,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.USER,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.USER,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async logoutAll(@Request() req: Request & { user: AuthPayload }) {
     const authPayload = req.user;
     return this.authService.logoutAll(authPayload);

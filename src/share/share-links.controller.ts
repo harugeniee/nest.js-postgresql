@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseInterceptors,
+} from '@nestjs/common';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { CreateShareLinkDto } from './dto/create-share-link.dto';
 import { ShareMetricsDto } from './dto/share-metrics.dto';
@@ -28,6 +39,12 @@ export class ShareLinksController {
    * @returns Created share link
    */
   @Post()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.SHARE_LINK_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.SHARE_LINK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async createShareLink(@Body() createShareLinkDto: CreateShareLinkDto) {
     return await this.shareLinksService.createShareLink(createShareLinkDto);
   }
@@ -40,6 +57,12 @@ export class ShareLinksController {
    * @returns Array of share links with summary metrics
    */
   @Get('content/:contentType/:contentId')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.SHARE_LINK_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.SHARE_LINK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   getShareLinksForContent(
     @Param('contentType') contentType: string,
     @Param('contentId', new SnowflakeIdPipe()) contentId: string,
@@ -74,6 +97,12 @@ export class ShareLinksController {
    * @returns Share link metrics
    */
   @Get(':code/metrics')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.SHARE_LINK_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.ENGAGEMENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.SHARE_LINK,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   async getShareLinkMetrics(
     @Param('code') code: string,
     @Query() metricsDto: ShareMetricsDto,

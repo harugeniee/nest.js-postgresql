@@ -1,0 +1,63 @@
+---
+alwaysApply: true
+---
+
+@rule controller_event_tracking
+All controllers MUST include event tracking for important endpoints using @TrackEvent decorator and @UseInterceptors(AnalyticsInterceptor).
+
+## Requirements
+- Import required decorators: TrackEvent, AnalyticsInterceptor, ANALYTICS_CONSTANTS
+- Add @TrackEvent decorator to ALL important endpoints (CRUD operations, user actions)
+- Add @UseInterceptors(AnalyticsInterceptor) to endpoints with @TrackEvent
+- Use appropriate event types from ANALYTICS_CONSTANTS.EVENT_TYPES
+- Use appropriate categories: CONTENT, SOCIAL, ENGAGEMENT, SYSTEM, USER
+- Use appropriate subject types matching the entity
+
+## Event Categories Mapping
+- **CONTENT**: articles, series, tags, media, stickers (create/read/update/delete content)
+- **SOCIAL**: follow, organizations, users (social interactions, user relationships)
+- **ENGAGEMENT**: comments, reactions, bookmarks, shares (user engagement)
+- **SYSTEM**: reports, contributions, notifications, qr, auth (system/admin functionality)
+- **USER**: users, auth (user management, authentication)
+
+## Required Endpoints to Track
+For each entity controller, track these operations:
+- CREATE: {entity}_create (POST endpoints)
+- VIEW: {entity}_view (GET /:id endpoints)
+- LIST: {entity}_list (GET endpoints for collections)
+- UPDATE: {entity}_update (PATCH/PUT endpoints)
+- DELETE: {entity}_delete (DELETE endpoints)
+- Special operations: approve, reject, read, scan, etc.
+
+## Implementation Pattern
+```typescript
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
+
+@Post()
+@TrackEvent(
+  ANALYTICS_CONSTANTS.EVENT_TYPES.ENTITY_CREATE,
+  ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT, // or SOCIAL/ENGAGEMENT/SYSTEM/USER
+  ANALYTICS_CONSTANTS.SUBJECT_TYPES.ENTITY,
+)
+@UseInterceptors(AnalyticsInterceptor)
+@Auth()
+async create(@Body() dto: CreateDto) {
+  return this.service.create(dto);
+}
+```
+
+## Exceptions
+- Do NOT track health check endpoints
+- Do NOT track internal/admin stats endpoints
+- Do NOT track low-value read-only endpoints (metadata, exists checks)
+- Skip tracking if endpoint is purely for debugging/testing
+
+## Validation Checklist
+- [ ] All CRUD endpoints have @TrackEvent decorators
+- [ ] All tracked endpoints have @UseInterceptors(AnalyticsInterceptor)
+- [ ] Event types match ANALYTICS_CONSTANTS.EVENT_TYPES
+- [ ] Categories and subject types are appropriate
+- [ ] Imports are present at top of file
+- [ ] No business logic mixed with tracking decorators

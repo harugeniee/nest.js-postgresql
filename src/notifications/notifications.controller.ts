@@ -10,7 +10,11 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
 } from '@nestjs/common';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
 import { SnowflakeIdPipe } from 'src/common/pipes';
@@ -34,6 +38,12 @@ export class NotificationsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.NOTIFICATION_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.NOTIFICATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   createNotification(
     @Body() dto: CreateNotificationDto,
     @Request() req: Request & { user: AuthPayload },
@@ -49,6 +59,12 @@ export class NotificationsController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.NOTIFICATION_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.NOTIFICATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   getUserNotifications(
     @Query() query: QueryNotificationsDto,
     @Request() req: Request & { user: AuthPayload },
@@ -78,6 +94,12 @@ export class NotificationsController {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.NOTIFICATION_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.NOTIFICATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   getNotification(
     @Param('id', new SnowflakeIdPipe()) id: string,
     @Request() req: Request & { user: AuthPayload },
@@ -90,6 +112,12 @@ export class NotificationsController {
 
   @Put(':id')
   @HttpCode(HttpStatus.OK)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.NOTIFICATION_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.NOTIFICATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   updateNotification(
     @Param('id', new SnowflakeIdPipe()) id: string,
     @Body() dto: UpdateNotificationDto,
@@ -100,6 +128,12 @@ export class NotificationsController {
 
   @Put(':id/read')
   @HttpCode(HttpStatus.OK)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.NOTIFICATION_READ,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.NOTIFICATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   markAsRead(
     @Param('id', new SnowflakeIdPipe()) id: string,
     @Body() dto: MarkAsReadDto,
@@ -110,12 +144,24 @@ export class NotificationsController {
 
   @Put('read-all')
   @HttpCode(HttpStatus.OK)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.NOTIFICATION_READ_ALL,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.NOTIFICATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   markAllAsRead(@Request() req: Request & { user: AuthPayload }) {
     return this.notificationsService.markAllAsRead(req.user.uid);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.NOTIFICATION_DELETE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.SYSTEM,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.NOTIFICATION,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   deleteNotification(
     @Param('id', new SnowflakeIdPipe()) id: string,
     @Request() _req: Request & { user: AuthPayload },

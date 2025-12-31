@@ -9,7 +9,11 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
 } from '@nestjs/common';
+import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
+import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { Auth } from 'src/common/decorators';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { TagsService } from './tags.service';
@@ -24,11 +28,23 @@ export class TagsController {
 
   @Post()
   @Auth([USER_CONSTANTS.ROLES.ADMIN, USER_CONSTANTS.ROLES.MODERATOR])
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.TAG_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.TAG,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   create(@Body() createTagDto: CreateTagDto): Promise<Tag> {
     return this.tagsService.create(createTagDto);
   }
 
   @Get()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.TAG_LIST,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.TAG,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   findAll(@Query() query: QueryTagsDto): Promise<IPagination<Tag>> {
     return this.tagsService.findAll(query);
   }
@@ -69,6 +85,12 @@ export class TagsController {
   }
 
   @Get(':id')
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.TAG_VIEW,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.TAG,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   findById(@Param('id', new SnowflakeIdPipe()) id: string): Promise<Tag> {
     return this.tagsService.findById(id);
   }
@@ -80,6 +102,12 @@ export class TagsController {
 
   @Patch(':id')
   @Auth([USER_CONSTANTS.ROLES.ADMIN, USER_CONSTANTS.ROLES.MODERATOR])
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.TAG_UPDATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.TAG,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   update(
     @Param('id', new SnowflakeIdPipe()) id: string,
     @Body() updateTagDto: UpdateTagDto,
@@ -90,6 +118,12 @@ export class TagsController {
   @Delete(':id')
   @Auth([USER_CONSTANTS.ROLES.ADMIN])
   @HttpCode(HttpStatus.NO_CONTENT)
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.TAG_DELETE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.TAG,
+  )
+  @UseInterceptors(AnalyticsInterceptor)
   remove(@Param('id', new SnowflakeIdPipe()) id: string): Promise<void> {
     return this.tagsService.remove(id);
   }
