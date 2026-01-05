@@ -17,6 +17,8 @@ import {
   CreateStaffDto,
   LinkCharactersDto,
   QueryStaffDto,
+  QueryStaffSeriesDto,
+  UpdateCharacterRoleDto,
   UpdateStaffDto,
 } from './dto';
 import { StaffsService } from './staffs.service';
@@ -114,5 +116,62 @@ export class StaffsController {
       linkCharactersDto.characters,
     );
     return { message: 'Characters linked successfully' };
+  }
+
+  /**
+   * Update a character role for a staff member
+   * Updates language, isPrimary, sortOrder, or notes for a CharacterStaff relationship
+   */
+  @Patch(':id/characters/:characterStaffId')
+  @Auth()
+  async updateCharacterRole(
+    @Param('id', SnowflakeIdPipe) id: string,
+    @Param('characterStaffId', SnowflakeIdPipe) characterStaffId: string,
+    @Body() updateDto: UpdateCharacterRoleDto,
+  ) {
+    await this.staffsService.updateCharacterRole(
+      id,
+      characterStaffId,
+      updateDto,
+    );
+    return { message: 'Character role updated successfully' };
+  }
+
+  /**
+   * Remove a character role from a staff member
+   * Deletes the CharacterStaff junction entity
+   */
+  @Delete(':id/characters/:characterStaffId')
+  @Auth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeCharacterRole(
+    @Param('id', SnowflakeIdPipe) id: string,
+    @Param('characterStaffId', SnowflakeIdPipe) characterStaffId: string,
+  ) {
+    await this.staffsService.removeCharacterRole(id, characterStaffId);
+  }
+
+  /**
+   * Get series that a staff member has worked on with offset pagination
+   * Returns StaffSeries objects with series information and role details
+   */
+  @Get(':id/series')
+  async getStaffSeries(
+    @Param('id', SnowflakeIdPipe) id: string,
+    @Query() queryDto: QueryStaffSeriesDto,
+  ) {
+    return this.staffsService.findSeriesByStaffId(id, queryDto);
+  }
+
+  /**
+   * Get series that a staff member has worked on with cursor pagination
+   * Returns StaffSeries objects with series information and role details
+   */
+  @Get(':id/series/cursor')
+  async getStaffSeriesCursor(
+    @Param('id', SnowflakeIdPipe) id: string,
+    @Query() cursorDto: CursorPaginationDto,
+  ) {
+    return this.staffsService.findSeriesByStaffIdCursor(id, cursorDto);
   }
 }

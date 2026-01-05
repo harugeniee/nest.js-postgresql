@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Character, CharacterStaff } from 'src/characters/entities';
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
@@ -9,8 +9,14 @@ import { ReactionCount } from 'src/reactions/entities/reaction-count.entity';
 import { ReactionsService } from 'src/reactions/reactions.service';
 import { CacheService } from 'src/shared/services';
 import { DeepPartial, Repository } from 'typeorm';
-import { CharacterRoleDto, CreateStaffDto, UpdateStaffDto } from './dto';
-import { Staff } from './entities/staff.entity';
+import {
+  CharacterRoleDto,
+  CreateStaffDto,
+  QueryStaffSeriesDto,
+  UpdateCharacterRoleDto,
+  UpdateStaffDto,
+} from './dto';
+import { Staff, StaffSeries } from './entities';
 
 @Injectable()
 export class StaffsService extends BaseService<Staff> {
@@ -23,6 +29,9 @@ export class StaffsService extends BaseService<Staff> {
 
     @InjectRepository(CharacterStaff)
     private readonly characterStaffRepository: Repository<CharacterStaff>,
+
+    @InjectRepository(StaffSeries)
+    private readonly staffSeriesRepository: Repository<StaffSeries>,
 
     cacheService: CacheService,
     private readonly reactionsService: ReactionsService,
@@ -380,5 +389,205 @@ export class StaffsService extends BaseService<Staff> {
       ...staff,
       reactionCounts,
     } as Staff & { reactionCounts?: ReactionCount[] };
+  }
+
+  /**
+   * Update a character role for a staff member
+   * Updates the CharacterStaff junction entity
+   * @param staffId Staff ID
+   * @param characterStaffId CharacterStaff junction entity ID
+   * @param updateDto Update data
+   */
+  async updateCharacterRole(
+    staffId: string,
+    characterStaffId: string,
+    updateDto: UpdateCharacterRoleDto,
+  ): Promise<void> {
+    const characterStaff = await this.characterStaffRepository.findOne({
+      where: { id: characterStaffId, staffId },
+    });
+
+    if (!characterStaff) {
+      throw new NotFoundException(
+        'Character role not found for this staff member',
+      );
+    }
+
+    await this.characterStaffRepository.update(characterStaffId, updateDto);
+
+    // Invalidate cache
+    await this.invalidateCacheForEntity(staffId);
+  }
+
+  /**
+   * Remove a character role from a staff member
+   * Deletes the CharacterStaff junction entity
+   * @param staffId Staff ID
+   * @param characterStaffId CharacterStaff junction entity ID
+   */
+  async removeCharacterRole(
+    staffId: string,
+    characterStaffId: string,
+  ): Promise<void> {
+    const characterStaff = await this.characterStaffRepository.findOne({
+      where: { id: characterStaffId, staffId },
+    });
+
+    if (!characterStaff) {
+      throw new NotFoundException(
+        'Character role not found for this staff member',
+      );
+    }
+
+    await this.characterStaffRepository.delete(characterStaffId);
+
+    // Invalidate cache
+    await this.invalidateCacheForEntity(staffId);
+  }
+
+  /**
+   * Get series that a staff member has worked on with offset pagination
+   * @param staffId Staff ID
+   * @param paginationDto Pagination and filter parameters
+   * @returns Paginated list of StaffSeries with series information
+   */
+  async findSeriesByStaffId(
+    staffId: string,
+    paginationDto: QueryStaffSeriesDto,
+  ): Promise<IPagination<StaffSeries>> {
+    // Verify staff exists
+    const staff = await this.staffRepository.findOne({
+      where: { id: staffId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff member not found');
+    }
+
+    // Extract and validate pagination parameters with defaults
+    const dto = paginationDto as unknown as {
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      order?: 'ASC' | 'DESC';
+      role?: string;
+      isMain?: boolean;
+    };
+
+    const page = dto.page || 1;
+    const limit = dto.limit || 10;
+    const sortBy = dto.sortBy || 'sortOrder';
+    const order = dto.order || 'ASC';
+
+    // Query StaffSeries with series relation
+    const queryBuilder = this.staffSeriesRepository
+      .createQueryBuilder('staffSeries')
+      .leftJoinAndSelect('staffSeries.series', 'series')
+      .leftJoinAndSelect('series.coverImage', 'coverImage')
+      .leftJoinAndSelect('series.tags', 'tags')
+      .where('staffSeries.staffId = :staffId', { staffId });
+
+    // Apply optional filters
+    if (dto.role) {
+      queryBuilder.andWhere('staffSeries.role = :role', { role: dto.role });
+    }
+
+    if (dto.isMain !== undefined) {
+      queryBuilder.andWhere('staffSeries.isMain = :isMain', {
+        isMain: dto.isMain,
+      });
+    }
+
+    // Apply sorting
+    queryBuilder.orderBy(`staffSeries.${sortBy}`, order);
+
+    // Apply pagination
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [result, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      result,
+      metaData: {
+        currentPage: page,
+        pageSize: limit,
+        totalRecords: total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Get series that a staff member has worked on with cursor pagination
+   * @param staffId Staff ID
+   * @param paginationDto Cursor pagination parameters
+   * @returns Cursor-paginated list of StaffSeries with series information
+   */
+  async findSeriesByStaffIdCursor(
+    staffId: string,
+    paginationDto: CursorPaginationDto,
+  ): Promise<IPaginationCursor<StaffSeries>> {
+    // Verify staff exists
+    const staff = await this.staffRepository.findOne({
+      where: { id: staffId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff member not found');
+    }
+
+    // Extract pagination parameters
+    const sortBy = paginationDto.sortBy || 'sortOrder';
+    const order = paginationDto.order || 'ASC';
+    const limit = paginationDto.limit || 10;
+
+    // Query StaffSeries with series relation
+    const queryBuilder = this.staffSeriesRepository
+      .createQueryBuilder('staffSeries')
+      .leftJoinAndSelect('staffSeries.series', 'series')
+      .leftJoinAndSelect('series.coverImage', 'coverImage')
+      .leftJoinAndSelect('series.tags', 'tags')
+      .where('staffSeries.staffId = :staffId', { staffId });
+
+    // Apply sorting
+    queryBuilder.orderBy(`staffSeries.${sortBy}`, order);
+
+    // Apply limit - take one extra to check if there's a next page
+    queryBuilder.take(limit + 1);
+
+    const result = await queryBuilder.getMany();
+
+    // Check if there are more results
+    const hasMore = result.length > limit;
+    if (hasMore) {
+      result.pop(); // Remove the extra item
+    }
+
+    // Generate cursors (simplified version)
+    let nextCursor: string | undefined;
+    const prevCursor: string | undefined = undefined;
+
+    if (hasMore && result.length > 0) {
+      const lastItem = result.at(-1);
+      if (lastItem) {
+        nextCursor = Buffer.from(
+          JSON.stringify({
+            [sortBy]: lastItem[sortBy as keyof StaffSeries],
+            id: lastItem.id,
+          }),
+        ).toString('base64');
+      }
+    }
+
+    return {
+      result,
+      metaData: {
+        nextCursor,
+        prevCursor,
+        take: limit,
+        sortBy,
+        order,
+      },
+    };
   }
 }

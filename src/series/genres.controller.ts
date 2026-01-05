@@ -33,7 +33,6 @@ export class GenresController {
   @Auth()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createGenreDto: CreateGenreDto) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.genresService.create(createGenreDto);
   }
 
@@ -42,7 +41,7 @@ export class GenresController {
    */
   @Get()
   async findAll(@Query() queryDto: QueryGenreDto) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.genresService.findAll(queryDto);
   }
 
@@ -51,7 +50,6 @@ export class GenresController {
    */
   @Get(':id')
   async findOne(@Param('id', SnowflakeIdPipe) id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.genresService.findById(id);
   }
 
@@ -65,7 +63,6 @@ export class GenresController {
     @Param('id', SnowflakeIdPipe) id: string,
     @Body() updateGenreDto: UpdateGenreDto,
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.genresService.update(id, updateGenreDto);
   }
 
