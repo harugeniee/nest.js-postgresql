@@ -1,0 +1,72 @@
+---
+alwaysApply: true
+---
+
+@rule acceptance_checklist
+Before finalizing code changes, verify all applicable items:
+
+## Entity
+- [ ] Extends `BaseEntityCustom` with explicit `@Entity('table_name')`.
+- [ ] Table name is plural snake_case (e.g., `articles`, `qr_tickets`).
+- [ ] Column decorators use snake_case names where needed (`@Column({ name: 'user_id' })`).
+- [ ] Proper indexes defined for frequently queried fields.
+- [ ] Foreign key columns have corresponding relation decorators.
+
+## Service
+- [ ] Extends `BaseService<T>` with proper configuration.
+- [ ] Cache prefix configured (unique per entity).
+- [ ] `relationsWhitelist` configured for security.
+- [ ] `selectWhitelist` configured to prevent sensitive field exposure.
+- [ ] `getSearchableColumns()` returns appropriate fields.
+- [ ] Lifecycle hooks used for side effects (cache invalidation, notifications).
+- [ ] Complex operations use `runInTransaction()`.
+- [ ] Logger instantiated: `private readonly logger = new Logger(ClassName.name)`.
+
+## Controller
+- [ ] Thin—no business logic; all logic in services.
+- [ ] `@Auth()` decorator on protected endpoints.
+- [ ] `@TrackEvent()` decorator on CRUD endpoints.
+- [ ] `@UseInterceptors(AnalyticsInterceptor)` applied (class or method level).
+- [ ] `SnowflakeIdPipe` used for ID parameters.
+- [ ] `@RequirePermissions()` used where fine-grained access is needed.
+
+## Module
+- [ ] `TypeOrmModule.forFeature([Entity])` imported.
+- [ ] `AnalyticsModule` imported (for `@TrackEvent` support).
+- [ ] `PermissionsModule` imported (for `@RequirePermissions` support).
+- [ ] Service exported if needed by other modules.
+
+## DTOs & Validation
+- [ ] All DTOs use `class-validator` decorators.
+- [ ] Pagination `limit` clamped to 1..100.
+- [ ] Proper `@Transform()` decorators for type conversion.
+
+## Pagination
+- [ ] `listCursor()` uses signed cursors (`encodeSignedCursor`/`decodeSignedCursor`).
+- [ ] Custom cursor methods document exceptions if using unsigned cursors.
+- [ ] Response format matches contract (offset or cursor metadata).
+
+## Query Building
+- [ ] `ConditionBuilder` used for dynamic filters.
+- [ ] No raw SQL string concatenation.
+- [ ] Search fields validated against `getSearchableColumns()`.
+
+## Caching
+- [ ] Cache keys use proper prefix format (`${prefix}:id:${id}`, `${prefix}:list:${hash}`).
+- [ ] Cache invalidation in `afterCreate`/`afterUpdate`/`afterDelete` hooks.
+- [ ] SWR enabled where appropriate (`swrSec > 0`).
+
+## Error Handling
+- [ ] Errors use i18n message keys (`{ messageKey: 'domain.ERROR_KEY' }`).
+- [ ] No internal details leaked in error responses.
+- [ ] Proper HTTP status codes used.
+
+## Async Processing
+- [ ] Heavy async processing uses RabbitMQ.
+- [ ] Simple domain events MAY use EventEmitter (document choice).
+
+## General
+- [ ] No migrations or generators used.
+- [ ] All package commands use Yarn.
+- [ ] Comments in English, clear and detailed.
+- [ ] No hardcoded secrets or sensitive data.

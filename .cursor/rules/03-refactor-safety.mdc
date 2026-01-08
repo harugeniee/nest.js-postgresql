@@ -19,11 +19,34 @@ findById(id: string): Promise<Article> {
 }
 
 @example transaction_support
-// GOOD: Use transaction for complex operations
+// GOOD: Use transaction for complex operations spanning multiple entities
 async createCommentWithMedia(dto: CreateCommentDto): Promise<Comment> {
   return await this.runInTransaction(async (queryRunner) => {
     const comment = await this.create(dto, { queryRunner });
     await this.processMedia(comment.id, dto.media, queryRunner);
     return comment;
   });
+}
+
+@example transaction_batch
+// GOOD: Use transaction for batch operations that must succeed together
+async transferOwnership(fromUserId: string, toUserId: string, articleIds: string[]): Promise<void> {
+  return await this.runInTransaction(async (queryRunner) => {
+    for (const id of articleIds) {
+      await this.update(id, { userId: toUserId }, { queryRunner });
+    }
+    await this.auditService.log({ action: 'transfer', fromUserId, toUserId, articleIds }, { queryRunner });
+  });
+}
+
+@example whitelist_expansion
+// When expanding whitelists, audit for sensitive fields
+// BEFORE: selectWhitelist: { id: true, title: true }
+// AFTER: selectWhitelist: { id: true, title: true, email: true } // DANGER: email may be sensitive
+
+// GOOD: Document the expansion and add test
+selectWhitelist: {
+  id: true,
+  title: true,
+  publicEmail: true, // Explicitly public field - see test in *.spec.ts
 }

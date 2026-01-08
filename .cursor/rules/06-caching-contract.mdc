@@ -29,3 +29,23 @@ if (cached) return cached;
 const stats = await this.calculateStats(userId);
 await this.cacheService?.set(cacheKey, stats, 300); // 5 min TTL
 return stats;
+
+@example swr_config
+// Configure SWR in BaseService options
+super(repo, {
+  entityName: 'Article',
+  cache: {
+    enabled: true,
+    ttlSec: 300,    // 5 minute TTL
+    swrSec: 60,     // Refresh in background when TTL < 60s
+    prefix: 'articles'
+  }
+}, cacheService);
+
+@example cache_remember
+// Use CacheService.remember() for cache-aside pattern
+const result = await this.cacheService?.remember(
+  `articles:popular:${period}`,
+  300, // TTL in seconds
+  async () => this.calculatePopularArticles(period),
+);

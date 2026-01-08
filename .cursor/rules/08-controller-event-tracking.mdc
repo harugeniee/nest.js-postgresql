@@ -29,16 +29,50 @@ For each entity controller, track these operations:
 - DELETE: {entity}_delete (DELETE endpoints)
 - Special operations: approve, reject, read, scan, etc.
 
+## Module Setup
+Import AnalyticsModule in your feature module:
+```typescript
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([Entity]),
+    AnalyticsModule, // Required for @TrackEvent support
+  ],
+  controllers: [EntityController],
+  providers: [EntityService],
+})
+export class EntityModule {}
+```
+
 ## Implementation Pattern
+
+### Option A: Class-level interceptor (Recommended for most controllers)
 ```typescript
 import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
 import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 
+@Controller('articles')
+@UseInterceptors(AnalyticsInterceptor) // Apply to all endpoints
+export class ArticlesController {
+  @Post()
+  @TrackEvent(
+    ANALYTICS_CONSTANTS.EVENT_TYPES.ARTICLE_CREATE,
+    ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
+    ANALYTICS_CONSTANTS.SUBJECT_TYPES.ARTICLE,
+  )
+  @Auth()
+  async create(@Body() dto: CreateDto) {
+    return this.service.create(dto);
+  }
+}
+```
+
+### Option B: Method-level interceptor (For selective tracking)
+```typescript
 @Post()
 @TrackEvent(
   ANALYTICS_CONSTANTS.EVENT_TYPES.ENTITY_CREATE,
-  ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT, // or SOCIAL/ENGAGEMENT/SYSTEM/USER
+  ANALYTICS_CONSTANTS.EVENT_CATEGORIES.CONTENT,
   ANALYTICS_CONSTANTS.SUBJECT_TYPES.ENTITY,
 )
 @UseInterceptors(AnalyticsInterceptor)

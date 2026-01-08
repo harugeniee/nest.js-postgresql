@@ -21,9 +21,23 @@ A domain module includes ONLY:
 
 @example module_structure
 @Module({
-  imports: [TypeOrmModule.forFeature([Article])],
+  imports: [
+    TypeOrmModule.forFeature([Article]),
+    AnalyticsModule,      // Required for @TrackEvent support
+    PermissionsModule,    // Required for @RequirePermissions support
+  ],
   controllers: [ArticlesController],
   providers: [ArticlesService, ScheduledPublishingService],
   exports: [ArticlesService],
 })
 export class ArticlesModule {}
+
+@example minimal_module
+// Minimal module without analytics/permissions
+@Module({
+  imports: [TypeOrmModule.forFeature([Tag])],
+  controllers: [TagsController],
+  providers: [TagsService],
+  exports: [TagsService],
+})
+export class TagsModule {}

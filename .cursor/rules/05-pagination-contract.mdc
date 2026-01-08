@@ -5,10 +5,14 @@ alwaysApply: true
 @rule cursor_contract
 INPUT: { limit: number(1..100), cursor?: string, sortBy?: keyof T, order?: 'ASC'|'DESC' }
 OUTPUT: { result: T[], metaData: { nextCursor?: string, prevCursor?: string, take: number, sortBy: string, order: 'ASC'|'DESC' } }
-- Use encodeSignedCursor/decodeSignedCursor only for security.
-- Never expose numeric offsets to clients.
-- Support stable ordering with (sortBy, id) tuple for consistent pagination.
-- Use PaginationFormatter.cursor() for consistent response format.
+- MUST use encodeSignedCursor/decodeSignedCursor for client-facing pagination.
+- MUST NOT expose numeric offsets to clients.
+- MUST support stable ordering with (sortBy, id) tuple for consistent pagination.
+- SHOULD use PaginationFormatter.cursor() for consistent response format.
+
+## Exception
+Custom methods outside BaseService.listCursor() MAY use unsigned cursors (encodeCursor/decodeCursor)
+for internal/specialized use cases (e.g., nested relations, custom query builders). Document these exceptions.
 
 @example
 const result = await this.listCursor({ 
@@ -20,12 +24,16 @@ const result = await this.listCursor({
 return result; // Already formatted by BaseService
 
 @example signed_cursor
-// GOOD: Use signed cursors
+// GOOD: Use signed cursors for client-facing pagination
 const nextCursor = encodeSignedCursor({
   key: sortBy,
   order: direction,
   value: { [sortBy]: lastRecord[sortBy], id: lastRecord.id }
 });
 
-// BAD: Don't use unsigned cursors
-const nextCursor = encodeCursor({ key: sortBy, value: lastRecord[sortBy] });
+// ACCEPTABLE: Unsigned cursors for internal/specialized use only
+// Document the exception when using this pattern
+const internalCursor = encodeCursor({ key: sortBy, value: lastRecord[sortBy] });
+
+// BAD: Unsigned cursors for general client-facing APIs
+const nextCursor = encodeCursor({ key: sortBy, value: lastRecord[sortBy] }); // Don't do this
