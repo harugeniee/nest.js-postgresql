@@ -1,32 +1,60 @@
 /**
  * Mail configuration factory
  * Provides mail service configuration based on environment variables
+ * Supports multiple providers: 'smtp' (default) and 'resend'
  */
-export const mailConfig = () => ({
-  host: process.env.MAIL_HOST || 'smtp.gmail.com',
-  port: Number(process.env.MAIL_PORT) || 587,
-  secure: process.env.MAIL_SECURE === 'true', // true for 465, false for other ports
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-  from: process.env.MAIL_FROM || process.env.MAIL_USER,
-  admin: process.env.MAIL_ADMIN || process.env.MAIL_FROM,
-  // Additional configuration
-  pool: true, // use pooled connections
-  maxConnections: 5, // max connections in pool
-  maxMessages: 100, // max messages per connection
-  rateDelta: 20000, // rate limiting
-  rateLimit: 5, // max messages per rateDelta
-  // TLS options
-  tls: {
-    rejectUnauthorized: process.env.NODE_ENV === 'production',
-  },
-  // Connection timeout
-  connectionTimeout: 60000, // 60 seconds
-  greetingTimeout: 30000, // 30 seconds
-  socketTimeout: 60000, // 60 seconds
-});
+export const mailConfig = () => {
+  const provider = (process.env.MAIL_PROVIDER || 'smtp') as 'smtp' | 'resend';
+
+  // Base configuration shared by all providers
+  const baseConfig = {
+    provider,
+    from: process.env.MAIL_FROM || process.env.MAIL_USER,
+    admin: process.env.MAIL_ADMIN || process.env.MAIL_FROM,
+    // Connection pooling
+    pool: true, // use pooled connections
+    maxConnections: 5, // max connections in pool
+    maxMessages: 100, // max messages per connection
+    rateDelta: 20000, // rate limiting
+    rateLimit: 5, // max messages per rateDelta
+    // Connection timeout
+    connectionTimeout: 60000, // 60 seconds
+    greetingTimeout: 30000, // 30 seconds
+    socketTimeout: 60000, // 60 seconds
+  };
+
+  // Provider-specific configuration
+  if (provider === 'resend') {
+    return {
+      ...baseConfig,
+      host: 'smtp.resend.com',
+      port: Number(process.env.RESEND_PORT) || 465,
+      secure: true, // Required for Resend
+      auth: {
+        user: 'resend',
+        pass: process.env.RESEND_API_KEY,
+      },
+      tls: {
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
+      },
+    };
+  }
+
+  // Default SMTP configuration
+  return {
+    ...baseConfig,
+    host: process.env.MAIL_HOST || 'smtp.gmail.com',
+    port: Number(process.env.MAIL_PORT) || 587,
+    secure: process.env.MAIL_SECURE === 'true', // true for 465, false for other ports
+    auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
+    },
+    tls: {
+      rejectUnauthorized: process.env.NODE_ENV === 'production',
+    },
+  };
+};
 
 /**
  * Mail validation configuration

@@ -1,21 +1,21 @@
 import {
   Injectable,
   Logger,
-  OnModuleInit,
   OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import * as sanitizeHtml from 'sanitize-html';
 import { CacheService } from '../cache/cache.service';
-import {
-  MailOptions,
-  MailSendResult,
-  MailSendBatchResult,
-  MailValidationResult,
-  MailMetrics,
-  MailAddress,
-} from './mail.interface';
 import { mailConfig, mailValidationConfig } from './mail.config';
+import {
+  MailAddress,
+  MailMetrics,
+  MailOptions,
+  MailSendBatchResult,
+  MailSendResult,
+  MailValidationResult,
+} from './mail.interface';
 import * as templates from './templates';
 
 @Injectable()
@@ -57,6 +57,9 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
    */
   private async initializeTransporter(): Promise<void> {
     try {
+      this.logger.log(
+        `🔧 Initializing mail transporter with provider: ${this.config.provider}`,
+      );
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       this.transporter = nodemailer.createTransport({
         host: this.config.host,
@@ -79,7 +82,9 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
       if (this.transporter && typeof this.transporter.verify === 'function') {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         await this.transporter.verify();
-        this.logger.log('✅ Mail transporter verified successfully');
+        this.logger.log(
+          `✅ Mail transporter verified successfully (${this.config.provider})`,
+        );
       }
     } catch (error) {
       this.logger.error('❌ Failed to initialize mail transporter:', error);
@@ -122,6 +127,31 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.warn('⚠️ Failed to load email templates:', error);
     }
+  }
+
+  /**
+   * Build Resend-specific headers
+   */
+  private buildResendHeaders(
+    resendOptions?: import('./mail.interface').ResendOptions,
+  ): Record<string, string> {
+    const headers: Record<string, string> = {};
+
+    if (resendOptions?.idempotencyKey) {
+      headers['Resend-Idempotency-Key'] = resendOptions.idempotencyKey;
+    }
+
+    if (resendOptions?.preventThreading) {
+      // Generate unique ID to prevent Gmail threading
+      headers['X-Entity-Ref-ID'] =
+        `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    }
+
+    if (resendOptions?.unsubscribeUrl) {
+      headers['List-Unsubscribe'] = `<${resendOptions.unsubscribeUrl}>`;
+    }
+
+    return headers;
   }
 
   /**
@@ -176,6 +206,16 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
         throw new Error('Mail transporter not initialized');
       }
 
+      // Build headers (merge Resend headers if applicable)
+      const resendHeaders =
+        this.config.provider === 'resend'
+          ? this.buildResendHeaders(options.resendOptions)
+          : {};
+      const mergedHeaders = {
+        ...resendHeaders,
+        ...options.headers,
+      };
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       const info = await this.transporter.sendMail({
         from: options.from || this.config.from,
@@ -187,7 +227,8 @@ export class MailService implements OnModuleInit, OnModuleDestroy {
         text: options.text,
         html: options.html,
         attachments: options.attachments,
-        headers: options.headers,
+        headers:
+          Object.keys(mergedHeaders).length > 0 ? mergedHeaders : undefined,
         priority: options.priority,
         encoding: options.encoding,
         messageId: options.messageId,

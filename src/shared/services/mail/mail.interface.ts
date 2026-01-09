@@ -36,6 +36,18 @@ export interface MailContent {
 type MailAddressOrString = MailAddress | string;
 type MailAddressOrArrayOrString = MailAddress | MailAddress[] | string;
 
+/**
+ * Resend-specific options for email sending
+ */
+export interface ResendOptions {
+  /** Idempotency key to prevent duplicate sends */
+  idempotencyKey?: string;
+  /** Prevent email threading in Gmail by adding X-Entity-Ref-ID header */
+  preventThreading?: boolean;
+  /** Unsubscribe URL to add List-Unsubscribe header */
+  unsubscribeUrl?: string;
+}
+
 export interface MailOptions {
   from?: MailAddressOrString;
   to: MailAddressOrArrayOrString;
@@ -54,6 +66,8 @@ export interface MailOptions {
   messageId?: string;
   inReplyTo?: string;
   references?: string | string[];
+  /** Resend-specific options (only used when MAIL_PROVIDER=resend) */
+  resendOptions?: ResendOptions;
 }
 
 export interface MailSendResult {
@@ -102,6 +116,7 @@ export interface MailQueueStats {
 }
 
 export interface MailServiceConfig {
+  provider: 'smtp' | 'resend';
   host: string;
   port: number;
   secure: boolean;
@@ -165,7 +180,7 @@ export interface MailTemplateEngineConfig {
 
 export interface MailProvider {
   name: string;
-  type: 'smtp' | 'sendgrid' | 'mailgun' | 'ses' | 'mandrill';
+  type: 'smtp' | 'sendgrid' | 'mailgun' | 'ses' | 'mandrill' | 'resend';
   config: Record<string, unknown>;
   isActive: boolean;
   priority: number;
