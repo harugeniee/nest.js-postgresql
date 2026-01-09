@@ -1,8 +1,0 @@
----
-alwaysApply: false
----
-
-# DEPRECATED: See 00-guardrails.mdc
-
-This file has been superseded by `00-guardrails.mdc`.
-Please refer to that file for the current guardrails.
