@@ -48,6 +48,7 @@ export class KeyValueService extends BaseService<KeyValue> {
           value: true,
           namespace: true,
           expiresAt: true,
+          status: true,
           contentType: true,
           metadata: true,
           createdAt: true,

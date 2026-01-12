@@ -12,6 +12,10 @@ export const CONTENT_TYPES = {
   BOOLEAN: 'boolean',
   OBJECT: 'object',
   ARRAY: 'array',
+  JSON: 'json',
+  XML: 'xml',
+  HTML: 'html',
+  MARKDOWN: 'markdown',
 } as const;
 
 export type ContentType = (typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES];
