@@ -3,22 +3,9 @@ import * as firebase from 'firebase-admin';
 import { auth, messaging } from 'firebase-admin';
 
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
-import { firebaseConfig } from './firebase.config';
-
-// Firebase service account configuration
-const firebaseParams = {
-  type: firebaseConfig.type,
-  projectId: firebaseConfig.project_id,
-  privateKeyId: firebaseConfig.private_key_id,
-  privateKey: firebaseConfig.private_key,
-  clientEmail: firebaseConfig.client_email,
-  clientId: firebaseConfig.client_id,
-  authUri: firebaseConfig.auth_uri,
-  tokenUri: firebaseConfig.token_uri,
-  authProviderX509CertUrl: firebaseConfig.auth_provider_x509_cert_url,
-  clientC509CertUrl: firebaseConfig.client_x509_cert_url,
-};
+import { firebaseConfig } from 'src/shared/config/firebase.config';
 
 // Type definitions for better type safety
 interface FirebaseError {
@@ -54,7 +41,10 @@ export class FirebaseService {
   private readonly auth: auth.Auth;
   private readonly messaging: messaging.Messaging;
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
+    // Get Firebase configuration from environment variables
+    const firebaseParams = this.getFirebaseConfig();
+
     // Initialize Firebase Admin SDK in constructor
     try {
       this.firebaseAdmin = firebase.initializeApp({
@@ -82,6 +72,26 @@ export class FirebaseService {
     this.auth = this.firebaseAdmin.auth();
     this.messaging = this.firebaseAdmin.messaging();
     this.logger.log('Firebase services (Auth, Messaging) initialized');
+  }
+
+  /**
+   * Get Firebase configuration from environment variables
+   * @returns Firebase service account configuration
+   */
+  private getFirebaseConfig() {
+    const config = firebaseConfig();
+    return {
+      type: 'service_account',
+      projectId: config.projectId,
+      privateKeyId: config.privateKeyId,
+      privateKey: config.privateKey,
+      clientEmail: config.clientEmail,
+      clientId: config.clientId,
+      authUri: 'https://accounts.google.com/o/oauth2/auth',
+      tokenUri: 'https://oauth2.googleapis.com/token',
+      authProviderX509CertUrl: 'https://www.googleapis.com/oauth2/v1/certs',
+      clientC509CertUrl: config.clientX509CertUrl,
+    };
   }
 
   /**

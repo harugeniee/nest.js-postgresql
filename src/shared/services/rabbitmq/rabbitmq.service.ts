@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import { lastValueFrom } from 'rxjs';
 
 import { JOB_NAME } from 'src/shared/constants';
 
@@ -76,7 +77,7 @@ export class RabbitMQService implements OnModuleInit {
   ): Promise<boolean> {
     try {
       this.logger.debug(`Sending data to RabbitMQ job: ${jobName}`, { data });
-      await this.client.emit(jobName, JSON.stringify(data)).toPromise();
+      await lastValueFrom(this.client.emit(jobName, JSON.stringify(data)));
       this.logger.debug(`Successfully sent data to RabbitMQ job: ${jobName}`);
       return true;
     } catch (error) {

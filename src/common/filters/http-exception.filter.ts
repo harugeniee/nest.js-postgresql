@@ -18,6 +18,7 @@ interface ExceptionResponse {
   code?: string;
   data?: unknown;
   message?: string;
+  details?: unknown;
 }
 
 interface RequestWithI18n extends Request {
@@ -56,14 +57,14 @@ export class I18nHttpExceptionFilter implements ExceptionFilter {
       message = translatedMessage;
     }
 
-    const detail = exceptionResponse?.message;
+    const details = exceptionResponse?.details;
 
     // Build error response
     const errorResponse = {
       success: false,
       status: status,
       message: message,
-      detail,
+      details,
       metadata: {
         messageKey,
         messageArgs,

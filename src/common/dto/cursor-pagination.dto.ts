@@ -1,7 +1,7 @@
 import { IsOptional, IsString } from 'class-validator';
-import { PaginationDto } from './pagination.dto';
+import { AdvancedPaginationDto } from './advanced-pagination.dto';
 
-export class CursorPaginationDto extends PaginationDto {
+export class CursorPaginationDto extends AdvancedPaginationDto {
   @IsOptional()
   @IsString()
   cursor?: string;

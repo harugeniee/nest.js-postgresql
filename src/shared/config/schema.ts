@@ -102,6 +102,26 @@ export const configValidationSchema = Joi.object({
   // APPLE_URL: Joi.string().uri().optional(),
   // APPLE_CLIENT_ID: Joi.string().optional(),
 
+  // AniList OAuth configuration (optional - for authenticated requests)
+  ANILIST_CLIENT_ID: Joi.string().optional(),
+  ANILIST_CLIENT_SECRET: Joi.string().optional(),
+  ANILIST_REDIRECT_URI: Joi.string().uri().optional(),
+
   // WebSocket configuration
   WS_ADAPTER_ENABLED: Joi.boolean().default(false),
+
+  // Sticker configuration
+  STICKER_MAX_SIZE: Joi.number().default(524288), // 512KB
+  STICKER_RECOMMENDED_SIDE: Joi.number().default(320),
+  STICKER_MAX_SIDE: Joi.number().default(1024),
+  STICKER_MAX_DURATION_MS: Joi.number().default(5000),
+  MEDIA_STICKER_FOLDER: Joi.string().default('stickers'),
+
+  // Firebase configuration
+  FIREBASE_PROJECT_ID: Joi.string().required(),
+  FIREBASE_PRIVATE_KEY_ID: Joi.string().required(),
+  FIREBASE_PRIVATE_KEY: Joi.string().required(),
+  FIREBASE_CLIENT_EMAIL: Joi.string().required(),
+  FIREBASE_CLIENT_ID: Joi.string().required(),
+  FIREBASE_CLIENT_X509_CERT_URL: Joi.string().required(),
 });

@@ -1,5 +1,4 @@
 import { AdvancedPaginationDto } from 'src/common/dto';
-import { USER_CONSTANTS } from 'src/shared/constants';
 import {
   Between,
   FindOptionsWhere,
@@ -8,22 +7,26 @@ import {
   LessThanOrEqual,
   Like,
   MoreThanOrEqual,
-  Not,
+  Raw,
 } from 'typeorm';
 
 export class ConditionBuilder {
   static build(
     data: Partial<AdvancedPaginationDto> = {},
     defaultField = 'name',
+    extraFilter?: FindOptionsWhere<any>,
   ) {
     let conditions: FindOptionsWhere<any> = {
-      status: Not(USER_CONSTANTS.STATUS.REMOVED),
+      // status: Not(USER_CONSTANTS.STATUS.REMOVED),
     };
     conditions = this.addStatusCondition(conditions, data.status);
     conditions = this.addIdsCondition(conditions, data.ids);
     conditions = this.addUserCondition(conditions, data.userId);
     conditions = this.addDateConditions(conditions, data);
     conditions = this.addSearchConditions(conditions, data, defaultField);
+    if (extraFilter) {
+      Object.assign(conditions, extraFilter);
+    }
     return conditions;
   }
 
@@ -89,12 +92,33 @@ export class ConditionBuilder {
     const searchFields = this.getSearchFields(defaultField, data.fields);
 
     if (searchFields.length > 1) {
-      conditions = searchFields.map((field) => ({
-        ...conditions,
-        [field]: searchOperator(`%${data.query}%`),
-      }));
+      conditions = searchFields.map((field) => {
+        const fieldName = field.endsWith(':jsonb')
+          ? field.replace(':jsonb', '')
+          : field;
+        const fieldCondition = field.endsWith(':jsonb')
+          ? Raw((alias) => `(${alias})::text ILIKE :like`, {
+              like: `%${data.query}%`,
+            })
+          : searchOperator(`%${data.query}%`);
+
+        return {
+          ...conditions,
+          [fieldName]: fieldCondition,
+        };
+      });
     } else {
-      conditions[searchFields[0]] = searchOperator(`%${data.query}%`);
+      const field = searchFields[0];
+      const fieldName = field.endsWith(':jsonb')
+        ? field.replace(':jsonb', '')
+        : field;
+      const fieldCondition = field.endsWith(':jsonb')
+        ? Raw((alias) => `(${alias})::text ILIKE :like`, {
+            like: `%${data.query}%`,
+          })
+        : searchOperator(`%${data.query}%`);
+
+      conditions[fieldName] = fieldCondition;
     }
     return conditions;
   }

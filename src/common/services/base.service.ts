@@ -224,13 +224,12 @@ export abstract class BaseService<T extends { id: string }> {
     const where = ConditionBuilder.build(
       {
         ...rest,
-        ...(extraFilter || {}),
         // Pass validated search fields to ConditionBuilder
         fields: searchFields,
       },
       this.defaultSearchField,
+      extraFilter,
     );
-
     const safe = this.applyQueryOpts(opts);
     const orderObj = this.buildOrderObject(sortBy, order);
     await this.onListQueryBuilt({ where, order: orderObj, dto: pagination });
@@ -301,10 +300,12 @@ export abstract class BaseService<T extends { id: string }> {
       // Pass validated search fields to ConditionBuilder
       fields: searchFields,
     };
-    if (extraFilter) {
-      Object.assign(baseFilter, extraFilter);
-    }
-    const where = ConditionBuilder.build(baseFilter, this.defaultSearchField);
+    const where = ConditionBuilder.build(
+      baseFilter,
+      this.defaultSearchField,
+      extraFilter,
+    );
+    console.log('where', where);
     const safe = this.applyQueryOpts(opts);
     const token = decodeSignedCursor(cursor);
     const take = limit;
@@ -327,7 +328,7 @@ export abstract class BaseService<T extends { id: string }> {
         direction,
         boundary,
       );
-
+    console.log('whereToUse', whereToUse);
     const [data] = await this.repo.findAndCount({
       where: whereToUse,
       order: orderObj,

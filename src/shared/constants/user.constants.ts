@@ -49,6 +49,7 @@ export const USER_CONSTANTS = {
     EMAIL_PASSWORD: 'email_password',
     OAUTH: 'oauth',
     PHONE_OTP: 'phone_otp',
+    FIREBASE: 'firebase',
   },
 
   AUTH_TYPES: {
