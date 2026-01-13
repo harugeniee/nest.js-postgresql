@@ -80,7 +80,9 @@ export class ContributionsController {
   )
   @UseInterceptors(AnalyticsInterceptor)
   async findAll(@Query() queryDto: QueryContributionDto) {
-    return this.contributionsService.listOffset(queryDto);
+    return this.contributionsService.listOffset(queryDto, undefined, {
+      relations: ['contributor'],
+    });
   }
 
   /**
