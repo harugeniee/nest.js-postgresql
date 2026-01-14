@@ -30,4 +30,6 @@ export const JOB_NAME = {
   SERIES_SAVE: 'series_save',
   SERIES_CRAWL: 'series_crawl',
   SERIES_BATCH_SAVE: 'series_batch_save',
+  // Character events
+  CHARACTER_UPDATE: 'character_update',
 } as const;

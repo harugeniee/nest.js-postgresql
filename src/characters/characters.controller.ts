@@ -10,7 +10,6 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiOperation } from '@nestjs/swagger';
 import { Auth } from 'src/common/decorators';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { CharactersService } from './characters.service';
@@ -59,14 +58,31 @@ export class CharactersController {
    * gender, blood type, voice actors, reactions, and top series
    */
   @Get('stats/overview')
-  @ApiOperation({
-    summary: 'Get character statistics overview',
-    description:
-      'Returns comprehensive statistics about characters including counts by status, gender, blood type, voice actors, reactions, and top series',
-  })
   async getCharacterStatistics(): Promise<CharacterStatsDto> {
     const stats = await this.charactersService.getCharacterStatistics();
     return stats;
+  }
+
+  /**
+   * Trigger character update from Jikan API for a specific series
+   * Queues a job to fetch and update characters for the given series
+   *
+   * @param seriesId - Series ID to update characters for
+   * @returns Job ID and status information
+   */
+  @Post('update/:seriesId')
+  @Auth()
+  @HttpCode(HttpStatus.ACCEPTED)
+  async triggerCharacterUpdate(
+    @Param('seriesId', SnowflakeIdPipe) seriesId: string,
+  ): Promise<{
+    success: boolean;
+    jobId: string;
+    seriesId: string;
+    myAnimeListId?: string;
+    message: string;
+  }> {
+    return this.charactersService.triggerCharacterUpdate(seriesId);
   }
 
   /**

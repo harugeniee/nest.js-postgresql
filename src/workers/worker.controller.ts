@@ -7,6 +7,7 @@ import {
 } from '@nestjs/microservices';
 
 import { AnalyticsQueueJob } from 'src/analytics/interfaces/analytics-queue.interface';
+import { CharacterUpdateJob } from 'src/characters/interfaces/character-queue.interface';
 import {
   SeriesBatchSaveJob,
   SeriesCrawlJob,
@@ -514,6 +515,40 @@ export class WorkerController {
       channel.ack(originalMsg);
     } catch (error: unknown) {
       console.log('Error processing series batch save:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  // ==================== CHARACTER PROCESSING METHODS ====================
+
+  @MessagePattern(JOB_NAME.CHARACTER_UPDATE)
+  async handleCharacterUpdate(
+    @Payload() job: CharacterUpdateJob | string,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      // Parse job if it's a string
+      let parsedJob: CharacterUpdateJob;
+      if (typeof job === 'string') {
+        parsedJob = JSON.parse(job) as CharacterUpdateJob;
+      } else {
+        parsedJob = job;
+      }
+
+      console.log(
+        `Character update job received: ${parsedJob.jobId} for series ${parsedJob.seriesId} (MAL: ${parsedJob.myAnimeListId})`,
+      );
+
+      await this.workerService.processCharacterUpdate(parsedJob);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing character update:', error);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       channel.nack(originalMsg, false, true);
     }

@@ -53,6 +53,9 @@ export class Character extends BaseEntityCustom {
   @Column({ type: 'jsonb', nullable: true })
   name?: CharacterName;
 
+  @Column({ type: 'jsonb', nullable: true })
+  imageUrls?: Record<string, JSON>;
+
   /**
    * The ID of the character image
    */
@@ -125,6 +128,16 @@ export class Character extends BaseEntityCustom {
   siteUrl?: string;
 
   /**
+   * URL for the character page on the website
+   */
+  @Column({
+    type: 'varchar',
+    length: CHARACTER_CONSTANTS.SITE_URL_MAX_LENGTH,
+    nullable: true,
+  })
+  siteMyAnimeListUrl?: string;
+
+  /**
    * Notes for the character
    */
   @Column({
@@ -132,6 +145,15 @@ export class Character extends BaseEntityCustom {
     nullable: true,
   })
   notes?: string;
+
+  /**
+   * Character role
+   */
+  @Column({
+    type: 'varchar',
+    nullable: true,
+  })
+  role: string;
 
   /**
    * Character status

@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
 import { ReactionCount } from 'src/reactions/entities/reaction-count.entity';
 import { ReactionsService } from 'src/reactions/reactions.service';
+import { Series } from 'src/series/entities/series.entity';
 import { CHARACTER_CONSTANTS } from 'src/shared/constants';
 import { CacheService } from 'src/shared/services';
 import {
@@ -22,9 +23,12 @@ import {
 } from './dto';
 import { CharacterStaff } from './entities/character-staff.entity';
 import { Character } from './entities/character.entity';
+import { CharacterQueueService } from './services/character-queue.service';
 
 @Injectable()
 export class CharactersService extends BaseService<Character> {
+  private readonly logger = new Logger(CharactersService.name);
+
   constructor(
     @InjectRepository(Character)
     private readonly characterRepository: Repository<Character>,
@@ -32,8 +36,11 @@ export class CharactersService extends BaseService<Character> {
     private readonly characterStaffRepository: Repository<CharacterStaff>,
     @InjectRepository(ReactionCount)
     private readonly reactionCountRepository: Repository<ReactionCount>,
+    @InjectRepository(Series)
+    private readonly seriesRepository: Repository<Series>,
     cacheService: CacheService,
     private readonly reactionsService: ReactionsService,
+    private readonly characterQueueService: CharacterQueueService,
   ) {
     super(
       new TypeOrmBaseRepository<Character>(characterRepository),
@@ -397,5 +404,77 @@ export class CharactersService extends BaseService<Character> {
     );
 
     return stats;
+  }
+
+  /**
+   * Trigger character update from Jikan API for a specific series
+   * Validates the series exists and has myAnimeListId, then queues a character update job
+   *
+   * @param seriesId - Series ID to update characters for
+   * @returns Job ID and status information
+   */
+  async triggerCharacterUpdate(seriesId: string): Promise<{
+    success: boolean;
+    jobId: string;
+    seriesId: string;
+    myAnimeListId?: string;
+    message: string;
+  }> {
+    // Find the series
+    const series = await this.seriesRepository.findOne({
+      where: { id: seriesId },
+      select: ['id', 'myAnimeListId', 'type', 'title'],
+    });
+
+    if (!series) {
+      throw new HttpException(
+        { messageKey: 'series.NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Check if series has myAnimeListId
+    if (!series.myAnimeListId) {
+      throw new HttpException(
+        {
+          messageKey: 'character.UPDATE_FAILED_NO_MAL_ID',
+          message: `Series ${seriesId} does not have a MyAnimeList ID`,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    try {
+      // Queue character update job
+      const jobId = await this.characterQueueService.sendCharacterUpdateJob(
+        series.id,
+        series.myAnimeListId,
+      );
+
+      this.logger.log(
+        `Character update job queued: ${jobId} for series ${seriesId} (MAL: ${series.myAnimeListId})`,
+      );
+
+      return {
+        success: true,
+        jobId,
+        seriesId: series.id,
+        myAnimeListId: series.myAnimeListId,
+        message: `Character update job queued successfully for series ${seriesId}`,
+      };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Failed to queue character update job for series ${seriesId}: ${errorMessage}`,
+      );
+      throw new HttpException(
+        {
+          messageKey: 'character.UPDATE_FAILED',
+          message: `Failed to queue character update job: ${errorMessage}`,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

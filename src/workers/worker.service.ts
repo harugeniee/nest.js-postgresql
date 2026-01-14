@@ -7,6 +7,12 @@ import {
 import { CommentsService } from 'src/comments/comments.service';
 import { maskEmail } from 'src/common/utils';
 import {
+  CharacterUpdateJob,
+  CharacterUpdateJobResult,
+} from 'src/characters/interfaces/character-queue.interface';
+import { JikanApiService } from 'src/characters/services/jikan-api.service';
+import { CharacterUpdateService } from 'src/characters/services/character-update.service';
+import {
   SeriesBatchSaveJob,
   SeriesCrawlJob,
   SeriesSaveJob,
@@ -40,6 +46,8 @@ export class WorkerService {
     private readonly mailQueueIntegrationService: MailQueueIntegrationService,
     private readonly analyticsService: AnalyticsService,
     private readonly aniListCrawlService: AniListCrawlService,
+    private readonly jikanApiService: JikanApiService,
+    private readonly characterUpdateService: CharacterUpdateService,
   ) {}
 
   testRABBIT(id: number) {
@@ -961,6 +969,81 @@ export class WorkerService {
         `Series batch save job failed: ${job.jobId}, Error: ${errorMessage}, time: ${processingTime}ms`,
       );
       throw error;
+    }
+  }
+
+  // ==================== CHARACTER PROCESSING METHODS ====================
+
+  /**
+   * Process character update job
+   * Fetches character data from Jikan API and updates Character entities
+   */
+  async processCharacterUpdate(
+    job: CharacterUpdateJob,
+  ): Promise<CharacterUpdateJobResult> {
+    const startTime = Date.now();
+    this.logger.log(
+      `Processing character update job: ${job.jobId} for series ${job.seriesId} (MAL: ${job.myAnimeListId})`,
+    );
+
+    try {
+      // Fetch character data from Jikan API
+      const jikanData = await this.jikanApiService.getMangaCharacters(
+        job.myAnimeListId,
+      );
+
+      if (!jikanData || !jikanData.data || jikanData.data.length === 0) {
+        this.logger.warn(
+          `No characters found for manga ${job.myAnimeListId} in Jikan API`,
+        );
+        return {
+          jobId: job.jobId,
+          success: true,
+          processingTime: Date.now() - startTime,
+          data: {
+            seriesId: job.seriesId,
+            myAnimeListId: job.myAnimeListId,
+            charactersProcessed: 0,
+            charactersCreated: 0,
+            charactersUpdated: 0,
+          },
+        };
+      }
+
+      // Update characters in database
+      const result =
+        await this.characterUpdateService.updateCharactersFromJikan(
+          job.seriesId,
+          jikanData,
+        );
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Character update job completed: ${job.jobId}, processed: ${result.processed}, created: ${result.created}, updated: ${result.updated}, time: ${processingTime}ms`,
+      );
+
+      return {
+        jobId: job.jobId,
+        success: true,
+        processingTime,
+        data: {
+          seriesId: job.seriesId,
+          myAnimeListId: job.myAnimeListId,
+          charactersProcessed: result.processed,
+          charactersCreated: result.created,
+          charactersUpdated: result.updated,
+        },
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      this.logger.error(`Character update job failed: ${job.jobId}`, error);
+
+      return {
+        jobId: job.jobId,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTime,
+      };
     }
   }
 }

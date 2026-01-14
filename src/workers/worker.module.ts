@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AnalyticsModule } from 'src/analytics/analytics.module';
+import { CharactersModule } from 'src/characters/characters.module';
 import { CommentsModule } from 'src/comments/comments.module';
 import { SeriesModule } from 'src/series/series.module';
 import { ShareModule } from 'src/share/share.module';
@@ -15,6 +16,7 @@ import { WorkerService } from './worker.service';
     ShareModule,
     AnalyticsModule,
     SeriesModule,
+    CharactersModule,
   ],
   controllers: [WorkerController],
   providers: [WorkerService],
