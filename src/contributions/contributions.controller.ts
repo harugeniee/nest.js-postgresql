@@ -80,7 +80,20 @@ export class ContributionsController {
   )
   @UseInterceptors(AnalyticsInterceptor)
   async findAll(@Query() queryDto: QueryContributionDto) {
-    return this.contributionsService.listOffset(queryDto, undefined, {
+    const extraFilter: Record<string, unknown> = {};
+    if (queryDto.entityType) {
+      extraFilter.entityType = queryDto.entityType;
+    }
+    if (queryDto.action) {
+      extraFilter.action = queryDto.action;
+    }
+    if (queryDto.contributorId) {
+      extraFilter.contributorId = queryDto.contributorId;
+    }
+    if (queryDto.entityId) {
+      extraFilter.entityId = queryDto.entityId;
+    }
+    return this.contributionsService.listOffset(queryDto, extraFilter, {
       relations: ['contributor'],
     });
   }
