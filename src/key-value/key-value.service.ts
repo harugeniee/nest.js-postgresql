@@ -67,6 +67,42 @@ export class KeyValueService extends BaseService<KeyValue> {
   }
 
   /**
+   * Hydrate a plain object from cache into a KeyValue entity instance
+   * This is necessary because cached data is stored as plain JSON objects
+   * and needs to be converted back to entity instances to use methods like isActive()
+   * @param data - Plain object from cache (may have Date fields as strings)
+   * @returns KeyValue entity instance with all methods available
+   */
+  private hydrateFromCache(data: unknown): KeyValue {
+    const cached = data as Partial<KeyValue> & {
+      expiresAt?: string | Date;
+      createdAt?: string | Date;
+      updatedAt?: string | Date;
+      deletedAt?: string | Date | null;
+    };
+
+    // Create entity instance and copy all properties from cached data
+    const entity = Object.assign(new KeyValue(), cached);
+
+    // Convert date strings back to Date objects if needed
+    // This is necessary because JSON serialization converts Date to string
+    if (cached.expiresAt && typeof cached.expiresAt === 'string') {
+      entity.expiresAt = new Date(cached.expiresAt);
+    }
+    if (cached.createdAt && typeof cached.createdAt === 'string') {
+      entity.createdAt = new Date(cached.createdAt);
+    }
+    if (cached.updatedAt && typeof cached.updatedAt === 'string') {
+      entity.updatedAt = new Date(cached.updatedAt);
+    }
+    if (cached.deletedAt && typeof cached.deletedAt === 'string') {
+      entity.deletedAt = new Date(cached.deletedAt);
+    }
+
+    return entity;
+  }
+
+  /**
    * Get a key-value pair by key and optional namespace
    * @param key - The key to retrieve
    * @param namespace - Optional namespace
@@ -77,7 +113,8 @@ export class KeyValueService extends BaseService<KeyValue> {
     const cached = await this.cacheService?.get(cacheKey);
 
     if (cached) {
-      const entity = cached as KeyValue;
+      // Hydrate cached plain object to entity instance so methods like isActive() work
+      const entity = this.hydrateFromCache(cached);
       // Check if cached entity is still valid
       if (entity.isActive()) {
         return entity;
@@ -146,7 +183,9 @@ export class KeyValueService extends BaseService<KeyValue> {
     const cached = await this.cacheService?.get(cacheKey);
 
     if (cached) {
-      return cached as KeyValue[];
+      // Hydrate cached array of plain objects to entity instances
+      const cachedArray = cached as any[];
+      return cachedArray.map((item) => this.hydrateFromCache(item));
     }
 
     const entities = await this.keyValueRepository.find({
