@@ -17,6 +17,10 @@ import { SeriesService } from './series.service';
 import { AniListCrawlService } from './services/anilist-crawl.service';
 import { GenresService } from './services/genres.service';
 import { SegmentsService } from './services/segments.service';
+import { JikanApiService } from './services/jikan-api.service';
+import { JikanMapperService } from './services/jikan-mapper.service';
+import { JikanCrawlService } from './services/jikan-crawl.service';
+import { JikanSeriesCronjobService } from './services/jikan-series-cronjob.service';
 
 @Module({
   imports: [
@@ -47,7 +51,20 @@ import { SegmentsService } from './services/segments.service';
     GenresService,
     AniListCrawlService,
     SegmentsService,
+    JikanApiService,
+    JikanMapperService,
+    JikanCrawlService,
+    JikanSeriesCronjobService,
   ],
-  exports: [SeriesService, GenresService, AniListCrawlService, SegmentsService],
+  exports: [
+    SeriesService,
+    GenresService,
+    AniListCrawlService,
+    SegmentsService,
+    JikanApiService,
+    JikanMapperService,
+    JikanCrawlService,
+    JikanSeriesCronjobService,
+  ],
 })
 export class SeriesModule {}

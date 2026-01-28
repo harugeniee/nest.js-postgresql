@@ -14,19 +14,22 @@ import {
 } from '@nestjs/common';
 import { TrackEvent } from 'src/analytics/decorators/track-event.decorator';
 import { AnalyticsInterceptor } from 'src/analytics/interceptors/analytics.interceptor';
-import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { Auth } from 'src/common/decorators';
 import { CursorPaginationDto } from 'src/common/dto';
 import { SnowflakeIdPipe } from 'src/common/pipes';
+import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
 import { CreateSeriesDto, QuerySeriesDto, UpdateSeriesDto } from './dto';
+import { SyncJikanDto } from './dto/sync-jikan.dto';
 import { SeriesService } from './series.service';
 import { AniListCrawlService } from './services/anilist-crawl.service';
+import { JikanCrawlService } from './services/jikan-crawl.service';
 
 @Controller('series')
 export class SeriesController {
   constructor(
     private readonly seriesService: SeriesService,
     private readonly anilistCrawlService: AniListCrawlService,
+    private readonly jikanCrawlService: JikanCrawlService,
   ) {}
 
   /**
@@ -172,6 +175,147 @@ export class SeriesController {
   }
 
   /**
+   * Sync series from Jikan API by MyAnimeList ID
+   * Accepts MAL ID in request body with optional type
+   *
+   * @param syncDto - DTO containing myAnimeListId and optional type
+   * @returns Synced series entity
+   */
+  @Post('jikan/sync')
+  @HttpCode(HttpStatus.OK)
+  async syncJikanSeries(@Body() syncDto: SyncJikanDto) {
+    const { myAnimeListId, type } = syncDto;
+
+    // If type is provided, use it; otherwise try both
+    if (type === 'anime') {
+      const result = await this.jikanCrawlService.syncAnimeById(myAnimeListId);
+      if (!result) {
+        throw new BadRequestException(
+          `Failed to sync anime with MAL ID ${myAnimeListId}. It may not exist in Jikan API.`,
+        );
+      }
+      return {
+        success: true,
+        series: result,
+        message: `Successfully synced anime with MAL ID ${myAnimeListId}`,
+      };
+    } else if (type === 'manga') {
+      const result = await this.jikanCrawlService.syncMangaById(myAnimeListId);
+      if (!result) {
+        throw new BadRequestException(
+          `Failed to sync manga with MAL ID ${myAnimeListId}. It may not exist in Jikan API.`,
+        );
+      }
+      return {
+        success: true,
+        series: result,
+        message: `Successfully synced manga with MAL ID ${myAnimeListId}`,
+      };
+    } else {
+      // Try anime first, then manga if anime fails
+      let result = await this.jikanCrawlService.syncAnimeById(myAnimeListId);
+      if (result) {
+        return {
+          success: true,
+          series: result,
+          type: 'anime',
+          message: `Successfully synced anime with MAL ID ${myAnimeListId}`,
+        };
+      }
+
+      // Try manga if anime failed
+      result = await this.jikanCrawlService.syncMangaById(myAnimeListId);
+      if (result) {
+        return {
+          success: true,
+          series: result,
+          type: 'manga',
+          message: `Successfully synced manga with MAL ID ${myAnimeListId}`,
+        };
+      }
+
+      throw new BadRequestException(
+        `Failed to sync series with MAL ID ${myAnimeListId}. It may not exist in Jikan API.`,
+      );
+    }
+  }
+
+  /**
+   * Sync series from Jikan API by MyAnimeList ID (GET endpoint)
+   * Must be placed before @Get(':id') to avoid route conflict
+   *
+   * @param malId - MyAnimeList ID (MAL ID)
+   * @param type - Optional type (anime or manga). If not provided, will try both
+   * @returns Synced series entity
+   */
+  @Get('jikan/:malId/sync')
+  @HttpCode(HttpStatus.OK)
+  async syncJikanSeriesById(
+    @Param('malId') malId: string,
+    @Query('type') type?: 'anime' | 'manga',
+  ) {
+    const id = Number.parseInt(malId, 10);
+    if (Number.isNaN(id) || id < 1) {
+      throw new BadRequestException(
+        'Invalid MyAnimeList ID. Must be a positive number.',
+      );
+    }
+
+    // If type is provided, use it; otherwise try both
+    if (type === 'anime') {
+      const result = await this.jikanCrawlService.syncAnimeById(id);
+      if (!result) {
+        throw new BadRequestException(
+          `Failed to sync anime with MAL ID ${id}. It may not exist in Jikan API.`,
+        );
+      }
+      return {
+        success: true,
+        series: result,
+        message: `Successfully synced anime with MAL ID ${id}`,
+      };
+    } else if (type === 'manga') {
+      const result = await this.jikanCrawlService.syncMangaById(id);
+      if (!result) {
+        throw new BadRequestException(
+          `Failed to sync manga with MAL ID ${id}. It may not exist in Jikan API.`,
+        );
+      }
+      return {
+        success: true,
+        series: result,
+        message: `Successfully synced manga with MAL ID ${id}`,
+      };
+    } else {
+      // Try anime first, then manga if anime fails
+      let result = await this.jikanCrawlService.syncAnimeById(id);
+      if (result) {
+        return {
+          success: true,
+          series: result,
+          type: 'anime',
+          message: `Successfully synced anime with MAL ID ${id}`,
+        };
+      }
+
+      // Try manga if anime failed
+      result = await this.jikanCrawlService.syncMangaById(id);
+      if (result) {
+        return {
+          success: true,
+          series: result,
+          type: 'manga',
+          message: `Successfully synced manga with MAL ID ${id}`,
+        };
+      }
+
+      throw new BadRequestException(
+        `Failed to sync series with MAL ID ${id}. It may not exist in Jikan API.`,
+      );
+    }
+  }
+
+  /**
    * Get a series by ID
    */
   @Get(':id')
@@ -182,7 +326,13 @@ export class SeriesController {
   )
   @UseInterceptors(AnalyticsInterceptor)
   async findOne(@Param('id', SnowflakeIdPipe) id: string) {
-    return this.seriesService.findById(id);
+    return this.seriesService.findById(id, {
+      relations: {
+        genres: {
+          genre: true,
+        },
+      },
+    });
   }
 
   /**
