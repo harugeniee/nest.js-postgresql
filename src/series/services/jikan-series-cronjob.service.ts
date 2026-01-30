@@ -1,67 +1,92 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
+import { randomUUID } from 'node:crypto';
+import { JOB_NAME } from 'src/shared/constants';
+import { CacheService, RabbitMQService } from 'src/shared/services';
 import { JikanCrawlService } from './jikan-crawl.service';
+import { JikanSyncTopJob } from './series-queue.interface';
+
+/** Redis key: set by worker when Jikan sync job is running; cron skips sending if present. TTL 2h. */
+const JIKAN_SYNC_IN_PROGRESS_KEY = 'jikan:sync:in_progress';
+/** Redis key: set when Jikan API returns 429; cron skips until after blocked_until (timestamp ms). TTL ~60–120s. */
+const JIKAN_RATE_LIMIT_BLOCKED_UNTIL_KEY = 'jikan:rate_limit:blocked_until';
 
 /**
  * Jikan Series Cronjob Service
  *
- * Service for scheduling periodic syncs of anime and manga data from Jikan API
- * Runs daily at 2 AM to sync existing series and discover new popular content
+ * Schedules periodic sync of anime and manga from Jikan API.
+ * Runs daily at 2:00 AM: checks Redis (rate limit / in-progress), then enqueues two jobs
+ * (sync top 100 anime, sync top 100 manga) to RabbitMQ. Worker processes jobs and syncs
+ * data (create or update by myAnimeListId).
  */
 @Injectable()
 export class JikanSeriesCronjobService {
   private readonly logger = new Logger(JikanSeriesCronjobService.name);
 
-  constructor(private readonly jikanCrawlService: JikanCrawlService) {}
+  constructor(
+    private readonly jikanCrawlService: JikanCrawlService,
+    private readonly rabbitMQService: RabbitMQService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   /**
-   * Cron job to sync series data from Jikan API
-   * Runs every hour to sync top content
-   *
-   * Workflow:
-   * 1. Sync top 100 anime and top 100 manga (for discovery)
-   * 2. Log summary statistics
+   * Cron: runs daily at 2:00 AM.
+   * Before sending jobs: checks Redis for jikan:sync:in_progress and jikan:rate_limit:blocked_until.
+   * Only if both checks pass, sends JIKAN_SYNC_TOP_ANIME and JIKAN_SYNC_TOP_MANGA jobs to RabbitMQ.
    */
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron('0 2 * * *')
   async syncFromJikan(): Promise<void> {
-    this.logger.log('Starting Jikan API series sync cronjob');
+    this.logger.log('Starting Jikan API series sync cronjob (2:00 AM)');
 
     try {
-      const startTime = Date.now();
+      // Check if a Jikan sync is already in progress (worker sets this)
+      const inProgress = await this.cacheService.get(JIKAN_SYNC_IN_PROGRESS_KEY);
+      if (inProgress) {
+        this.logger.warn(
+          'Jikan sync already in progress (jikan:sync:in_progress), skipping this run',
+        );
+        return;
+      }
 
-      // Step 1: Sync existing series (temporarily disabled)
-      // this.logger.log('Step 1: Syncing existing series with myAnimeListId');
-      // const existingStats = await this.jikanCrawlService.syncExistingSeries();
-      // this.logger.log(
-      //   `Existing series sync completed: ${JSON.stringify(existingStats)}`,
-      // );
+      // Check if we are in rate-limit backoff (worker sets this on 429)
+      const blockedUntilRaw = await this.cacheService.get(
+        JIKAN_RATE_LIMIT_BLOCKED_UNTIL_KEY,
+      );
+      if (blockedUntilRaw) {
+        const blockedUntil = Number.parseInt(String(blockedUntilRaw), 10);
+        if (!Number.isNaN(blockedUntil) && Date.now() < blockedUntil) {
+          this.logger.warn(
+            `Jikan rate limited (jikan:rate_limit:blocked_until), skip until ${new Date(blockedUntil).toISOString()}`,
+          );
+          return;
+        }
+      }
 
-      // Step 1: Sync top anime
-      this.logger.log('Step 1: Syncing top 100 anime');
-      const topAnimeStats = await this.jikanCrawlService.syncTopAnime(100);
-      this.logger.log(
-        `Top anime sync completed: ${JSON.stringify(topAnimeStats)}`,
+      const limit = 100;
+      const timestamp = new Date().toISOString();
+
+      const animeJob: JikanSyncTopJob = {
+        jobId: randomUUID(),
+        limit,
+        timestamp,
+      };
+      const mangaJob: JikanSyncTopJob = {
+        jobId: randomUUID(),
+        limit,
+        timestamp,
+      };
+
+      await this.rabbitMQService.sendDataToRabbitMQAsync(
+        JOB_NAME.JIKAN_SYNC_TOP_ANIME,
+        animeJob,
+      );
+      await this.rabbitMQService.sendDataToRabbitMQAsync(
+        JOB_NAME.JIKAN_SYNC_TOP_MANGA,
+        mangaJob,
       );
 
-      // Step 2: Sync top manga
-      this.logger.log('Step 2: Syncing top 100 manga');
-      const topMangaStats = await this.jikanCrawlService.syncTopManga(100);
       this.logger.log(
-        `Top manga sync completed: ${JSON.stringify(topMangaStats)}`,
-      );
-
-      const endTime = Date.now();
-      const duration = ((endTime - startTime) / 1000).toFixed(2);
-
-      // Summary
-      const totalProcessed = topAnimeStats.processed + topMangaStats.processed;
-      const totalSuccessful =
-        topAnimeStats.successful + topMangaStats.successful;
-      const totalFailed = topAnimeStats.failed + topMangaStats.failed;
-
-      this.logger.log(
-        `Jikan API series sync cronjob completed in ${duration}s. ` +
-          `Total: ${totalProcessed} processed, ${totalSuccessful} successful, ${totalFailed} failed`,
+        `Enqueued Jikan sync jobs: anime ${animeJob.jobId}, manga ${mangaJob.jobId}`,
       );
     } catch (error: unknown) {
       const errorMessage =
@@ -74,10 +99,11 @@ export class JikanSeriesCronjobService {
   }
 
   /**
-   * Manual sync method for testing or on-demand updates
-   * Can be called via API endpoint or worker job
+   * Manual sync for testing or on-demand updates.
+   * Runs in-process (calls JikanCrawlService directly); does not check Redis or enqueue.
+   * Use for admin/API-triggered sync. Optional enqueue can be added later.
    *
-   * @param options - Sync options
+   * @param options - Sync options (syncExisting, syncTopAnime, syncTopManga, topLimit)
    * @returns Promise with sync statistics
    */
   async manualSync(options?: {
@@ -129,30 +155,30 @@ export class JikanSeriesCronjobService {
     } = {};
 
     try {
-      const topLimit = options?.topLimit || 100;
+      const topLimit = options?.topLimit ?? 100;
 
-      // Sync existing series if requested (default: true)
       if (options?.syncExisting !== false) {
         this.logger.log('Syncing existing series with myAnimeListId');
-        results.existing = await this.jikanCrawlService.syncExistingSeries();
+        results.existing =
+          await this.jikanCrawlService.syncExistingSeries();
         this.logger.log(
           `Existing series sync completed: ${JSON.stringify(results.existing)}`,
         );
       }
 
-      // Sync top anime if requested (default: true)
       if (options?.syncTopAnime !== false) {
         this.logger.log(`Syncing top ${topLimit} anime`);
-        results.topAnime = await this.jikanCrawlService.syncTopAnime(topLimit);
+        results.topAnime =
+          await this.jikanCrawlService.syncTopAnime(topLimit);
         this.logger.log(
           `Top anime sync completed: ${JSON.stringify(results.topAnime)}`,
         );
       }
 
-      // Sync top manga if requested (default: true)
       if (options?.syncTopManga !== false) {
         this.logger.log(`Syncing top ${topLimit} manga`);
-        results.topManga = await this.jikanCrawlService.syncTopManga(topLimit);
+        results.topManga =
+          await this.jikanCrawlService.syncTopManga(topLimit);
         this.logger.log(
           `Top manga sync completed: ${JSON.stringify(results.topManga)}`,
         );

@@ -9,6 +9,7 @@ import {
 import { AnalyticsQueueJob } from 'src/analytics/interfaces/analytics-queue.interface';
 import { CharacterUpdateJob } from 'src/characters/interfaces/character-queue.interface';
 import {
+  JikanSyncTopJob,
   SeriesBatchSaveJob,
   SeriesCrawlJob,
   SeriesSaveJob,
@@ -515,6 +516,70 @@ export class WorkerController {
       channel.ack(originalMsg);
     } catch (error: unknown) {
       console.log('Error processing series batch save:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  // ==================== JIKAN SYNC PROCESSING METHODS ====================
+
+  @MessagePattern(JOB_NAME.JIKAN_SYNC_TOP_ANIME)
+  async handleJikanSyncTopAnime(
+    @Payload() job: JikanSyncTopJob | string,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      let parsedJob: JikanSyncTopJob;
+      if (typeof job === 'string') {
+        parsedJob = JSON.parse(job) as JikanSyncTopJob;
+      } else {
+        parsedJob = job;
+      }
+
+      console.log(
+        `Jikan sync top anime job received: ${parsedJob.jobId} (limit: ${parsedJob.limit})`,
+      );
+
+      await this.workerService.processJikanSyncTopAnime(parsedJob);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing Jikan sync top anime:', error);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.nack(originalMsg, false, true);
+    }
+  }
+
+  @MessagePattern(JOB_NAME.JIKAN_SYNC_TOP_MANGA)
+  async handleJikanSyncTopManga(
+    @Payload() job: JikanSyncTopJob | string,
+    @Ctx() context: RmqContext,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      let parsedJob: JikanSyncTopJob;
+      if (typeof job === 'string') {
+        parsedJob = JSON.parse(job) as JikanSyncTopJob;
+      } else {
+        parsedJob = job;
+      }
+
+      console.log(
+        `Jikan sync top manga job received: ${parsedJob.jobId} (limit: ${parsedJob.limit})`,
+      );
+
+      await this.workerService.processJikanSyncTopManga(parsedJob);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      channel.ack(originalMsg);
+    } catch (error: unknown) {
+      console.log('Error processing Jikan sync top manga:', error);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       channel.nack(originalMsg, false, true);
     }

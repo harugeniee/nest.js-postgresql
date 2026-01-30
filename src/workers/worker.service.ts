@@ -12,7 +12,9 @@ import {
 } from 'src/characters/interfaces/character-queue.interface';
 import { JikanApiService } from 'src/characters/services/jikan-api.service';
 import { CharacterUpdateService } from 'src/characters/services/character-update.service';
+import { JikanCrawlService } from 'src/series/services/jikan-crawl.service';
 import {
+  JikanSyncTopJob,
   SeriesBatchSaveJob,
   SeriesCrawlJob,
   SeriesSaveJob,
@@ -26,6 +28,7 @@ import {
   ShareDeletedJob,
 } from 'src/share/interfaces/share-queue.interface';
 import { NOTIFICATION_CONSTANTS } from 'src/shared/constants';
+import { CacheService } from 'src/shared/services';
 import { MailQueueIntegrationService } from 'src/shared/services/mail/mail-queue-integration.service';
 import {
   BatchEmailQueueJob,
@@ -40,6 +43,9 @@ import { MailService } from 'src/shared/services/mail/mail.service';
 export class WorkerService {
   private readonly logger = new Logger(WorkerService.name);
 
+  /** Redis key set by worker when Jikan sync is running; cron skips if present. TTL 2h. */
+  private static readonly JIKAN_SYNC_IN_PROGRESS_KEY = 'jikan:sync:in_progress';
+
   constructor(
     private readonly mailService: MailService,
     private readonly commentsService: CommentsService,
@@ -48,6 +54,8 @@ export class WorkerService {
     private readonly aniListCrawlService: AniListCrawlService,
     private readonly jikanApiService: JikanApiService,
     private readonly characterUpdateService: CharacterUpdateService,
+    private readonly jikanCrawlService: JikanCrawlService,
+    private readonly cacheService: CacheService,
   ) {}
 
   testRABBIT(id: number) {
@@ -969,6 +977,82 @@ export class WorkerService {
         `Series batch save job failed: ${job.jobId}, Error: ${errorMessage}, time: ${processingTime}ms`,
       );
       throw error;
+    }
+  }
+
+  /**
+   * Process Jikan sync top anime job.
+   * Sets jikan:sync:in_progress before running, clears it in finally.
+   * Calls JikanCrawlService.syncTopAnime(limit) to fetch top anime from Jikan API and save/update by myAnimeListId.
+   */
+  async processJikanSyncTopAnime(job: JikanSyncTopJob): Promise<void> {
+    const startTime = Date.now();
+    const limit = job.limit ?? 100;
+    this.logger.log(
+      `Processing Jikan sync top anime job: ${job.jobId} (limit: ${limit})`,
+    );
+
+    const inProgressKey = WorkerService.JIKAN_SYNC_IN_PROGRESS_KEY;
+    const inProgressTtlSec = 7200; // 2 hours safety TTL
+
+    try {
+      await this.cacheService.set(inProgressKey, '1', inProgressTtlSec);
+
+      const stats = await this.jikanCrawlService.syncTopAnime(limit);
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Jikan sync top anime job completed: ${job.jobId}, ` +
+          `processed: ${stats.processed}, successful: ${stats.successful}, failed: ${stats.failed}, time: ${processingTime}ms`,
+      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Jikan sync top anime job failed: ${job.jobId}: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    } finally {
+      await this.cacheService.delete(inProgressKey);
+    }
+  }
+
+  /**
+   * Process Jikan sync top manga job.
+   * Sets jikan:sync:in_progress before running, clears it in finally.
+   * Calls JikanCrawlService.syncTopManga(limit) to fetch top manga from Jikan API and save/update by myAnimeListId.
+   */
+  async processJikanSyncTopManga(job: JikanSyncTopJob): Promise<void> {
+    const startTime = Date.now();
+    const limit = job.limit ?? 100;
+    this.logger.log(
+      `Processing Jikan sync top manga job: ${job.jobId} (limit: ${limit})`,
+    );
+
+    const inProgressKey = WorkerService.JIKAN_SYNC_IN_PROGRESS_KEY;
+    const inProgressTtlSec = 7200; // 2 hours safety TTL
+
+    try {
+      await this.cacheService.set(inProgressKey, '1', inProgressTtlSec);
+
+      const stats = await this.jikanCrawlService.syncTopManga(limit);
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Jikan sync top manga job completed: ${job.jobId}, ` +
+          `processed: ${stats.processed}, successful: ${stats.successful}, failed: ${stats.failed}, time: ${processingTime}ms`,
+      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Jikan sync top manga job failed: ${job.jobId}: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    } finally {
+      await this.cacheService.delete(inProgressKey);
     }
   }
 

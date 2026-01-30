@@ -74,6 +74,30 @@ export interface SeriesBatchSaveJob {
 }
 
 /**
+ * Jikan Sync Top Job Interface
+ *
+ * Interface for Jikan top anime/manga sync jobs sent to RabbitMQ queue.
+ * Worker will fetch top N from Jikan API and save/update series by myAnimeListId.
+ * Used for both JIKAN_SYNC_TOP_ANIME and JIKAN_SYNC_TOP_MANGA (distinguished by job name).
+ */
+export interface JikanSyncTopJob {
+  /**
+   * Unique job identifier
+   */
+  jobId: string;
+
+  /**
+   * Maximum number of items to sync (default 100)
+   */
+  limit: number;
+
+  /**
+   * Timestamp when the job was created (ISO string)
+   */
+  timestamp: string;
+}
+
+/**
  * Series Save Job Result
  *
  * Result returned after processing series save job

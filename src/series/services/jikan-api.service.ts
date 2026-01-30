@@ -1,6 +1,7 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
+import { CacheService } from 'src/shared/services';
 import {
   JikanAnimeData,
   JikanAnimeFullResponse,
@@ -35,7 +36,14 @@ export class JikanApiService {
   private requestCount: number = 0;
   private minuteStartTime: number = Date.now();
 
-  constructor(private readonly httpService: HttpService) {}
+  /** Redis key set when Jikan API returns 429; cron checks this before sending jobs. TTL 120s. */
+  private static readonly JIKAN_RATE_LIMIT_BLOCKED_UNTIL_KEY =
+    'jikan:rate_limit:blocked_until';
+
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   /**
    * Get anime by MyAnimeList ID
@@ -241,8 +249,9 @@ export class JikanApiService {
           : undefined;
 
       if (statusCode === 429) {
+        await this.setRateLimitBlockedUntil();
         this.logger.warn(
-          `Rate limit exceeded for anime search, waiting before retry`,
+          `Rate limit exceeded for anime search, set jikan:rate_limit:blocked_until, waiting before retry`,
         );
         await this.delay(2000);
 
@@ -316,8 +325,9 @@ export class JikanApiService {
           : undefined;
 
       if (statusCode === 429) {
+        await this.setRateLimitBlockedUntil();
         this.logger.warn(
-          `Rate limit exceeded for manga search, waiting before retry`,
+          `Rate limit exceeded for manga search, set jikan:rate_limit:blocked_until, waiting before retry`,
         );
         await this.delay(2000);
 
@@ -481,10 +491,11 @@ export class JikanApiService {
       throw new Error(`${type} ${id} not found`);
     }
 
-    // Handle rate limiting (429)
+    // Handle rate limiting (429): set Redis so cron skips next run; then wait and retry
     if (statusCode === 429) {
+      await this.setRateLimitBlockedUntil();
       this.logger.warn(
-        `Rate limit exceeded for ${type} ${id}, waiting before retry`,
+        `Rate limit exceeded for ${type} ${id}, set jikan:rate_limit:blocked_until, waiting before retry`,
       );
       await this.delay(2000);
 
@@ -553,5 +564,19 @@ export class JikanApiService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Set Redis key jikan:rate_limit:blocked_until when Jikan API returns 429.
+   * Cron checks this key before sending jobs; worker can skip or delay.
+   */
+  private async setRateLimitBlockedUntil(): Promise<void> {
+    const blockedUntilMs = Date.now() + 60_000;
+    const ttlSec = 120;
+    await this.cacheService.set(
+      JikanApiService.JIKAN_RATE_LIMIT_BLOCKED_UNTIL_KEY,
+      String(blockedUntilMs),
+      ttlSec,
+    );
   }
 }

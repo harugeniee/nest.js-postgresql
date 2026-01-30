@@ -30,6 +30,9 @@ export const JOB_NAME = {
   SERIES_SAVE: 'series_save',
   SERIES_CRAWL: 'series_crawl',
   SERIES_BATCH_SAVE: 'series_batch_save',
+  // Jikan sync (MyAnimeList) events
+  JIKAN_SYNC_TOP_ANIME: 'jikan_sync_top_anime',
+  JIKAN_SYNC_TOP_MANGA: 'jikan_sync_top_manga',
   // Character events
   CHARACTER_UPDATE: 'character_update',
 } as const;
