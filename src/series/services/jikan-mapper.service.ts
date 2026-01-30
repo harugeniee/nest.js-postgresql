@@ -3,11 +3,10 @@ import { SERIES_CONSTANTS } from 'src/shared/constants';
 import { Series, SeriesTitle } from '../entities/series.entity';
 import {
   JikanAnimeData,
-  JikanAired,
-  JikanMangaData,
   JikanExternal,
+  JikanMangaData,
   JikanStreaming,
-  JikanTrailer,
+  JikanTrailer
 } from './jikan.types';
 
 /**
@@ -49,7 +48,7 @@ export class JikanMapperService {
       streamingEpisodes: this.mapStreamingLinks(jikanData.streaming),
       trailer: this.mapTrailer(jikanData.trailer),
       coverImageUrls: this.mapCoverImages(jikanData.images),
-      bannerImageUrl: jikanData.images?.jpg?.large_image_url || undefined,
+      // bannerImageUrl: jikanData.images?.jpg?.large_image_url || undefined,
       source: this.mapSource(jikanData.source),
       metadata: {
         scored_by: jikanData.scored_by,
@@ -102,7 +101,7 @@ export class JikanMapperService {
       synonyms: jikanData.title_synonyms || undefined,
       externalLinks: this.mapExternalLinks(jikanData.external),
       coverImageUrls: this.mapCoverImages(jikanData.images),
-      bannerImageUrl: jikanData.images?.jpg?.large_image_url || undefined,
+      // bannerImageUrl: jikanData.images?.jpg?.large_image_url || undefined,
       metadata: {
         scored_by: jikanData.scored_by,
         rank: jikanData.rank,
