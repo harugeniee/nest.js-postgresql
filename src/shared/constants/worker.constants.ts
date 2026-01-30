@@ -33,6 +33,7 @@ export const JOB_NAME = {
   // Jikan sync (MyAnimeList) events
   JIKAN_SYNC_TOP_ANIME: 'jikan_sync_top_anime',
   JIKAN_SYNC_TOP_MANGA: 'jikan_sync_top_manga',
+  JIKAN_SYNC_ONE_SERIES: 'jikan_sync_one_series',
   // Character events
   CHARACTER_UPDATE: 'character_update',
 } as const;

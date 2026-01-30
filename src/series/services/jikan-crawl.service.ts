@@ -22,6 +22,10 @@ export class JikanCrawlService {
   private readonly BATCH_SIZE = 50; // Process series in batches
   private readonly SYNC_STATE_CACHE_KEY_PREFIX = 'jikan:sync_state:';
 
+  /** Redis LIST key for pending series to sync (refreshSyncExistingPendingList / cron every minute). */
+  static readonly JIKAN_SYNC_EXISTING_PENDING_KEY =
+    'jikan:sync_existing:pending';
+
   constructor(
     @InjectRepository(Series)
     private readonly seriesRepository: Repository<Series>,
@@ -97,6 +101,59 @@ export class JikanCrawlService {
       this.logger.error(`Failed to sync manga ${malId}: ${errorMessage}`);
       return null;
     }
+  }
+
+  /**
+   * Refresh the Redis LIST of series pending sync (myAnimeListId).
+   * Query all series with myAnimeListId, replace the list with current data.
+   * Called by cron (e.g. daily at 2 AM); cron every minute then pops N items and sends jobs.
+   *
+   * @returns Promise with number of items pushed to the list (0 if no CacheService or no series)
+   */
+  async refreshSyncExistingPendingList(): Promise<number> {
+    if (!this.cacheService) {
+      this.logger.warn(
+        'CacheService not available, skip refreshSyncExistingPendingList',
+      );
+      return 0;
+    }
+
+    const allSeries = await this.seriesRepository
+      .createQueryBuilder('series')
+      .where('series.myAnimeListId IS NOT NULL')
+      .andWhere("series.myAnimeListId != ''")
+      .select(['series.id', 'series.myAnimeListId', 'series.type'])
+      .getMany();
+
+    if (allSeries.length === 0) {
+      this.logger.log(
+        'No series with myAnimeListId found, clearing pending list',
+      );
+      await this.cacheService.delete(
+        JikanCrawlService.JIKAN_SYNC_EXISTING_PENDING_KEY,
+      );
+      return 0;
+    }
+
+    const key = JikanCrawlService.JIKAN_SYNC_EXISTING_PENDING_KEY;
+    await this.cacheService.delete(key);
+
+    for (const series of allSeries) {
+      if (!series.myAnimeListId || !series.type) continue;
+      const item = JSON.stringify({
+        seriesId: series.id,
+        myAnimeListId: series.myAnimeListId,
+        type: series.type,
+      });
+      /* CacheService.listPush; DI can make the call appear unsafe to ESLint. */
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await this.cacheService.listPush(key, item);
+    }
+
+    this.logger.log(
+      `refreshSyncExistingPendingList: pushed ${allSeries.length} items to ${key}`,
+    );
+    return allSeries.length;
   }
 
   /**

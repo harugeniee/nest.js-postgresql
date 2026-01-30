@@ -74,6 +74,39 @@ export interface SeriesBatchSaveJob {
 }
 
 /**
+ * Jikan Sync One Series Job Interface
+ *
+ * Interface for a single-series sync job from the pending Redis LIST.
+ * Worker calls getAnimeFullById (anime) or getMangaFullById (manga) per type.
+ */
+export interface JikanSyncOneSeriesJob {
+  /**
+   * Unique job identifier
+   */
+  jobId: string;
+
+  /**
+   * Series entity ID (for logging)
+   */
+  seriesId: string;
+
+  /**
+   * MyAnimeList ID (MAL ID) to fetch from Jikan API
+   */
+  myAnimeListId: string;
+
+  /**
+   * Type: ANIME or MANGA — determines which Jikan API endpoint to call
+   */
+  type: 'ANIME' | 'MANGA';
+
+  /**
+   * Timestamp when the job was created (ISO string)
+   */
+  timestamp: string;
+}
+
+/**
  * Jikan Sync Top Job Interface
  *
  * Interface for Jikan top anime/manga sync jobs sent to RabbitMQ queue.

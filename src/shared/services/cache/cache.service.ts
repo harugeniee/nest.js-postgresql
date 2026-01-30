@@ -299,6 +299,74 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Push one or more values to the right of a Redis LIST.
+   *
+   * @param key - Redis LIST key
+   * @param values - One or more string values to append
+   * @returns Promise with the list length after push
+   */
+  async listPush(key: string, ...values: string[]): Promise<number> {
+    try {
+      if (values.length === 0) return 0;
+      const result = await this.redis.rpush(key, ...values);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to listPush key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Return a range of elements from a Redis LIST (LRANGE).
+   *
+   * @param key - Redis LIST key
+   * @param start - Zero-based start index (inclusive)
+   * @param stop - Zero-based stop index (inclusive); -1 means end of list
+   * @returns Promise with array of string values
+   */
+  async listRange(key: string, start: number, stop: number): Promise<string[]> {
+    try {
+      const result = await this.redis.lrange(key, start, stop);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to listRange key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Trim a Redis LIST so that it only keeps the specified range (LTRIM).
+   *
+   * @param key - Redis LIST key
+   * @param start - Zero-based start index (inclusive)
+   * @param stop - Zero-based stop index (inclusive); -1 means end of list
+   */
+  async listTrim(key: string, start: number, stop: number): Promise<void> {
+    try {
+      await this.redis.ltrim(key, start, stop);
+    } catch (error) {
+      this.logger.error(`Failed to listTrim key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Return the length of a Redis LIST (LLEN).
+   *
+   * @param key - Redis LIST key
+   * @returns Promise with list length
+   */
+  async listLength(key: string): Promise<number> {
+    try {
+      const result = await this.redis.llen(key);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to listLength key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Check existence of a cache key.
    *
    * @param {string} key - Cache key to check.

@@ -6,7 +6,7 @@ import {
   JikanExternal,
   JikanMangaData,
   JikanStreaming,
-  JikanTrailer
+  JikanTrailer,
 } from './jikan.types';
 
 /**

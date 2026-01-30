@@ -14,6 +14,7 @@ import { JikanApiService } from 'src/characters/services/jikan-api.service';
 import { CharacterUpdateService } from 'src/characters/services/character-update.service';
 import { JikanCrawlService } from 'src/series/services/jikan-crawl.service';
 import {
+  JikanSyncOneSeriesJob,
   JikanSyncTopJob,
   SeriesBatchSaveJob,
   SeriesCrawlJob,
@@ -1054,6 +1055,35 @@ export class WorkerService {
     } finally {
       await this.cacheService.delete(inProgressKey);
     }
+  }
+
+  /**
+   * Process Jikan sync one series job.
+   * Calls getAnimeFullById (ANIME) or getMangaFullById (MANGA) via syncAnimeById/syncMangaById.
+   */
+  async processJikanSyncOneSeries(job: JikanSyncOneSeriesJob): Promise<void> {
+    const malId = Number.parseInt(job.myAnimeListId, 10);
+    if (Number.isNaN(malId)) {
+      throw new Error(
+        `Invalid myAnimeListId for job ${job.jobId}: ${job.myAnimeListId}`,
+      );
+    }
+
+    this.logger.log(
+      `Processing Jikan sync one series: ${job.jobId} (seriesId: ${job.seriesId}, type: ${job.type}, malId: ${malId})`,
+    );
+
+    if (job.type === 'ANIME') {
+      await this.jikanCrawlService.syncAnimeById(malId);
+    } else if (job.type === 'MANGA') {
+      await this.jikanCrawlService.syncMangaById(malId);
+    } else {
+      throw new Error(`Unknown type for job ${job.jobId}: ${job.type}`);
+    }
+
+    this.logger.log(
+      `Jikan sync one series job completed: ${job.jobId} (seriesId: ${job.seriesId})`,
+    );
   }
 
   // ==================== CHARACTER PROCESSING METHODS ====================
