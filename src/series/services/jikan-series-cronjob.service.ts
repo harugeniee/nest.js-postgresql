@@ -40,7 +40,7 @@ export class JikanSeriesCronjobService {
    * Before sending jobs: checks Redis for jikan:sync:in_progress and jikan:rate_limit:blocked_until.
    * Only if both checks pass, sends JIKAN_SYNC_TOP_ANIME and JIKAN_SYNC_TOP_MANGA jobs to RabbitMQ.
    */
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  @Cron(CronExpression.EVERY_30_MINUTES)
   async syncFromJikan(): Promise<void> {
     this.logger.log('Starting Jikan API series sync cronjob (2:00 AM)');
 
@@ -118,7 +118,7 @@ export class JikanSeriesCronjobService {
    * Checks rate limit (blocked_until), then pops N items from Redis LIST jikan:sync_existing:pending,
    * sends N JIKAN_SYNC_ONE_SERIES jobs to RabbitMQ, and trims the list (removes sent items).
    */
-  @Cron(CronExpression.EVERY_MINUTE)
+  // @Cron(CronExpression.EVERY_MINUTE)
   async sendExistingSyncJobsEveryMinute(): Promise<void> {
     try {
       const blockedUntilRaw = await this.cacheService.get(
@@ -137,7 +137,7 @@ export class JikanSeriesCronjobService {
       const key = JikanCrawlService.JIKAN_SYNC_EXISTING_PENDING_KEY;
       const N = SYNC_EXISTING_BATCH_SIZE_PER_MINUTE;
       /* CacheService.listRange returns Promise<string[]>; DI can make the call appear unsafe to ESLint. */
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
       const items: string[] = await this.cacheService.listRange(key, 0, N - 1);
 
       if (items.length === 0) {
@@ -172,11 +172,11 @@ export class JikanSeriesCronjobService {
       }
 
       /* CacheService methods; DI can make calls appear unsafe to ESLint. */
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
       await this.cacheService.listTrim(key, items.length, -1);
 
       /* CacheService.listLength returns Promise<number>; DI can make the call appear unsafe to ESLint. */
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
       const remaining: number = await this.cacheService.listLength(key);
       this.logger.log(
         `sendExistingSyncJobsEveryMinute: sent ${items.length} jobs, ${remaining} remaining in list`,
