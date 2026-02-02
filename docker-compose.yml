@@ -1,3 +1,12 @@
+# Logging: limit container log size to avoid filling disk on VPS.
+# Docker rotates and removes old logs automatically (no cron script needed).
+x-logging: &logging_defaults
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   # NestJS Application Service
   app:
@@ -20,6 +29,7 @@ services:
       - ./.env:/app/.env:ro
     networks:
       - manga_sbs
+    <<: *logging_defaults
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/v5', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s

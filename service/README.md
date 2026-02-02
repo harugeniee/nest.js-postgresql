@@ -94,6 +94,10 @@ docker-compose down -v
 
 Services are connected through a custom bridge network named `nest-network` for secure communication.
 
+## Log rotation
+
+Container logs are limited so they do not fill disk on the server. Each service uses the `json-file` driver with `max-size: 10m` and `max-file: 3` (Docker rotates and removes old logs automatically; no cron script needed).
+
 ## Data Persistence
 
 - PostgreSQL data is stored in the `postgres_data` volume
