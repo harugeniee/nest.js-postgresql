@@ -8,3 +8,4 @@ export * from './query-segment-cursor.dto';
 export * from './create-genre.dto';
 export * from './update-genre.dto';
 export * from './query-genre.dto';
+export * from './sync-series-external.dto';

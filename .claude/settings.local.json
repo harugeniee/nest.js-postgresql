@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.anilist.co)",
+      "WebFetch(domain:docs.api.jikan.moe)",
+      "Bash(yarn build:*)",
+      "Bash(yarn lint:*)",
+      "Bash(yarn eslint:*)"
+    ]
+  }
+}

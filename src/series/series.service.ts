@@ -1,12 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AdvancedPaginationDto, CursorPaginationDto } from 'src/common/dto';
 import { IPagination, IPaginationCursor } from 'src/common/interface';
 import { TypeOrmBaseRepository } from 'src/common/repositories/typeorm.base-repo';
 import { BaseService } from 'src/common/services';
+import { generateJobId } from 'src/common/utils';
 import { ReactionCount } from 'src/reactions/entities/reaction-count.entity';
 import { ReactionsService } from 'src/reactions/reactions.service';
-import { CacheService } from 'src/shared/services';
+import { JOB_NAME, SERIES_CONSTANTS } from 'src/shared/constants';
+import { CacheService, RabbitMQService } from 'src/shared/services';
 import {
   DeepPartial,
   FindOptionsRelations,
@@ -14,6 +16,10 @@ import {
   Repository,
 } from 'typeorm';
 import { Series } from './entities/series.entity';
+import {
+  JikanSyncOneSeriesJob,
+  SeriesSaveJob,
+} from './services/series-queue.interface';
 
 @Injectable()
 export class SeriesService extends BaseService<Series> {
@@ -24,6 +30,7 @@ export class SeriesService extends BaseService<Series> {
     private readonly seriesRepository: Repository<Series>,
     cacheService: CacheService,
     private readonly reactionsService: ReactionsService,
+    private readonly rabbitMQService: RabbitMQService,
   ) {
     super(
       new TypeOrmBaseRepository<Series>(seriesRepository),
@@ -320,5 +327,93 @@ export class SeriesService extends BaseService<Series> {
       ...series,
       reactionCounts,
     } as Series & { reactionCounts?: ReactionCount[] };
+  }
+
+  /**
+   * Queue a sync job for a series from external source (Jikan/AniList)
+   *
+   * If source is not provided, auto-detect:
+   * - Priority: aniListId -> myAnimeListId
+   * - If neither exists, return 400 error
+   *
+   * @param seriesId Internal series ID
+   * @param source Optional source to sync from ('jikan' or 'anilist')
+   * @returns Job ID and resolved source
+   */
+  async queueSyncFromExternal(
+    seriesId: string,
+    source?: 'jikan' | 'anilist',
+  ): Promise<{ jobId: string; source: 'jikan' | 'anilist' }> {
+    // 1. Get series
+    const series = await this.findById(seriesId);
+    if (!series) {
+      throw new HttpException(
+        { messageKey: 'series.NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // 2. Determine source (auto-detect if not provided)
+    let resolvedSource: 'jikan' | 'anilist';
+
+    if (source) {
+      // User specified source - validate corresponding ID exists
+      resolvedSource = source;
+      if (source === 'anilist' && !series.aniListId) {
+        throw new HttpException(
+          { messageKey: 'series.MISSING_ANILIST_ID' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      if (source === 'jikan' && !series.myAnimeListId) {
+        throw new HttpException(
+          { messageKey: 'series.MISSING_MAL_ID' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    } else if (series.aniListId) {
+      // Auto-detect: prioritize aniListId -> myAnimeListId
+      resolvedSource = 'anilist';
+    } else if (series.myAnimeListId) {
+      resolvedSource = 'jikan';
+    } else {
+      throw new HttpException(
+        { messageKey: 'series.NO_EXTERNAL_ID' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // 3. Create and send job
+    const jobId = generateJobId();
+    const timestamp = new Date().toISOString();
+
+    if (resolvedSource === 'jikan') {
+      // Determine type from series.type
+      const type =
+        series.type === SERIES_CONSTANTS.TYPE.ANIME ? 'ANIME' : 'MANGA';
+
+      const job: JikanSyncOneSeriesJob = {
+        jobId,
+        seriesId,
+        myAnimeListId: series.myAnimeListId!,
+        type,
+        timestamp,
+      };
+
+      this.rabbitMQService.sendDataToRabbitMQ(
+        JOB_NAME.JIKAN_SYNC_ONE_SERIES,
+        job,
+      );
+    } else {
+      const job: SeriesSaveJob = {
+        jobId,
+        aniListId: Number.parseInt(series.aniListId!, 10),
+        timestamp,
+      };
+
+      this.rabbitMQService.sendDataToRabbitMQ(JOB_NAME.SERIES_SAVE, job);
+    }
+
+    return { jobId, source: resolvedSource };
   }
 }

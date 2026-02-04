@@ -18,7 +18,12 @@ import { Auth } from 'src/common/decorators';
 import { CursorPaginationDto } from 'src/common/dto';
 import { SnowflakeIdPipe } from 'src/common/pipes';
 import { ANALYTICS_CONSTANTS } from 'src/shared/constants/analytics.constants';
-import { CreateSeriesDto, QuerySeriesDto, UpdateSeriesDto } from './dto';
+import {
+  CreateSeriesDto,
+  QuerySeriesDto,
+  SyncSeriesExternalDto,
+  UpdateSeriesDto,
+} from './dto';
 import { SyncJikanDto } from './dto/sync-jikan.dto';
 import { SeriesService } from './series.service';
 import { AniListCrawlService } from './services/anilist-crawl.service';
@@ -313,6 +318,36 @@ export class SeriesController {
         `Failed to sync series with MAL ID ${id}. It may not exist in Jikan API.`,
       );
     }
+  }
+
+  /**
+   * Queue a sync job for series from external source (Jikan/AniList)
+   *
+   * If source is not provided, auto-detect:
+   * - Priority: aniListId -> myAnimeListId
+   * - If neither exists, return 400 error
+   *
+   * @param id Internal series ID
+   * @param syncDto DTO containing optional source
+   * @returns Job ID and resolved source
+   */
+  @Post(':id/sync')
+  @Auth()
+  @HttpCode(HttpStatus.ACCEPTED)
+  async syncSeriesFromExternal(
+    @Param('id', SnowflakeIdPipe) id: string,
+    @Body() syncDto: SyncSeriesExternalDto,
+  ) {
+    const result = await this.seriesService.queueSyncFromExternal(
+      id,
+      syncDto.source,
+    );
+    return {
+      success: true,
+      jobId: result.jobId,
+      source: result.source,
+      message: `Sync job queued for ${result.source}`,
+    };
   }
 
   /**

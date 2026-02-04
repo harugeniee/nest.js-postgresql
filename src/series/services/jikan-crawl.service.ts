@@ -146,7 +146,7 @@ export class JikanCrawlService {
         type: series.type,
       });
       /* CacheService.listPush; DI can make the call appear unsafe to ESLint. */
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
       await this.cacheService.listPush(key, item);
     }
 
