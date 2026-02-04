@@ -11,6 +11,10 @@ alwaysApply: true
 - Configure: `entityName`, `cache`, `defaultSearchField`, `relationsWhitelist`, `selectWhitelist`.
 - Override `getSearchableColumns()` to define searchable fields.
 
+### GraphQL Support
+- For GraphQL resolvers, extend `GraphQLBaseService<T>` from `src/common/services/graphql-base.service.ts`.
+- Adds GraphQL-specific pagination (connections/edges) and field selection.
+
 ## BaseService Capabilities
 - **CRUD**: `create`, `createMany`, `update`, `updateMany`, `remove`, `removeMany`, `softDelete`, `softDeleteMany`, `restore`
 - **Queries**: `findById`, `findOne`, `listOffset`, `listCursor`

@@ -7,6 +7,7 @@ This is a comprehensive NestJS social media platform with the following architec
 
 ## Core Infrastructure
 - **BaseService<T>**: Extends all domain services with CRUD, caching, pagination, lifecycle hooks
+- **GraphQLBaseService<T>**: GraphQL-optimized service with connections/edges pagination
 - **BaseEntityCustom**: All entities extend this with Snowflake IDs, UUIDs, timestamps, soft delete
 - **TypeOrmBaseRepository<T>**: Repository pattern with transaction support
 - **CacheService**: Redis-based caching with SWR, distributed locks, atomic operations
@@ -14,23 +15,32 @@ This is a comprehensive NestJS social media platform with the following architec
 - **PaginationFormatter**: Consistent offset and cursor pagination responses
 
 ## Domain Modules
-- **Articles**: Content management with scheduled publishing, co-authors, SEO
-- **Comments**: Nested comments with media/sticker support, mentions, pinning
-- **Reactions**: Polymorphic reactions with toggle semantics, count aggregation
-- **Bookmarks**: User bookmarking with folders, tags, status management
-- **Notifications**: Multi-channel notifications with preferences, RabbitMQ processing
-- **Users**: Multi-auth support (email/password, Firebase, OAuth), session management
-- **QR**: QR ticket system with WebSocket polling, PKCE security, action framework
-- **Share**: Link generation, click tracking, attribution, daily aggregation
-- **Stickers**: Sticker packs with media integration, animation support
-- **Rate-limit**: Hybrid rate limiting (plan + policy based), Redis distributed
-- **Follow**: User following with Roaring Bitmap optimization
 - **Analytics**: User behavior tracking and metrics
+- **Articles**: Content management with scheduled publishing, co-authors, SEO
+- **Auth**: Authentication (JWT, Firebase, OAuth)
+- **Authors**: Author management system
+- **Badges**: Badge/achievement system
+- **Bookmarks**: User bookmarking with folders, tags, status management
+- **Characters**: Character management (anime/manga)
+- **Comments**: Nested comments with media/sticker support, mentions, pinning
+- **Contributions**: User contributions tracking
+- **Follow**: User following with Roaring Bitmap optimization
+- **Key-Value**: Key-value storage service
+- **Media**: File upload and management
+- **Notifications**: Multi-channel notifications with preferences, RabbitMQ processing
 - **Organizations**: Multi-tenant organization support
 - **Permissions**: Granular permission system
+- **QR**: QR ticket system with WebSocket polling, PKCE security, action framework
+- **Rate-limit**: Hybrid rate limiting (plan + policy based), Redis distributed
+- **Reactions**: Polymorphic reactions with toggle semantics, count aggregation
 - **Reports**: Content reporting system
-- **Media**: File upload and management
+- **Series**: Series management with Jikan/Anilist API integration
+- **Share**: Link generation, click tracking, attribution, daily aggregation
+- **Staffs**: Staff management
+- **Stickers**: Sticker packs with media integration, animation support
+- **Studios**: Studio/organization management
 - **Tags**: Content tagging system
+- **Users**: Multi-auth support (email/password, Firebase, OAuth), session management
 - **Workers**: Background job processing
 
 ## Key Patterns

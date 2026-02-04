@@ -10,7 +10,8 @@ alwaysApply: true
 ### Guards
 | Guard | Purpose |
 |-------|---------|
-| `JwtAccessTokenGuard` | JWT validation |
+| `JwtAccessTokenGuard` | JWT access token validation |
+| `JwtRefreshTokenGuard` | JWT refresh token validation |
 | `RolesGuard` | Role-based access |
 | `PermissionsGuard` | Permission-based access |
 | `OptionalAuthGuard` | Optional authentication |

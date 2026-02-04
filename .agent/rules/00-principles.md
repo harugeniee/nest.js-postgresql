@@ -11,7 +11,7 @@ alwaysApply: true
 This project follows strict engineering standards to ensure maintainability and consistency.
 
 ### MUST
-- Develop within existing domain modules (`analytics`, `articles`, `auth`, `bookmarks`, `comments`, `follow`, `media`, `notifications`, `organizations`, `permissions`, `qr`, `rate-limit`, `reactions`, `reports`, `series`, `share`, `staffs`, `stickers`, `studios`, `tags`, `users`, `workers`).
+- Develop within existing domain modules (`analytics`, `articles`, `auth`, `authors`, `badges`, `bookmarks`, `characters`, `comments`, `contributions`, `follow`, `key-value`, `media`, `notifications`, `organizations`, `permissions`, `qr`, `rate-limit`, `reactions`, `reports`, `series`, `share`, `staffs`, `stickers`, `studios`, `tags`, `users`, `workers`).
 - Keep controllers thin: validation + routing only; delegate ALL business logic to services.
 - Use **Yarn exclusively** (`yarn add`, `yarn remove`, `yarn install`).
 - Follow patterns established in `src/`, `src/shared/`, `src/common/`.

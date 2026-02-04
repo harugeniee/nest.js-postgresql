@@ -6,9 +6,11 @@ alwaysApply: true
 Before finalizing code changes, verify all applicable items:
 
 ## Entity
-- [ ] Extends `BaseEntityCustom` with explicit `@Entity('table_name')`.
+- [ ] Extends `BaseEntityCustom` with explicit `@Entity('table_name')` or `@Entity({ name: 'table_name' })`.
 - [ ] Table name is plural snake_case (e.g., `articles`, `qr_tickets`).
-- [ ] Column decorators use snake_case names where needed (`@Column({ name: 'user_id' })`).
+- [ ] Properties/columns use camelCase (e.g., `userId`, `createdAt`).
+- [ ] JoinColumn uses camelCase names (`@JoinColumn({ name: 'userId' })`).
+- [ ] JoinTable (M2M) uses snake_case for table and columns (`article_tags`, `article_id`).
 - [ ] Proper indexes defined for frequently queried fields.
 - [ ] Foreign key columns have corresponding relation decorators.
 
