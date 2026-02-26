@@ -74,12 +74,13 @@ export class Article extends BaseEntityCustom {
 
 ### MUST
 - Extend `BaseService<T>` from `src/common/services/base.service.ts`.
-- Configure: `entityName`, `cache`, `defaultSearchField`, `relationsWhitelist`, `selectWhitelist`.
+- Configure: `entityName`, `cache`, `defaultSearchField`, `relationsWhitelist`, `selectWhitelist`, `idKey`, `softDelete`, `emitEvents`.
 - Override `getSearchableColumns()` to define searchable fields.
 
-### GraphQL Support
-- For GraphQL resolvers, extend `GraphQLBaseService<T>` from `src/common/services/graphql-base.service.ts`.
-- Adds GraphQL-specific pagination (connections/edges) and field selection.
+### GraphQL Support (Available, Not Yet Adopted)
+- `GraphQLBaseService<T>` exists at `src/common/services/graphql-base.service.ts` with GraphQL-specific pagination (connections/edges) and field selection.
+- **No domain service currently extends it.** Tested in `graphql-base.service.spec.ts` but not yet used in production.
+- When needed, extend `GraphQLBaseService<T>` following the same config pattern as `BaseService`.
 
 ### BaseService Provides
 - **CRUD**: `create`, `createMany`, `update`, `updateMany`, `remove`, `removeMany`, `softDelete`, `softDeleteMany`, `restore`
@@ -295,8 +296,9 @@ this.logger.error('Failed to publish', { articleId, error: error.message });
 - Queue interfaces in `src/*/interfaces/*-queue.interface.ts`.
 
 ### EventEmitter
-- **MAY** use for simple, in-process domain events (3 services currently use this pattern).
-- Acceptable for lightweight side effects that don't need retry/persistence.
+- Supported via `emitEvents` config in BaseService, but the project has largely moved to RabbitMQ.
+- Most services explicitly set `emitEvents: false` (comments, reactions, reports, notifications). Only `BookmarkFolderService` currently enables it.
+- **MAY** use for lightweight, in-process side effects that do not need retry/persistence, but prefer RabbitMQ for new features.
 
 ---
 
@@ -381,11 +383,17 @@ export class ArticlesModule {}
 |---------|----------|---------|
 | `ConditionBuilder` | `src/shared/helpers` | Safe query building |
 | `PaginationFormatter` | `src/shared/helpers` | Response formatting |
+| `buildResponse` | `src/shared/helpers` | Standardized response with messageKey |
+| `formatI18nResponse` | `src/shared/helpers` | i18n response translation |
 | `encodeSignedCursor` | `src/common/utils/cursor.util.ts` | Secure cursors |
 | `SnowflakeIdPipe` | `src/common/pipes` | ID validation |
 | `CacheService` | `src/shared/services/cache` | Redis caching |
 | `BaseService` | `src/common/services` | REST API base service |
-| `GraphQLBaseService` | `src/common/services` | GraphQL base service |
+| `GraphQLBaseService` | `src/common/services` | GraphQL base service (not yet adopted) |
+| `sha256Hex` / `stableStringify` | `src/common/utils/hash.util.ts` | Hashing and stable serialization |
+| `createSlug` | `src/common/utils/slug.util.ts` | Vietnamese-aware slug generation |
+| `mapTypeOrmError` / `notFound` | `src/common/utils/error.util.ts` | TypeORM error mapping and 404 helpers |
+| `normalizeSearchInput` | `src/common/utils/query.util.ts` | Search input normalization (NFC) |
 
 ---
 
@@ -406,7 +414,13 @@ See `.cursor/rules/07-checklist.mdc` for the full acceptance checklist.
 
 ## Related Documentation
 
-- `.cursor/rules/` — Detailed rule files for specific patterns
-- `docs/BASE_SERVICE_GUIDE.md` — BaseService usage
-- `docs/DATABASE_NAMING_CONVENTIONS.md` — Naming standards
-- `docs/HYBRID_RATE_LIMITING_IMPLEMENTATION.md` — Rate limiting
+- `.cursor/rules/` — Detailed rule files for specific patterns:
+  - `00-guardrails.mdc` — Hard guardrails (migrations, package management, controllers)
+  - `03-refactor-safety.mdc` — Refactoring safety and backward compatibility
+  - `04-query-and-filter.mdc` — ConditionBuilder usage and search validation
+  - `05-pagination-contract.mdc` — Cursor and offset pagination contracts
+  - `06-caching-contract.mdc` — Cache key naming, SWR, invalidation
+  - `07-checklist.mdc` — PR acceptance checklist
+  - `07-ddd-module-contract.mdc` — DDD module structure contract
+  - `08-controller-event-tracking.mdc` — Analytics event tracking patterns
+  - `modules/` — Module-specific rules (articles, bookmarks, comments, notifications, qr, rate-limit, reactions, share, stickers, users)

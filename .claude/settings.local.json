@@ -5,7 +5,9 @@
       "WebFetch(domain:docs.api.jikan.moe)",
       "Bash(yarn build:*)",
       "Bash(yarn lint:*)",
-      "Bash(yarn eslint:*)"
+      "Bash(yarn eslint:*)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(ls -d /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql/src/*/)"
     ]
   }
 }
