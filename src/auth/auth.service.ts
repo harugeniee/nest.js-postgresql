@@ -143,7 +143,10 @@ export class AuthService {
     this.userPermissionService
       .initUserPermissions(id)
       .catch((err) =>
-        this.logger.error(`Failed to init permissions cache for user ${id}`, err),
+        this.logger.error(
+          `Failed to init permissions cache for user ${id}`,
+          err,
+        ),
       );
 
     return { accessToken, refreshToken };
