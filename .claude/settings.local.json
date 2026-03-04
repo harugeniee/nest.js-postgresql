@@ -7,7 +7,14 @@
       "Bash(yarn lint:*)",
       "Bash(yarn eslint:*)",
       "Bash(xargs -I {} basename {})",
-      "Bash(ls -d /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql/src/*/)"
+      "Bash(ls -d /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql/src/*/)",
+      "Bash(grep -r \"qr\" /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql/docker-compose*)",
+      "Bash(grep -i \"import.*qr\\\\|from.*qr\" /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql/src/**/*.ts)",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(wc -l /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql/src/*/*controller.ts)",
+      "Bash(git -C /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql log --oneline)",
+      "Bash(git -C /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql show --stat 53112d3)"
     ]
   }
 }
