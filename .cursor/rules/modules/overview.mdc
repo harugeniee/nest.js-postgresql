@@ -30,7 +30,6 @@ This is a comprehensive NestJS social media platform with the following architec
 - **Notifications**: Multi-channel notifications with preferences, RabbitMQ processing
 - **Organizations**: Multi-tenant organization support
 - **Permissions**: Granular permission system
-- **QR**: QR ticket system with WebSocket polling, PKCE security, action framework
 - **Rate-limit**: Hybrid rate limiting (plan + policy based), Redis distributed
 - **Reactions**: Polymorphic reactions with toggle semantics, count aggregation
 - **Reports**: Content reporting system

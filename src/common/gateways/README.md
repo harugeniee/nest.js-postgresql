@@ -213,4 +213,4 @@ protected async onClientDisconnected(
 
 ## **📚 Examples**
 
-Xem `src/qr/qr.gateway.ts` để biết cách implement cụ thể.
+Xem `src/common/gateways/base.gateway.ts` để biết cách implement cụ thể.

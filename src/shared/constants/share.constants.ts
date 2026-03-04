@@ -13,7 +13,6 @@ export const SHARE_CONSTANTS = {
     COMMENT: 'comment',
     BOOKMARK_FOLDER: 'bookmark_folder',
     STICKER_PACK: 'sticker_pack',
-    QR_TICKET: 'qr_ticket',
   } as const,
 
   /**

@@ -17,13 +17,7 @@ export const configValidationSchema = Joi.object({
   I18N_FALLBACK_LANGUAGE: Joi.string().default('en'),
   I18N_SUPPORTED_LANGUAGES: Joi.string().default('en,vi'),
 
-  // QR HMAC secret
-  QR_HMAC_SECRET: Joi.string().required(),
   CURSOR_HMAC_SECRET: Joi.string().required(),
-
-  // QR configuration
-  QR_TICKET_TTL_SECONDS: Joi.number().min(60).max(600).default(180),
-  QR_GRANT_TTL_SECONDS: Joi.number().min(10).max(120).default(30),
 
   // Database configuration
   DATABASE_TYPE: Joi.string().valid('postgres').default('postgres'),

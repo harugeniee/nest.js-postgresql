@@ -232,10 +232,6 @@ export class ShareRedirectController {
         targetUrl = `${baseUrl}/stickers/packs/${shareLink.contentId}`;
         break;
 
-      case SHARE_CONSTANTS.CONTENT_TYPES.QR_TICKET:
-        targetUrl = `${baseUrl}/qr/tickets/${shareLink.contentId}`;
-        break;
-
       default:
         // Fallback to generic content page
         targetUrl = `${baseUrl}/content/${shareLink.contentType}/${shareLink.contentId}`;

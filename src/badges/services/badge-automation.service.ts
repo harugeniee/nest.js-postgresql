@@ -217,23 +217,6 @@ export class BadgeAutomationService {
   }
 
   /**
-   * Check and assign badges based on QR code activity
-   */
-  async checkQRBadges(userId: string): Promise<BadgeAssignment[]> {
-    this.logger.log(`Checking QR badges for user: ${userId}`);
-
-    const assignedBadges: BadgeAssignment[] = [];
-
-    // Check for QR code expert badge
-    await this.checkQRCodeExpertBadge(userId, assignedBadges);
-
-    this.logger.log(
-      `Assigned ${assignedBadges.length} QR badges for user: ${userId}`,
-    );
-    return assignedBadges;
-  }
-
-  /**
    * Check and assign badges based on sticker activity
    */
   async checkStickerBadges(userId: string): Promise<BadgeAssignment[]> {
@@ -445,13 +428,6 @@ export class BadgeAutomationService {
     assignedBadges: BadgeAssignment[],
   ): Promise<void> {
     // Implementation for notification master badge logic
-  }
-
-  private async checkQRCodeExpertBadge(
-    userId: string,
-    assignedBadges: BadgeAssignment[],
-  ): Promise<void> {
-    // Implementation for QR code expert badge logic
   }
 
   private async checkStickerCreatorBadge(

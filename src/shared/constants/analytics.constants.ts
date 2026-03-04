@@ -116,12 +116,6 @@ export const ANALYTICS_EVENT_TYPES = {
   REPORT_VIEW: 'report_view',
   REPORT_LIST: 'report_list',
 
-  // QR Ticket events
-  QR_TICKET_CREATE: 'qr_ticket_create',
-  QR_TICKET_SCAN: 'qr_ticket_scan',
-  QR_TICKET_APPROVE: 'qr_ticket_approve',
-  QR_TICKET_REJECT: 'qr_ticket_reject',
-
   // Auth events
   AUTH_LOGIN: 'auth_login',
   AUTH_LOGOUT: 'auth_logout',
@@ -188,7 +182,6 @@ export const ANALYTICS_SUBJECT_TYPES = {
   STICKER: 'sticker',
   STICKER_PACK: 'sticker_pack',
   BOOKMARK_FOLDER: 'bookmark_folder',
-  QR_TICKET: 'qr_ticket',
   REACTION: 'reaction',
   CONTRIBUTION: 'contribution',
   TAG: 'tag',

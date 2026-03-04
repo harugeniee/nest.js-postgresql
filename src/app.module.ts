@@ -29,7 +29,6 @@ import { MediaModule } from './media/media.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PermissionsModule } from './permissions/permissions.module';
-import { QrModule } from './qr/qr.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { ReportsModule } from './reports/reports.module';
@@ -115,7 +114,6 @@ import { WorkerModule } from './workers/worker.module';
     BadgesModule,
     CharactersModule,
     ContributionsModule,
-    QrModule,
     RateLimitModule,
     ArticlesModule,
     ReactionsModule,

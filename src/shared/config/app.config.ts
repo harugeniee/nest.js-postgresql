@@ -10,11 +10,6 @@ export const appConfig = () => ({
     fallbackLanguage: process.env.I18N_FALLBACK_LANGUAGE || 'en',
     supportedLanguages: process.env.I18N_SUPPORTED_LANGUAGES || 'en,vi',
   },
-  qr: {
-    hmacSecret: process.env.QR_HMAC_SECRET,
-    ticketTtlSeconds: Number(process.env.QR_TICKET_TTL_SECONDS) || 180,
-    grantTtlSeconds: Number(process.env.QR_GRANT_TTL_SECONDS) || 30,
-  },
   cursor: {
     hmacSecret: process.env.CURSOR_HMAC_SECRET,
   },

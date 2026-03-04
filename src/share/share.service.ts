@@ -144,8 +144,6 @@ export class ShareService extends BaseService<ShareLink> {
         return await this.resolveBookmarkFolder(contentId);
       case SHARE_CONSTANTS.CONTENT_TYPES.STICKER_PACK:
         return await this.resolveStickerPack(contentId);
-      case SHARE_CONSTANTS.CONTENT_TYPES.QR_TICKET:
-        return await this.resolveQrTicket(contentId);
       default:
         return null;
     }
@@ -210,13 +208,6 @@ export class ShareService extends BaseService<ShareLink> {
     return await this.shareLinkRepository.manager.findOne(StickerPack, {
       where: { id: contentId },
     });
-  }
-
-  /**
-   * Resolve QR ticket content
-   */
-  private async resolveQrTicket(_contentId: string): Promise<null> {
-    return null; // TODO: Implement when QR ticket entity is available
   }
 
   /**

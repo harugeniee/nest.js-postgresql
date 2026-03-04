@@ -17,7 +17,7 @@ All controllers MUST include event tracking for important endpoints using @Track
 - **CONTENT**: articles, series, tags, media, stickers (create/read/update/delete content)
 - **SOCIAL**: follow, organizations, users (social interactions, user relationships)
 - **ENGAGEMENT**: comments, reactions, bookmarks, shares (user engagement)
-- **SYSTEM**: reports, contributions, notifications, qr, auth (system/admin functionality)
+- **SYSTEM**: reports, contributions, notifications, auth (system/admin functionality)
 - **USER**: users, auth (user management, authentication)
 
 ## Required Endpoints to Track

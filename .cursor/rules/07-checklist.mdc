@@ -7,7 +7,7 @@ Before finalizing code changes, verify all applicable items:
 
 ## Entity
 - [ ] Extends `BaseEntityCustom` with explicit `@Entity('table_name')` or `@Entity({ name: 'table_name' })`.
-- [ ] Table name is plural snake_case (e.g., `articles`, `qr_tickets`).
+- [ ] Table name is plural snake_case (e.g., `articles`, `comments`).
 - [ ] Properties/columns use camelCase (e.g., `userId`, `createdAt`).
 - [ ] JoinColumn uses camelCase names (`@JoinColumn({ name: 'userId' })`).
 - [ ] JoinTable (M2M) uses snake_case for table and columns (`article_tags`, `article_id`).

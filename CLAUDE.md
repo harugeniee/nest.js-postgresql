@@ -11,7 +11,7 @@ alwaysApply: true
 ## 0) General Principles
 
 ### MUST
-- Develop within existing domain modules (`analytics`, `articles`, `auth`, `authors`, `badges`, `bookmarks`, `characters`, `comments`, `contributions`, `follow`, `key-value`, `media`, `notifications`, `organizations`, `permissions`, `qr`, `rate-limit`, `reactions`, `reports`, `series`, `share`, `staffs`, `stickers`, `studios`, `tags`, `users`, `workers`).
+- Develop within existing domain modules (`analytics`, `articles`, `auth`, `authors`, `badges`, `bookmarks`, `characters`, `comments`, `contributions`, `follow`, `key-value`, `media`, `notifications`, `organizations`, `permissions`, `rate-limit`, `reactions`, `reports`, `series`, `share`, `staffs`, `stickers`, `studios`, `tags`, `users`, `workers`).
 - Keep controllers thin: validation + routing only; delegate ALL business logic to services.
 - Use **Yarn exclusively** (`yarn add`, `yarn remove`, `yarn install`).
 - Follow patterns established in `src/`, `src/shared/`, `src/common/`.
@@ -423,4 +423,4 @@ See `.cursor/rules/07-checklist.mdc` for the full acceptance checklist.
   - `07-checklist.mdc` — PR acceptance checklist
   - `07-ddd-module-contract.mdc` — DDD module structure contract
   - `08-controller-event-tracking.mdc` — Analytics event tracking patterns
-  - `modules/` — Module-specific rules (articles, bookmarks, comments, notifications, qr, rate-limit, reactions, share, stickers, users)
+  - `modules/` — Module-specific rules (articles, bookmarks, comments, notifications, rate-limit, reactions, share, stickers, users)

@@ -14,7 +14,6 @@ export * from './media.constants';
 export * from './notification.constants';
 export * from './organization.constants';
 export * from './permission.constants';
-export * from './qr.constants';
 export * from './report.constants';
 export * from './series.constants';
 export * from './share.constants';
