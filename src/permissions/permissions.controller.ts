@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { Auth } from 'src/common/decorators';
 import { AuthPayload } from 'src/common/interface';
+import { SnowflakeIdPipe } from 'src/common/pipes/snowflake-id.pipe';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { EffectivePermissionsDto } from './dto/effective-permissions.dto';
@@ -38,59 +39,72 @@ export class PermissionsController {
   // ==================== ROLE ENDPOINTS ====================
 
   @Post('roles')
+  @Auth(['admin'])
   @HttpCode(HttpStatus.CREATED)
   async createRole(@Body() dto: CreateRoleDto): Promise<Role> {
     return this.permissionsService.createRole(dto);
   }
 
   @Get('roles')
+  @Auth()
   async getAllRoles(): Promise<Role[]> {
     return this.permissionsService.getAllRoles();
   }
 
   @Get('roles/:id')
-  async getRole(@Param('id') id: string): Promise<Role> {
+  @Auth()
+  async getRole(@Param('id', SnowflakeIdPipe) id: string): Promise<Role> {
     return this.permissionsService.findById(id);
   }
 
   @Patch('roles/:id')
+  @Auth(['admin'])
   async updateRole(
-    @Param('id') id: string,
+    @Param('id', SnowflakeIdPipe) id: string,
     @Body() dto: UpdateRoleDto,
   ): Promise<Role> {
     return this.permissionsService.updateRole(id, dto);
   }
 
   @Delete('roles/:id')
+  @Auth(['admin'])
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteRole(@Param('id') id: string): Promise<void> {
+  async deleteRole(@Param('id', SnowflakeIdPipe) id: string): Promise<void> {
     return this.permissionsService.remove(id);
   }
 
   // ==================== USER-ROLE ENDPOINTS ====================
 
   @Post('users/roles')
+  @Auth(['admin'])
   @HttpCode(HttpStatus.CREATED)
   async assignRole(@Body() dto: AssignRoleDto): Promise<UserRole> {
     return this.permissionsService.assignRole(dto);
   }
 
   @Delete('users/:userId/roles/:roleId')
+  @Auth(['admin'])
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeRole(
-    @Param('userId') userId: string,
-    @Param('roleId') roleId: string,
+    @Param('userId', SnowflakeIdPipe) userId: string,
+    @Param('roleId', SnowflakeIdPipe) roleId: string,
   ): Promise<void> {
     return this.permissionsService.removeRole(userId, roleId);
   }
 
   @Get('users/:userId/roles')
-  async getUserRoles(@Param('userId') userId: string): Promise<UserRole[]> {
+  @Auth()
+  async getUserRoles(
+    @Param('userId', SnowflakeIdPipe) userId: string,
+  ): Promise<UserRole[]> {
     return this.permissionsService.getUserRoles(userId);
   }
 
   @Get('roles/:roleId/users')
-  async getUsersWithRole(@Param('roleId') roleId: string): Promise<UserRole[]> {
+  @Auth()
+  async getUsersWithRole(
+    @Param('roleId', SnowflakeIdPipe) roleId: string,
+  ): Promise<UserRole[]> {
     return this.permissionsService.getUsersWithRole(roleId);
   }
 
@@ -115,6 +129,7 @@ export class PermissionsController {
   // ==================== PERMISSION CALCULATION ENDPOINTS ====================
 
   @Get('effective')
+  @Auth()
   async computeEffectivePermissions(
     @Query() dto: EffectivePermissionsDto,
   ): Promise<EffectivePermissions> {
@@ -134,6 +149,7 @@ export class PermissionsController {
   // ==================== SEGMENT PERMISSIONS ENDPOINTS ====================
 
   @Post('segments/permissions')
+  @Auth(['admin'])
   @HttpCode(HttpStatus.CREATED)
   async grantSegmentPermission(
     @Body() dto: GrantSegmentPermissionDto,
@@ -142,6 +158,7 @@ export class PermissionsController {
   }
 
   @Delete('segments/permissions')
+  @Auth(['admin'])
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeSegmentPermission(
     @Body() dto: RevokeSegmentPermissionDto,
@@ -150,15 +167,17 @@ export class PermissionsController {
   }
 
   @Get('users/:userId/segments/permissions')
+  @Auth()
   async getUserSegmentPermissions(
-    @Param('userId') userId: string,
+    @Param('userId', SnowflakeIdPipe) userId: string,
   ): Promise<UserPermission[]> {
     return this.permissionsService.getUserSegmentPermissions(userId);
   }
 
   @Get('segments/:segmentId/permissions')
+  @Auth()
   async getUsersWithSegmentPermission(
-    @Param('segmentId') segmentId: string,
+    @Param('segmentId', SnowflakeIdPipe) segmentId: string,
     @Query('permission') permission?: 'SEGMENTS_UPDATE' | 'SEGMENTS_CREATE',
   ): Promise<UserPermission[]> {
     return this.permissionsService.getUsersWithSegmentPermission(
@@ -166,8 +185,4 @@ export class PermissionsController {
       permission,
     );
   }
-
-  // ==================== UTILITY ENDPOINTS ====================
-  // Note: Default roles are now created automatically when creating an organization
-  // This endpoint has been removed as roles must be associated with an organization
 }

@@ -1,9 +1,13 @@
-import { PermissionKey } from '../types/permission-key.type';
-
 /**
- * All PermissionKey constants for the system
- * Organized by component for easy reference
+ * Re-export all permission key constants from the single source of truth.
+ * Individual constants kept for backward compatibility.
+ * @see ./permission-definitions.ts
  */
+import { PermissionKey } from '../types/permission-key.type';
+import { ALL_PERMISSION_KEYS as _ALL_KEYS } from './permission-definitions';
+
+// Re-export the auto-derived array
+export const ALL_PERMISSION_KEYS = _ALL_KEYS;
 
 // Article permissions
 export const ARTICLE_CREATE: PermissionKey = 'article.create';
@@ -58,54 +62,3 @@ export const REPORT_CREATE: PermissionKey = 'report.create';
 export const REPORT_READ: PermissionKey = 'report.read';
 export const REPORT_UPDATE: PermissionKey = 'report.update';
 export const REPORT_DELETE: PermissionKey = 'report.delete';
-
-/**
- * All PermissionKeys as an array
- */
-export const ALL_PERMISSION_KEYS: PermissionKey[] = [
-  // Article
-  ARTICLE_CREATE,
-  ARTICLE_READ,
-  ARTICLE_UPDATE,
-  ARTICLE_DELETE,
-  // Series
-  SERIES_CREATE,
-  SERIES_READ,
-  SERIES_UPDATE,
-  SERIES_DELETE,
-  // Segment
-  SEGMENT_CREATE,
-  SEGMENT_READ,
-  SEGMENT_UPDATE,
-  SEGMENT_DELETE,
-  // Organization
-  ORGANIZATION_CREATE,
-  ORGANIZATION_READ,
-  ORGANIZATION_UPDATE,
-  ORGANIZATION_DELETE,
-  // Team
-  TEAM_CREATE,
-  TEAM_READ,
-  TEAM_UPDATE,
-  TEAM_DELETE,
-  // Project
-  PROJECT_CREATE,
-  PROJECT_READ,
-  PROJECT_UPDATE,
-  PROJECT_DELETE,
-  // Media
-  MEDIA_CREATE,
-  MEDIA_READ,
-  MEDIA_UPDATE,
-  MEDIA_DELETE,
-  // Sticker
-  STICKER_CREATE,
-  STICKER_READ,
-  STICKER_UPDATE,
-  STICKER_DELETE,
-  // Report
-  REPORT_CREATE,
-  REPORT_READ,
-  REPORT_UPDATE,
-  REPORT_DELETE,
-];

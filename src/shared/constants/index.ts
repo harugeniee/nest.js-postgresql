@@ -13,7 +13,7 @@ export * from './key-value.constants';
 export * from './media.constants';
 export * from './notification.constants';
 export * from './organization.constants';
-export * from './permission.constants';
+// Legacy permission.constants.ts removed — use src/permissions/constants/permission-definitions.ts
 export * from './report.constants';
 export * from './series.constants';
 export * from './share.constants';

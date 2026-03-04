@@ -223,61 +223,68 @@ export class PermissionsGuard implements CanActivate {
   }
 
   /**
-   * Evaluate permissions using PermissionEvaluator
-   * @param user - User authentication payload
-   * @param permissionOptions - Permission check options
-   * @param request - Express request
-   * @returns true if access is allowed, false otherwise
+   * Evaluate permissions using PermissionEvaluator batch API.
+   * Loads permission sources once for all keys instead of N individual queries.
    */
   private async evaluatePermissions(
     user: AuthPayload,
     permissionOptions: PermissionCheckOptions,
     request: Request,
   ): Promise<boolean> {
-    // Get permission keys from options
     const permissionKeys = {
-      all: permissionOptions.all,
-      any: permissionOptions.any,
-      none: permissionOptions.none,
+      all: permissionOptions.all || [],
+      any: permissionOptions.any || [],
+      none: permissionOptions.none || [],
     };
 
     // Extract scope from options or request
     let scopeType = permissionOptions.scopeType;
     let scopeId = permissionOptions.scopeId;
 
-    // Auto-detect scope if enabled
     if (permissionOptions.autoDetectScope) {
-      const detectedScope = await this.extractScopeFromRequest(request);
-      if (detectedScope) {
-        scopeType = detectedScope.scopeType;
-        scopeId = detectedScope.scopeId;
+      const detectedContext =
+        await this.contextResolverService.autoDetectContext(request);
+      if (detectedContext) {
+        scopeType = detectedContext.type;
+        scopeId = detectedContext.id;
       }
     }
 
-    // Map organizationId to scope if provided (backward compatibility)
     if (!scopeType && !scopeId && permissionOptions.organizationId) {
       scopeType = 'organization';
       scopeId = permissionOptions.organizationId;
     }
 
+    // Collect all unique keys and evaluate in one batch
+    const allKeys = [
+      ...new Set([
+        ...permissionKeys.all,
+        ...permissionKeys.any,
+        ...permissionKeys.none,
+      ]),
+    ];
+
+    if (allKeys.length === 0) return true;
+
+    const results = await this.permissionEvaluator.evaluateBatch(
+      user.uid,
+      allKeys,
+      scopeType,
+      scopeId,
+    );
+
     // Check ALL permissions
-    if (permissionKeys.all && permissionKeys.all.length > 0) {
-      for (const permissionKey of permissionKeys.all) {
-        const hasPermission = await this.permissionEvaluator.evaluate(
-          user.uid,
-          permissionKey,
-          scopeType,
-          scopeId,
-        );
-        if (!hasPermission) {
+    if (permissionKeys.all.length > 0) {
+      for (const key of permissionKeys.all) {
+        if (!results.get(key)) {
           throw new ForbiddenException({
             messageKey: 'auth.FORBIDDEN',
             details: {
               userId: user.uid,
-              requiredPermission: permissionKey,
+              requiredPermission: key,
               scopeType,
               scopeId,
-              message: `Missing required permission: ${permissionKey}`,
+              message: `Missing required permission: ${key}`,
             },
           });
         }
@@ -285,18 +292,9 @@ export class PermissionsGuard implements CanActivate {
     }
 
     // Check ANY permissions
-    if (permissionKeys.any && permissionKeys.any.length > 0) {
-      const hasAny = await Promise.all(
-        permissionKeys.any.map((permissionKey) =>
-          this.permissionEvaluator.evaluate(
-            user.uid,
-            permissionKey,
-            scopeType,
-            scopeId,
-          ),
-        ),
-      );
-      if (!hasAny.some((result) => result === true)) {
+    if (permissionKeys.any.length > 0) {
+      const hasAny = permissionKeys.any.some((key) => results.get(key));
+      if (!hasAny) {
         throw new ForbiddenException({
           messageKey: 'auth.FORBIDDEN',
           details: {
@@ -311,23 +309,17 @@ export class PermissionsGuard implements CanActivate {
     }
 
     // Check NONE permissions
-    if (permissionKeys.none && permissionKeys.none.length > 0) {
-      for (const permissionKey of permissionKeys.none) {
-        const hasPermission = await this.permissionEvaluator.evaluate(
-          user.uid,
-          permissionKey,
-          scopeType,
-          scopeId,
-        );
-        if (hasPermission) {
+    if (permissionKeys.none.length > 0) {
+      for (const key of permissionKeys.none) {
+        if (results.get(key)) {
           throw new ForbiddenException({
             messageKey: 'auth.FORBIDDEN',
             details: {
               userId: user.uid,
-              forbiddenPermission: permissionKey,
+              forbiddenPermission: key,
               scopeType,
               scopeId,
-              message: `User has forbidden permission: ${permissionKey}`,
+              message: `User has forbidden permission: ${key}`,
             },
           });
         }
@@ -342,57 +334,5 @@ export class PermissionsGuard implements CanActivate {
     });
 
     return true;
-  }
-
-  // V1 evaluation method removed - use permission evaluation only
-
-  /**
-   * Extract scope from request (for auto-detection)
-   * @param request - Express request
-   * @returns Scope info or null
-   */
-  private async extractScopeFromRequest(request: Request): Promise<{
-    scopeType: string;
-    scopeId: string;
-  } | null> {
-    const params = request.params as Record<string, string>;
-    const body = request.body as Record<string, unknown>;
-    const query = request.query as Record<string, string>;
-
-    // Try to extract organization scope
-    const orgId =
-      params.organizationId ||
-      params.orgId ||
-      (body.organizationId as string) ||
-      query.organizationId;
-
-    if (orgId) {
-      return { scopeType: 'organization', scopeId: orgId };
-    }
-
-    // Try to extract segment scope
-    if (
-      request.url.includes('/segments/') ||
-      request.url.includes('/segment/')
-    ) {
-      const segmentId =
-        params.segmentId ||
-        params.id ||
-        (body.segmentId as string) ||
-        query.segmentId;
-
-      if (segmentId) {
-        return { scopeType: 'segment', scopeId: segmentId };
-      }
-    }
-
-    // Try to extract other scopes from contexts
-    const contexts =
-      await this.contextResolverService.autoDetectContext(request);
-    if (contexts) {
-      return { scopeType: contexts.type, scopeId: contexts.id };
-    }
-
-    return null;
   }
 }

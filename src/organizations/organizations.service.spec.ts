@@ -4,10 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CacheService } from 'src/shared/services';
 import { PermissionsService } from 'src/permissions/permissions.service';
-import {
-  ORGANIZATION_CONSTANTS,
-  PERMISSION_CONSTANTS,
-} from 'src/shared/constants';
+import { ORGANIZATION_CONSTANTS } from 'src/shared/constants';
 import { OrganizationsService } from './organizations.service';
 import { Organization } from './entities/organization.entity';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
@@ -121,7 +118,7 @@ describe('OrganizationsService', () => {
     findById: jest.fn(),
     assignRole: jest.fn(),
     removeRole: jest.fn(),
-    hasPermission: jest.fn(),
+    evaluate: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -580,13 +577,12 @@ describe('OrganizationsService', () => {
       // Arrange
       const userId = 'user-uuid-123';
       const organizationId = '1234567890123456789';
-      const permission =
-        PERMISSION_CONSTANTS.ORGANIZATION_MANAGE_MEMBERS.toString();
+      const permission = '9'; // Legacy bit position for ORGANIZATION_MANAGE_MEMBERS
 
       jest
         .spyOn(service, 'findById')
         .mockResolvedValue(mockOrganization as Organization);
-      mockPermissionsService.hasPermission = jest.fn().mockResolvedValue(true);
+      mockPermissionsService.evaluate = jest.fn().mockResolvedValue(true);
 
       // Act
       const result = await service.hasOrganizationPermission(
@@ -597,9 +593,10 @@ describe('OrganizationsService', () => {
 
       // Assert
       expect(result).toBe(true);
-      expect(mockPermissionsService.hasPermission).toHaveBeenCalledWith(
+      expect(mockPermissionsService.evaluate).toHaveBeenCalledWith(
         userId,
-        PERMISSION_CONSTANTS.ORGANIZATION_MANAGE_MEMBERS,
+        '9',
+        'organization',
         organizationId,
       );
     });

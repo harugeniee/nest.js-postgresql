@@ -5,8 +5,6 @@ import { Role } from './entities/role.entity';
 import { ScopePermission } from './entities/scope-permission.entity';
 import { UserPermission } from './entities/user-permission.entity';
 import { UserRole } from './entities/user-role.entity';
-import { PermissionHealthCheckService } from './monitoring/health-check.service';
-import { PermissionMetricsService } from './monitoring/permission-metrics.service';
 import { PermissionsController } from './permissions.controller';
 import { PermissionsService } from './permissions.service';
 import {
@@ -14,11 +12,13 @@ import {
   OrganizationContextResolver,
   SegmentContextResolver,
 } from './resolvers';
-import { AuthPermissionService, UserPermissionService } from './services';
+import { UserPermissionService } from './services';
 import { ContextResolverService } from './services/context-resolver.service';
 import { PermissionEvaluator } from './services/permission-evaluator.service';
 import { PermissionRegistry } from './services/permission-registry.service';
+import { RoleService } from './services/role.service';
 import { ScopePermissionService } from './services/scope-permission.service';
+import { UserRoleService } from './services/user-role.service';
 
 /**
  * Permissions module providing Discord-style permission system
@@ -32,8 +32,9 @@ import { ScopePermissionService } from './services/scope-permission.service';
   controllers: [PermissionsController],
   providers: [
     PermissionsService,
+    RoleService,
+    UserRoleService,
     UserPermissionService,
-    AuthPermissionService,
     ContextResolverService,
     SegmentContextResolver,
     OrganizationContextResolver,
@@ -41,19 +42,16 @@ import { ScopePermissionService } from './services/scope-permission.service';
     PermissionRegistry,
     PermissionEvaluator,
     ScopePermissionService,
-    PermissionMetricsService,
-    PermissionHealthCheckService,
   ],
   exports: [
     PermissionsService,
+    RoleService,
+    UserRoleService,
     UserPermissionService,
-    AuthPermissionService,
     ContextResolverService,
     PermissionRegistry,
     PermissionEvaluator,
     ScopePermissionService,
-    PermissionMetricsService,
-    PermissionHealthCheckService,
   ],
 })
 export class PermissionsModule {}

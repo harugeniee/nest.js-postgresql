@@ -6,7 +6,9 @@ import { CacheService } from 'src/shared/services';
 import { IsNull, Repository } from 'typeorm';
 import { CreateScopePermissionDto } from '../dto/create-scope-permission.dto';
 import { ScopePermission } from '../entities/scope-permission.entity';
+import { PermissionKey } from '../types/permission-key.type';
 import { PermissionEvaluator } from './permission-evaluator.service';
+import { PermissionRegistry } from './permission-registry.service';
 
 /**
  * ScopePermissionService
@@ -21,6 +23,7 @@ export class ScopePermissionService extends BaseService<ScopePermission> {
     private readonly scopePermissionRepository: Repository<ScopePermission>,
     cacheService: CacheService,
     private readonly permissionEvaluator: PermissionEvaluator,
+    private readonly permissionRegistry: PermissionRegistry,
   ) {
     super(
       new TypeOrmBaseRepository<ScopePermission>(scopePermissionRepository),
@@ -180,19 +183,22 @@ export class ScopePermissionService extends BaseService<ScopePermission> {
       });
     }
 
+    // Get bitmask for the permission key
+    const bitMask = this.permissionRegistry.getBitMask(
+      permissionKey as PermissionKey,
+    );
+
     // Update the appropriate bitfield
     if (allow) {
-      // Add to allow, remove from deny
-      const currentAllow = BigInt(scopePermission.allowPermissions);
-      // Note: We'd need PermissionRegistry here to get the bit mask
-      // For now, this is a simplified version
-      scopePermission.allowPermissions = currentAllow.toString();
-      scopePermission.denyPermissions = '0'; // Clear deny for this key
+      const currentAllow = BigInt(scopePermission.allowPermissions || '0');
+      scopePermission.allowPermissions = (currentAllow | bitMask).toString();
+      const currentDeny = BigInt(scopePermission.denyPermissions || '0');
+      scopePermission.denyPermissions = (currentDeny & ~bitMask).toString();
     } else {
-      // Add to deny, remove from allow
-      const currentDeny = BigInt(scopePermission.denyPermissions);
-      scopePermission.denyPermissions = currentDeny.toString();
-      scopePermission.allowPermissions = '0'; // Clear allow for this key
+      const currentDeny = BigInt(scopePermission.denyPermissions || '0');
+      scopePermission.denyPermissions = (currentDeny | bitMask).toString();
+      const currentAllow = BigInt(scopePermission.allowPermissions || '0');
+      scopePermission.allowPermissions = (currentAllow & ~bitMask).toString();
     }
 
     const saved = await this.scopePermissionRepository.save(scopePermission);

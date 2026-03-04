@@ -2,19 +2,23 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Organization } from 'src/organizations/entities/organization.entity';
-import { Repository } from 'typeorm';
 import { DEFAULT_ROLES } from './constants/permissions.constants';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
+import { GrantSegmentPermissionDto } from './dto/grant-segment-permission.dto';
+import { RevokeSegmentPermissionDto } from './dto/revoke-segment-permission.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { Role } from './entities/role.entity';
+import { UserPermission } from './entities/user-permission.entity';
 import { UserRole } from './entities/user-role.entity';
 import { PermissionsService } from './permissions.service';
+import { PermissionEvaluator } from './services/permission-evaluator.service';
+import { PermissionRegistry } from './services/permission-registry.service';
+import { RoleService } from './services/role.service';
+import { ScopePermissionService } from './services/scope-permission.service';
 import { UserPermissionService } from './services/user-permission.service';
+import { UserRoleService } from './services/user-role.service';
 
-/**
- * Helper function to create a complete mock Role object for testing
- */
 function createMockRole(overrides: Partial<Role> = {}): Role {
   return {
     id: overrides.id || 'role-id',
@@ -44,6 +48,8 @@ function createMockRole(overrides: Partial<Role> = {}): Role {
     setDenyPermissionsFromBigInt: jest.fn(),
     isEveryoneRole: jest.fn(() => false),
     isAdmin: jest.fn(() => false),
+    isScoped: jest.fn(() => false),
+    isGlobal: jest.fn(() => true),
     toJSON: jest.fn(),
     isDeleted: jest.fn(() => false),
     getAge: jest.fn(() => 0),
@@ -53,495 +59,387 @@ function createMockRole(overrides: Partial<Role> = {}): Role {
 }
 
 /**
- * Unit tests for PermissionsService focusing on permission calculation algorithm
- * Tests 5+ canonical scenarios as required
+ * Unit tests for PermissionsService (facade)
+ * Verifies delegation to sub-services
  */
 describe('PermissionsService', () => {
   let service: PermissionsService;
-  let roleRepository: Repository<Role>;
-  let userRoleRepository: Repository<UserRole>;
 
-  const mockCacheService = {
-    get: jest.fn(),
-    set: jest.fn(),
-    delete: jest.fn(),
-    deleteKeysByPattern: jest.fn(),
+  const mockRoleService = {
+    createRole: jest.fn(),
+    updateRole: jest.fn(),
+    findById: jest.fn(),
+    findOne: jest.fn(),
+    update: jest.fn(),
+    remove: jest.fn(),
+    findRoleByName: jest.fn(),
+    getAllRoles: jest.fn(),
+    createDefaultRoles: jest.fn(),
+    updateRolePermissions: jest.fn(),
+  };
+
+  const mockUserRoleService = {
+    assignRole: jest.fn(),
+    removeRole: jest.fn(),
+    getUserRoles: jest.fn(),
+    getUsersWithRole: jest.fn(),
+    hasRoleName: jest.fn(),
+  };
+
+  const mockPermissionEvaluator = {
+    evaluate: jest.fn(),
+    getEffectivePermissions: jest.fn(),
+    invalidateUserCache: jest.fn(),
+  };
+
+  const mockScopePermissionService = {
+    grantScopePermission: jest.fn(),
+    revokeScopePermission: jest.fn(),
+  };
+
+  const mockPermissionRegistry = {
+    getBitMask: jest.fn(),
+    getBitMasks: jest.fn(),
   };
 
   const mockUserPermissionService = {
     refreshUserPermissions: jest.fn(),
   };
 
+  const mockUserPermissionRepository = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
+    softDelete: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PermissionsService,
+        { provide: RoleService, useValue: mockRoleService },
+        { provide: UserRoleService, useValue: mockUserRoleService },
+        { provide: PermissionEvaluator, useValue: mockPermissionEvaluator },
         {
-          provide: getRepositoryToken(Role),
-          useValue: {
-            find: jest.fn(),
-            findOne: jest.fn(),
-            save: jest.fn(),
-            create: jest.fn(),
-            remove: jest.fn(),
-            metadata: {
-              columns: [
-                { propertyName: 'deletedAt' },
-                { propertyName: 'id' },
-                { propertyName: 'name' },
-                { propertyName: 'permissions' },
-              ],
-            },
-          },
+          provide: ScopePermissionService,
+          useValue: mockScopePermissionService,
         },
+        { provide: PermissionRegistry, useValue: mockPermissionRegistry },
+        { provide: UserPermissionService, useValue: mockUserPermissionService },
         {
-          provide: getRepositoryToken(UserRole),
-          useValue: {
-            find: jest.fn(),
-            findOne: jest.fn(),
-            save: jest.fn(),
-            remove: jest.fn(),
-            metadata: {
-              columns: [
-                { propertyName: 'deletedAt' },
-                { propertyName: 'id' },
-                { propertyName: 'userId' },
-                { propertyName: 'roleId' },
-              ],
-            },
-          },
-        },
-        {
-          provide: 'CacheService',
-          useValue: mockCacheService,
-        },
-        {
-          provide: UserPermissionService,
-          useValue: mockUserPermissionService,
+          provide: getRepositoryToken(UserPermission),
+          useValue: mockUserPermissionRepository,
         },
       ],
     }).compile();
 
     service = module.get<PermissionsService>(PermissionsService);
-    roleRepository = module.get<Repository<Role>>(getRepositoryToken(Role));
-    userRoleRepository = module.get<Repository<UserRole>>(
-      getRepositoryToken(UserRole),
-    );
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
+  // ==================== Role CRUD delegation ====================
+
   describe('createRole', () => {
-    it('should create a new role successfully', async () => {
-      // Arrange
-      const createDto: CreateRoleDto = {
-        name: 'test-role',
-        description: 'A test role',
-        permissions: '123',
-        position: 1,
-        color: '#ff0000',
-        mentionable: true,
-        managed: false,
-        icon: 'https://example.com/icon.png',
-        unicodeEmoji: '👑',
-      };
+    it('should delegate to RoleService.createRole', async () => {
+      const dto: CreateRoleDto = { name: 'test-role', permissions: '123' };
+      const expected = createMockRole({ name: 'test-role' });
+      mockRoleService.createRole.mockResolvedValue(expected);
 
-      const expectedRole = createMockRole({
-        name: createDto.name,
-        description: createDto.description,
-        allowPermissions: createDto.permissions,
-        denyPermissions: '0',
-        position: createDto.position,
-        color: createDto.color,
-        mentionable: createDto.mentionable,
-        managed: createDto.managed,
-        icon: createDto.icon,
-        unicodeEmoji: createDto.unicodeEmoji,
-      });
+      const result = await service.createRole(dto);
 
-      jest.spyOn(service, 'create').mockResolvedValue(expectedRole);
-
-      // Act
-      const result = await service.createRole(createDto);
-
-      // Assert
-      expect(result).toEqual(expectedRole);
-      expect(service.create).toHaveBeenCalledWith({
-        name: createDto.name,
-        description: createDto.description,
-        allowPermissions: createDto.permissions,
-        denyPermissions: '0',
-        position: createDto.position,
-        color: createDto.color,
-        mentionable: createDto.mentionable,
-        managed: createDto.managed,
-        icon: createDto.icon,
-        unicodeEmoji: createDto.unicodeEmoji,
-      });
-    });
-
-    it('should create role with default values', async () => {
-      // Arrange
-      const createDto: CreateRoleDto = {
-        name: 'minimal-role',
-      };
-
-      const expectedRole = createMockRole({
-        name: createDto.name,
-        allowPermissions: '0',
-        denyPermissions: '0',
-        position: 0,
-        mentionable: false,
-        managed: false,
-      });
-
-      jest.spyOn(service, 'create').mockResolvedValue(expectedRole);
-
-      // Act
-      const result = await service.createRole(createDto);
-
-      // Assert
-      expect(result).toEqual(expectedRole);
-      expect(service.create).toHaveBeenCalledWith({
-        name: createDto.name,
-        description: undefined,
-        allowPermissions: '0',
-        denyPermissions: '0',
-        position: 0,
-        color: undefined,
-        mentionable: false,
-        managed: false,
-        icon: undefined,
-        unicodeEmoji: undefined,
-      });
-    });
-
-    it('should throw HttpException when role creation fails', async () => {
-      // Arrange
-      const createDto: CreateRoleDto = {
-        name: 'test-role',
-      };
-
-      const error = new Error('Database connection failed');
-      jest.spyOn(service, 'create').mockRejectedValue(error);
-
-      // Act & Assert
-      await expect(service.createRole(createDto)).rejects.toThrow(Error);
+      expect(result).toEqual(expected);
+      expect(mockRoleService.createRole).toHaveBeenCalledWith(dto);
     });
   });
 
   describe('updateRole', () => {
-    it('should update role successfully', async () => {
-      // Arrange
-      const roleId = 'role-123';
-      const updateDto: UpdateRoleDto = {
-        name: 'updated-role',
-        description: 'Updated description',
-        permissions: '456',
-      };
+    it('should delegate to RoleService.updateRole', async () => {
+      const dto: UpdateRoleDto = { name: 'updated' };
+      const expected = createMockRole({ name: 'updated' });
+      mockRoleService.updateRole.mockResolvedValue(expected);
 
-      const existingRole = createMockRole({ id: roleId, name: 'old-name' });
-      const updatedRole = createMockRole({ ...existingRole, ...updateDto });
+      const result = await service.updateRole('role-1', dto);
 
-      jest.spyOn(service, 'findById').mockResolvedValue(existingRole);
-      jest.spyOn(service, 'update').mockResolvedValue(updatedRole);
-
-      // Act
-      const result = await service.updateRole(roleId, updateDto);
-
-      // Assert
-      expect(result).toEqual(updatedRole);
-      expect(service.findById).toHaveBeenCalledWith(roleId);
-      expect(service.update).toHaveBeenCalledWith(roleId, {
-        name: updateDto.name,
-        description: updateDto.description,
-        allowPermissions: updateDto.permissions,
-        denyPermissions: '0',
-      });
+      expect(result).toEqual(expected);
+      expect(mockRoleService.updateRole).toHaveBeenCalledWith('role-1', dto);
     });
 
-    it('should throw HttpException when role not found', async () => {
-      // Arrange
-      const roleId = 'non-existent-role';
-      const updateDto: UpdateRoleDto = { name: 'updated-name' };
+    it('should propagate HttpException from RoleService', async () => {
+      mockRoleService.updateRole.mockRejectedValue(
+        new HttpException('permission.ROLE_NOT_FOUND', HttpStatus.NOT_FOUND),
+      );
 
-      jest
-        .spyOn(service, 'findById')
-        .mockRejectedValue(
-          new HttpException('permission.ROLE_NOT_FOUND', HttpStatus.NOT_FOUND),
-        );
-
-      // Act & Assert
-      await expect(service.updateRole(roleId, updateDto)).rejects.toThrow(
+      await expect(service.updateRole('bad-id', { name: 'x' })).rejects.toThrow(
         HttpException,
-      );
-      await expect(service.updateRole(roleId, updateDto)).rejects.toThrow(
-        'permission.ROLE_NOT_FOUND',
-      );
-    });
-
-    it('should throw HttpException when update fails', async () => {
-      // Arrange
-      const roleId = 'role-123';
-      const updateDto: UpdateRoleDto = { name: 'updated-name' };
-
-      const existingRole = createMockRole({ id: roleId });
-      jest.spyOn(service, 'findById').mockResolvedValue(existingRole);
-
-      const error = new Error('Database update failed');
-      jest.spyOn(service, 'update').mockRejectedValue(error);
-
-      // Act & Assert
-      await expect(service.updateRole(roleId, updateDto)).rejects.toThrow(
-        Error,
       );
     });
   });
 
+  describe('findById', () => {
+    it('should delegate to RoleService.findById', async () => {
+      const expected = createMockRole({ id: 'role-1' });
+      mockRoleService.findById.mockResolvedValue(expected);
+
+      const result = await service.findById('role-1');
+
+      expect(result).toEqual(expected);
+      expect(mockRoleService.findById).toHaveBeenCalledWith('role-1');
+    });
+  });
+
+  describe('getAllRoles', () => {
+    it('should delegate to RoleService.getAllRoles', async () => {
+      const roles = [createMockRole(), createMockRole({ name: 'role-2' })];
+      mockRoleService.getAllRoles.mockResolvedValue(roles);
+
+      const result = await service.getAllRoles();
+
+      expect(result).toEqual(roles);
+      expect(mockRoleService.getAllRoles).toHaveBeenCalled();
+    });
+  });
+
+  describe('createDefaultRoles', () => {
+    it('should delegate to RoleService.createDefaultRoles', async () => {
+      const org = { id: 'org-1', slug: 'test-org' } as Organization;
+      const roles = [
+        createMockRole({ name: `test-org-${DEFAULT_ROLES.EVERYONE}` }),
+        createMockRole({ name: `test-org-${DEFAULT_ROLES.MEMBER}` }),
+        createMockRole({ name: `test-org-${DEFAULT_ROLES.MODERATOR}` }),
+        createMockRole({ name: `test-org-${DEFAULT_ROLES.ADMIN}` }),
+        createMockRole({
+          name: `test-org-${DEFAULT_ROLES.OWNER}`,
+          allowPermissions: (~0n).toString(),
+        }),
+      ];
+      mockRoleService.createDefaultRoles.mockResolvedValue(roles);
+
+      const result = await service.createDefaultRoles(org);
+
+      expect(result).toHaveLength(5);
+      expect(mockRoleService.createDefaultRoles).toHaveBeenCalledWith(org);
+      expect(BigInt(result[4].allowPermissions || '0')).toBe(~0n);
+    });
+  });
+
+  // ==================== User-Role delegation ====================
+
   describe('assignRole', () => {
-    it('should assign role to user successfully', async () => {
-      // Arrange
-      const assignDto: AssignRoleDto = {
-        userId: 'user-123',
-        roleId: 'role-456',
-        reason: 'Test assignment',
-        assignedBy: 'admin-789',
-        isTemporary: false,
-        expiresAt: '2024-12-31T23:59:59.000Z',
+    it('should delegate to UserRoleService.assignRole', async () => {
+      const dto: AssignRoleDto = {
+        userId: 'user-1',
+        roleId: 'role-1',
+        reason: 'test',
       };
-
-      const role = createMockRole({ id: assignDto.roleId });
-      const userRole = {
-        id: 'user-role-123',
-        userId: assignDto.userId,
-        roleId: assignDto.roleId,
-        reason: assignDto.reason,
-        assignedBy: assignDto.assignedBy,
-        isTemporary: assignDto.isTemporary,
-        expiresAt: assignDto.expiresAt
-          ? new Date(assignDto.expiresAt)
-          : undefined,
-        createdAt: new Date(),
+      const expected = {
+        id: 'ur-1',
+        userId: 'user-1',
+        roleId: 'role-1',
       } as UserRole;
+      mockUserRoleService.assignRole.mockResolvedValue(expected);
 
-      jest.spyOn(service, 'findById').mockResolvedValue(role);
-      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(null); // No existing assignment
-      jest.spyOn(userRoleRepository, 'save').mockResolvedValue(userRole);
-      mockUserPermissionService.refreshUserPermissions.mockResolvedValue(
-        undefined,
-      );
+      const result = await service.assignRole(dto);
 
-      // Act
-      const result = await service.assignRole(assignDto);
-
-      // Assert
-      expect(result).toEqual(userRole);
-      expect(service.findById).toHaveBeenCalledWith(assignDto.roleId);
-      expect(userRoleRepository.findOne).toHaveBeenCalledWith({
-        where: { userId: assignDto.userId, roleId: assignDto.roleId },
-      });
-      expect(userRoleRepository.save).toHaveBeenCalledWith({
-        userId: assignDto.userId,
-        roleId: assignDto.roleId,
-        reason: assignDto.reason,
-        assignedBy: assignDto.assignedBy,
-        isTemporary: assignDto.isTemporary,
-        expiresAt: assignDto.expiresAt
-          ? new Date(assignDto.expiresAt)
-          : undefined,
-      });
-      expect(
-        mockUserPermissionService.refreshUserPermissions,
-      ).toHaveBeenCalledWith(assignDto.userId);
-    });
-
-    it('should throw HttpException when role not found', async () => {
-      // Arrange
-      const assignDto: AssignRoleDto = {
-        userId: 'user-123',
-        roleId: 'non-existent-role',
-      };
-
-      jest
-        .spyOn(service, 'findById')
-        .mockRejectedValue(
-          new HttpException('permission.ROLE_NOT_FOUND', HttpStatus.NOT_FOUND),
-        );
-
-      // Act & Assert
-      await expect(service.assignRole(assignDto)).rejects.toThrow(
-        HttpException,
-      );
-      await expect(service.assignRole(assignDto)).rejects.toThrow(
-        'permission.ROLE_NOT_FOUND',
-      );
-    });
-
-    it('should throw HttpException when role already assigned', async () => {
-      // Arrange
-      const assignDto: AssignRoleDto = {
-        userId: 'user-123',
-        roleId: 'role-456',
-      };
-
-      const role = createMockRole({ id: assignDto.roleId });
-      const existingAssignment = {
-        id: 'existing-assignment',
-        userId: assignDto.userId,
-        roleId: assignDto.roleId,
-      } as UserRole;
-
-      jest.spyOn(service, 'findById').mockResolvedValue(role);
-      jest
-        .spyOn(userRoleRepository, 'findOne')
-        .mockResolvedValue(existingAssignment);
-
-      // Act & Assert
-      await expect(service.assignRole(assignDto)).rejects.toThrow(
-        HttpException,
-      );
-    });
-
-    it('should throw HttpException when assignment fails', async () => {
-      // Arrange
-      const assignDto: AssignRoleDto = {
-        userId: 'user-123',
-        roleId: 'role-456',
-      };
-
-      const role = createMockRole({ id: assignDto.roleId });
-      jest.spyOn(service, 'findById').mockResolvedValue(role);
-      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(null);
-
-      const error = new Error('Database save failed');
-      jest.spyOn(userRoleRepository, 'save').mockRejectedValue(error);
-
-      // Act & Assert
-      await expect(service.assignRole(assignDto)).rejects.toThrow(
-        HttpException,
-      );
-      await expect(service.assignRole(assignDto)).rejects.toThrow(Error);
+      expect(result).toEqual(expected);
+      expect(mockUserRoleService.assignRole).toHaveBeenCalledWith(dto);
     });
   });
 
   describe('removeRole', () => {
-    it('should remove role from user successfully', async () => {
-      // Arrange
-      const userId = 'user-123';
-      const roleId = 'role-456';
-      const userRole = {
-        id: 'user-role-123',
-        userId,
-        roleId,
-        createdAt: new Date(),
-      } as UserRole;
+    it('should delegate to UserRoleService.removeRole', async () => {
+      mockUserRoleService.removeRole.mockResolvedValue(undefined);
 
-      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(userRole);
-      jest.spyOn(userRoleRepository, 'remove').mockResolvedValue(userRole);
-      mockUserPermissionService.refreshUserPermissions.mockResolvedValue(
-        undefined,
-      );
+      await service.removeRole('user-1', 'role-1');
 
-      // Act
-      await service.removeRole(userId, roleId);
-
-      // Assert
-      expect(userRoleRepository.findOne).toHaveBeenCalledWith({
-        where: { userId, roleId },
-      });
-      expect(userRoleRepository.remove).toHaveBeenCalledWith(userRole);
-      expect(
-        mockUserPermissionService.refreshUserPermissions,
-      ).toHaveBeenCalledWith(userId);
-    });
-
-    it('should throw HttpException when role assignment not found', async () => {
-      // Arrange
-      const userId = 'user-123';
-      const roleId = 'role-456';
-
-      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(null);
-
-      // Act & Assert
-      await expect(service.removeRole(userId, roleId)).rejects.toThrow(
-        HttpException,
-      );
-      await expect(service.removeRole(userId, roleId)).rejects.toThrow(
-        HttpException,
+      expect(mockUserRoleService.removeRole).toHaveBeenCalledWith(
+        'user-1',
+        'role-1',
       );
     });
 
-    it('should throw HttpException when removal fails', async () => {
-      // Arrange
-      const userId = 'user-123';
-      const roleId = 'role-456';
-      const userRole = {
-        id: 'user-role-123',
-        userId,
-        roleId,
-        createdAt: new Date(),
-      } as UserRole;
+    it('should propagate HttpException when assignment not found', async () => {
+      mockUserRoleService.removeRole.mockRejectedValue(
+        new HttpException(
+          'permission.USER_ROLE_NOT_FOUND',
+          HttpStatus.NOT_FOUND,
+        ),
+      );
 
-      jest.spyOn(userRoleRepository, 'findOne').mockResolvedValue(userRole);
-
-      const error = new Error('Database remove failed');
-      jest.spyOn(userRoleRepository, 'remove').mockRejectedValue(error);
-
-      // Act & Assert
-      await expect(service.removeRole(userId, roleId)).rejects.toThrow(
+      await expect(service.removeRole('user-1', 'role-1')).rejects.toThrow(
         HttpException,
       );
-      await expect(service.removeRole(userId, roleId)).rejects.toThrow(Error);
     });
   });
 
-  // Note: computeEffectivePermissions and hasPermission(bigint) methods removed
-  // Use getUserEffectivePermissions() and evaluate() methods instead
+  describe('getUserRoles', () => {
+    it('should delegate to UserRoleService.getUserRoles', async () => {
+      const roles = [{ id: 'ur-1' } as UserRole];
+      mockUserRoleService.getUserRoles.mockResolvedValue(roles);
 
-  describe('createDefaultRoles', () => {
-    it('should create default roles with correct permissions', async () => {
-      // Arrange
-      const mockOrganization = {
-        id: 'org-123',
-        slug: 'test-org',
-      } as Organization;
+      const result = await service.getUserRoles('user-1');
 
-      const mockRoles: Role[] = [];
-      jest.spyOn(service, 'create').mockImplementation(async (data) => {
-        const role = {
-          ...data,
-          id: `role-${mockRoles.length}`,
-          createdAt: new Date(),
-        } as Role;
-        mockRoles.push(role);
-        return role;
+      expect(result).toEqual(roles);
+      expect(mockUserRoleService.getUserRoles).toHaveBeenCalledWith('user-1');
+    });
+  });
+
+  describe('hasRoleName', () => {
+    it('should delegate to UserRoleService.hasRoleName', async () => {
+      mockUserRoleService.hasRoleName.mockResolvedValue(true);
+
+      const result = await service.hasRoleName('user-1', 'admin');
+
+      expect(result).toBe(true);
+      expect(mockUserRoleService.hasRoleName).toHaveBeenCalledWith(
+        'user-1',
+        'admin',
+      );
+    });
+  });
+
+  // ==================== Permission evaluation delegation ====================
+
+  describe('evaluate', () => {
+    it('should delegate to PermissionEvaluator.evaluate', async () => {
+      mockPermissionEvaluator.evaluate.mockResolvedValue(true);
+
+      const result = await service.evaluate(
+        'user-1',
+        'article.read',
+        'organization',
+        'org-1',
+      );
+
+      expect(result).toBe(true);
+      expect(mockPermissionEvaluator.evaluate).toHaveBeenCalledWith(
+        'user-1',
+        'article.read',
+        'organization',
+        'org-1',
+      );
+    });
+  });
+
+  describe('getUserEffectivePermissions', () => {
+    it('should delegate to PermissionEvaluator.getEffectivePermissions', async () => {
+      const effective = { allowPermissions: 123n, denyPermissions: 0n };
+      mockPermissionEvaluator.getEffectivePermissions.mockResolvedValue(
+        effective,
+      );
+
+      const result = await service.getUserEffectivePermissions('user-1');
+
+      expect(result).toEqual(effective);
+      expect(
+        mockPermissionEvaluator.getEffectivePermissions,
+      ).toHaveBeenCalledWith('user-1', undefined, undefined);
+    });
+  });
+
+  // ==================== Segment permissions ====================
+
+  describe('grantSegmentPermission', () => {
+    it('should grant segment permission successfully', async () => {
+      const dto: GrantSegmentPermissionDto = {
+        userId: 'user-1',
+        segmentId: 'seg-1',
+        permission: 'segment.update',
+        reason: 'test',
+        grantedBy: 'admin-1',
+      };
+
+      mockPermissionRegistry.getBitMask.mockReturnValue(4n);
+      mockUserPermissionRepository.findOne.mockResolvedValue(null);
+      mockUserPermissionRepository.save.mockResolvedValue({
+        id: 'up-1',
+        ...dto,
       });
+      mockUserPermissionService.refreshUserPermissions.mockResolvedValue(
+        undefined,
+      );
+      mockPermissionEvaluator.invalidateUserCache.mockResolvedValue(undefined);
 
-      // Act
-      const result = await service.createDefaultRoles(mockOrganization);
+      const result = await service.grantSegmentPermission(dto);
 
-      // Assert
-      expect(result).toHaveLength(5);
-      expect(result[0].name).toBe(
-        `${mockOrganization.slug}-${DEFAULT_ROLES.EVERYONE}`,
+      expect(result).toBeDefined();
+      expect(mockPermissionRegistry.getBitMask).toHaveBeenCalledWith(
+        'segment.update',
       );
-      expect(result[1].name).toBe(
-        `${mockOrganization.slug}-${DEFAULT_ROLES.MEMBER}`,
-      );
-      expect(result[2].name).toBe(
-        `${mockOrganization.slug}-${DEFAULT_ROLES.MODERATOR}`,
-      );
-      expect(result[3].name).toBe(
-        `${mockOrganization.slug}-${DEFAULT_ROLES.ADMIN}`,
-      );
-      expect(result[4].name).toBe(
-        `${mockOrganization.slug}-${DEFAULT_ROLES.OWNER}`,
-      );
+      expect(mockUserPermissionRepository.save).toHaveBeenCalled();
+    });
 
-      // Check that owner has all permissions
-      expect(BigInt(result[4].allowPermissions || '0')).toBe(~0n); // All permissions
+    it('should throw when permission key is invalid', async () => {
+      const dto: GrantSegmentPermissionDto = {
+        userId: 'user-1',
+        segmentId: 'seg-1',
+        permission: 'invalid.key' as any,
+      };
+
+      mockPermissionRegistry.getBitMask.mockReturnValue(0n);
+
+      await expect(service.grantSegmentPermission(dto)).rejects.toThrow(
+        HttpException,
+      );
+    });
+  });
+
+  describe('revokeSegmentPermission', () => {
+    it('should revoke segment permission successfully', async () => {
+      const dto: RevokeSegmentPermissionDto = {
+        userId: 'user-1',
+        segmentId: 'seg-1',
+        permission: 'segment.update',
+      };
+
+      const existing = {
+        id: 'up-1',
+        isDeleted: jest.fn(() => false),
+      } as any;
+      mockUserPermissionRepository.findOne.mockResolvedValue(existing);
+      mockUserPermissionRepository.softDelete.mockResolvedValue(undefined);
+      mockUserPermissionService.refreshUserPermissions.mockResolvedValue(
+        undefined,
+      );
+      mockPermissionEvaluator.invalidateUserCache.mockResolvedValue(undefined);
+
+      await service.revokeSegmentPermission(dto);
+
+      expect(mockUserPermissionRepository.softDelete).toHaveBeenCalledWith(
+        'up-1',
+      );
+    });
+
+    it('should throw when permission not found', async () => {
+      const dto: RevokeSegmentPermissionDto = {
+        userId: 'user-1',
+        segmentId: 'seg-1',
+        permission: 'segment.update',
+      };
+
+      mockUserPermissionRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.revokeSegmentPermission(dto)).rejects.toThrow(
+        HttpException,
+      );
+    });
+  });
+
+  describe('canUpdateSegment', () => {
+    it('should delegate to PermissionEvaluator.evaluate with segment context', async () => {
+      mockPermissionEvaluator.evaluate.mockResolvedValue(true);
+
+      const result = await service.canUpdateSegment('user-1', 'seg-1');
+
+      expect(result).toBe(true);
+      expect(mockPermissionEvaluator.evaluate).toHaveBeenCalledWith(
+        'user-1',
+        'segment.update',
+        'segment',
+        'seg-1',
+      );
     });
   });
 });

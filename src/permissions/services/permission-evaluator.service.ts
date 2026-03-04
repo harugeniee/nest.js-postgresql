@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Role } from 'src/permissions/entities/role.entity';
 import { ScopePermission } from 'src/permissions/entities/scope-permission.entity';
 import { UserPermission } from 'src/permissions/entities/user-permission.entity';
 import { UserRole } from 'src/permissions/entities/user-role.entity';
@@ -18,7 +17,7 @@ import {
   evaluatePermissionWithPrecedence,
 } from 'src/permissions/utils/evaluation.util';
 import { CacheService } from 'src/shared/services';
-import { In, IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 
 /**
  * Cached effective permissions structure
@@ -46,8 +45,6 @@ export class PermissionEvaluator {
   constructor(
     @InjectRepository(ScopePermission)
     private readonly scopePermissionRepository: Repository<ScopePermission>,
-    @InjectRepository(Role)
-    private readonly roleRepository: Repository<Role>,
     @InjectRepository(UserRole)
     private readonly userRoleRepository: Repository<UserRole>,
     @InjectRepository(UserPermission)
@@ -211,7 +208,85 @@ export class PermissionEvaluator {
   }
 
   /**
-   * Load all permission sources for evaluation
+   * Evaluate multiple permission keys in a single batch.
+   * Loads permission sources once and checks all keys against them.
+   * @param userId - User ID
+   * @param permissionKeys - Array of PermissionKeys to check
+   * @param scopeType - Optional scope type
+   * @param scopeId - Optional scope ID
+   * @returns Map of PermissionKey → boolean
+   */
+  async evaluateBatch(
+    userId: string,
+    permissionKeys: PermissionKey[],
+    scopeType?: string,
+    scopeId?: string,
+  ): Promise<Map<PermissionKey, boolean>> {
+    const context: EvaluationContext = { userId, scopeType, scopeId };
+    const sources = await this.loadPermissionSources(context);
+    const results = new Map<PermissionKey, boolean>();
+
+    for (const key of permissionKeys) {
+      const bitIndex = this.permissionRegistry.getBitIndex(key);
+      if (bitIndex === null) {
+        results.set(key, false);
+        continue;
+      }
+      const evaluation = evaluatePermissionWithPrecedence(
+        sources.scopeAllow,
+        sources.scopeDeny,
+        sources.roleAllow,
+        sources.roleDeny,
+        sources.userAllow,
+        sources.userDeny,
+        bitIndex,
+      );
+      results.set(key, evaluation.allowed);
+    }
+
+    return results;
+  }
+
+  /**
+   * Check if user has ALL of the given permissions (batch).
+   */
+  async hasAllPermissions(
+    userId: string,
+    permissionKeys: PermissionKey[],
+    scopeType?: string,
+    scopeId?: string,
+  ): Promise<boolean> {
+    const results = await this.evaluateBatch(
+      userId,
+      permissionKeys,
+      scopeType,
+      scopeId,
+    );
+    return permissionKeys.every((k) => results.get(k) === true);
+  }
+
+  /**
+   * Check if user has ANY of the given permissions (batch).
+   */
+  async hasAnyPermission(
+    userId: string,
+    permissionKeys: PermissionKey[],
+    scopeType?: string,
+    scopeId?: string,
+  ): Promise<boolean> {
+    const results = await this.evaluateBatch(
+      userId,
+      permissionKeys,
+      scopeType,
+      scopeId,
+    );
+    return permissionKeys.some((k) => results.get(k) === true);
+  }
+
+  /**
+   * Load all permission sources for evaluation.
+   * Optimized: runs 3 independent queries in parallel and filters
+   * roles from the eager-loaded relation (no extra DB queries).
    * @param context - Evaluation context
    * @returns Aggregated permission bitfields
    */
@@ -223,128 +298,81 @@ export class PermissionEvaluator {
     userAllow: bigint;
     userDeny: bigint;
   }> {
-    // 1. Load scope permissions
-    let scopeAllow = 0n;
-    let scopeDeny = 0n;
-    if (context.scopeType && context.scopeId) {
-      const scopePermissions = await this.scopePermissionRepository.find({
-        where: {
-          scopeType: context.scopeType,
-          scopeId: context.scopeId,
-        },
-      });
+    const hasScope = !!(context.scopeType && context.scopeId);
 
-      const validScopePermissions = scopePermissions.filter((sp) =>
-        sp.isValid(),
-      );
-      scopeAllow = aggregateAllowBitfields(
-        validScopePermissions.map((sp) => sp.getAllowPermissionsAsBigInt()),
-      );
-      scopeDeny = aggregateDenyBitfields(
-        validScopePermissions.map((sp) => sp.getDenyPermissionsAsBigInt()),
-      );
-    }
-
-    // 2. Load user roles (global + scoped)
-    const userRoles = await this.userRoleRepository.find({
-      where: {
-        userId: context.userId,
-      },
-      relations: ['role'],
-    });
-
-    const validUserRoles = userRoles.filter((ur) => ur.isValid());
-    const roleIds = validUserRoles.map((ur) => ur.roleId);
-
-    // Get global roles and scoped roles
-    // Query global roles (where scopeType and scopeId are null)
-    const globalRoles: Role[] =
-      roleIds.length > 0
-        ? await this.roleRepository.find({
+    // Run 3 independent queries in parallel (down from 5 sequential)
+    const [scopePermissions, userRoles, userPermissions] = await Promise.all([
+      hasScope
+        ? this.scopePermissionRepository.find({
             where: {
-              id: In(roleIds),
-              scopeType: IsNull(),
-              scopeId: IsNull(),
-            },
-          })
-        : [];
-
-    // Query scoped roles if context has scope
-    const scopedRoles: Role[] =
-      context.scopeType && context.scopeId && roleIds.length > 0
-        ? await this.roleRepository.find({
-            where: {
-              id: In(roleIds),
               scopeType: context.scopeType,
               scopeId: context.scopeId,
             },
           })
-        : [];
+        : Promise.resolve([] as ScopePermission[]),
+      this.userRoleRepository.find({
+        where: { userId: context.userId },
+        relations: ['role'],
+      }),
+      this.userPermissionRepository.find({
+        where: { userId: context.userId },
+      }),
+    ]);
 
-    // Combine global and scoped roles
-    const roles: Role[] = [...globalRoles, ...scopedRoles];
+    // Process scope permissions
+    const validScopePermissions = scopePermissions.filter((sp) => sp.isValid());
+    const scopeAllow = aggregateAllowBitfields(
+      validScopePermissions.map((sp) => sp.getAllowPermissionsAsBigInt()),
+    );
+    const scopeDeny = aggregateDenyBitfields(
+      validScopePermissions.map((sp) => sp.getDenyPermissionsAsBigInt()),
+    );
 
-    // Aggregate role permissions
-    const roleAllowBitfields: bigint[] = [];
-    const roleDenyBitfields: bigint[] = [];
-
-    for (const role of roles) {
-      // Use allowPermissions and denyPermissions fields
-      if (
-        role.allowPermissions !== null &&
-        role.allowPermissions !== undefined
-      ) {
-        roleAllowBitfields.push(role.getAllowPermissionsAsBigInt());
-      }
-
-      if (role.denyPermissions !== null && role.denyPermissions !== undefined) {
-        roleDenyBitfields.push(role.getDenyPermissionsAsBigInt());
-      }
-    }
-
-    const roleAllow = aggregateAllowBitfields(roleAllowBitfields);
-    const roleDeny = aggregateDenyBitfields(roleDenyBitfields);
-
-    // 3. Load user permissions (global + scoped)
-    const userPermissions: UserPermission[] =
-      await this.userPermissionRepository.find({
-        where: {
-          userId: context.userId,
-        },
+    // Filter roles in memory from eager-loaded relation (eliminates 2 extra queries)
+    const validUserRoles = userRoles.filter((ur) => ur.isValid() && ur.role);
+    const roles = validUserRoles
+      .map((ur) => ur.role)
+      .filter((role) => {
+        const isGlobal = !role.scopeType && !role.scopeId;
+        const isMatchingScope =
+          hasScope &&
+          role.scopeType === context.scopeType &&
+          role.scopeId === context.scopeId;
+        return isGlobal || isMatchingScope;
       });
 
-    const validUserPermissions: UserPermission[] = userPermissions.filter(
-      (up) => up.isValid(),
+    const roleAllow = aggregateAllowBitfields(
+      roles
+        .filter((r) => r.allowPermissions != null)
+        .map((r) => r.getAllowPermissionsAsBigInt()),
     );
-    const globalUserPermissions = validUserPermissions.filter(
-      (up) => !up.contextType && !up.contextId,
+    const roleDeny = aggregateDenyBitfields(
+      roles
+        .filter((r) => r.denyPermissions != null)
+        .map((r) => r.getDenyPermissionsAsBigInt()),
     );
-    const scopedUserPermissions =
-      context.scopeType && context.scopeId
-        ? validUserPermissions.filter(
-            (up) =>
-              up.contextType === context.scopeType &&
-              up.contextId === context.scopeId,
-          )
-        : [];
 
-    // Aggregate user permissions
-    const userAllowBitfields: bigint[] = [];
-    const userDenyBitfields: bigint[] = [];
+    // Process user permissions — filter in memory
+    const validUserPermissions = userPermissions.filter((up) => up.isValid());
+    const relevantUserPermissions = validUserPermissions.filter((up) => {
+      const isGlobal = !up.contextType && !up.contextId;
+      const isMatchingScope =
+        hasScope &&
+        up.contextType === context.scopeType &&
+        up.contextId === context.scopeId;
+      return isGlobal || isMatchingScope;
+    });
 
-    for (const up of [...globalUserPermissions, ...scopedUserPermissions]) {
-      // Use allowPermissions and denyPermissions fields
-      if (up.allowPermissions !== null && up.allowPermissions !== undefined) {
-        userAllowBitfields.push(up.getAllowPermissionsAsBigInt());
-      }
-
-      if (up.denyPermissions !== null && up.denyPermissions !== undefined) {
-        userDenyBitfields.push(up.getDenyPermissionsAsBigInt());
-      }
-    }
-
-    const userAllow = aggregateAllowBitfields(userAllowBitfields);
-    const userDeny = aggregateDenyBitfields(userDenyBitfields);
+    const userAllow = aggregateAllowBitfields(
+      relevantUserPermissions
+        .filter((up) => up.allowPermissions != null)
+        .map((up) => up.getAllowPermissionsAsBigInt()),
+    );
+    const userDeny = aggregateDenyBitfields(
+      relevantUserPermissions
+        .filter((up) => up.denyPermissions != null)
+        .map((up) => up.getDenyPermissionsAsBigInt()),
+    );
 
     return {
       scopeAllow,
