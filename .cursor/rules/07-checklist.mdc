@@ -30,7 +30,7 @@ Before finalizing code changes, verify all applicable items:
 - [ ] `@TrackEvent()` decorator on CRUD endpoints.
 - [ ] `@UseInterceptors(AnalyticsInterceptor)` applied (class or method level).
 - [ ] `SnowflakeIdPipe` used for ID parameters.
-- [ ] `@RequirePermissions()` used where fine-grained access is needed.
+- [ ] `@RequirePermissions({ all: ['component.action'] })` used where fine-grained access is needed.
 
 ## Module
 - [ ] `TypeOrmModule.forFeature([Entity])` imported.
@@ -66,6 +66,13 @@ Before finalizing code changes, verify all applicable items:
 ## Async Processing
 - [ ] Heavy async processing uses RabbitMQ.
 - [ ] Simple domain events MAY use EventEmitter (document choice).
+
+## Permissions (when applicable)
+- [ ] Permission keys use `component.action` format (e.g., `article.create`, `segment.update`).
+- [ ] New components appended (not inserted) to `PERMISSION_COMPONENTS` in `permission-definitions.ts`.
+- [ ] `PermissionsModule` imported in feature module.
+- [ ] `PermissionEvaluator.evaluateBatch()` used for multi-key checks in services.
+- [ ] Cache lifecycle integrated: `initUserPermissions` on login, `clearUserPermissions` on logout.
 
 ## General
 - [ ] No migrations or generators used.

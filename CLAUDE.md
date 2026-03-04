@@ -256,17 +256,49 @@ throw new HttpException(
 | `JwtAccessTokenGuard` | JWT access token validation |
 | `JwtRefreshTokenGuard` | JWT refresh token validation |
 | `RolesGuard` | Role-based access |
-| `PermissionsGuard` | Permission-based access |
+| `PermissionsGuard` | Permission-based access (Redis-cached) |
 | `OptionalAuthGuard` | Optional authentication |
 | `WebSocketAuthGuard` | WebSocket auth |
 
-### Patterns
+### Auth Patterns
 ```typescript
 @Auth()                              // Requires authentication
 @Auth(['admin', 'moderator'])        // Requires specific roles
 @Auth(undefined, true)               // Optional authentication
 @RequirePermissions({ all: ['article.update'] })  // Permission check
+@RequirePermissions({ any: ['article.delete', 'report.delete'] })  // Any of these
+@RequirePermissions({ all: ['segment.update'], autoDetectScope: true })  // Auto scope
 ```
+
+### Permission System (Discord-style Bitwise)
+
+Permission keys follow `component.action` format, auto-derived from two arrays in `src/permissions/constants/permission-definitions.ts`:
+- **Components**: `article`, `series`, `segment`, `organization`, `team`, `project`, `media`, `sticker`, `report`
+- **Actions**: `create`, `read`, `update`, `delete`
+- **APPEND-ONLY**: Never reorder — bit positions are stored in DB bitmasks.
+
+### Permission Sub-Services
+| Service | Responsibility | Location |
+|---------|---------------|----------|
+| `PermissionsService` | Thin facade (delegates to sub-services) | `src/permissions/permissions.service.ts` |
+| `PermissionEvaluator` | Evaluation + effective permissions + caching | `src/permissions/services/permission-evaluator.service.ts` |
+| `RoleService` | Role CRUD + default role creation | `src/permissions/services/role.service.ts` |
+| `UserRoleService` | User-role assignments | `src/permissions/services/user-role.service.ts` |
+| `UserPermissionService` | Cache lifecycle (init/refresh/clear) | `src/permissions/services/user-permission.service.ts` |
+| `ScopePermissionService` | Scope-level permission grants | `src/permissions/services/scope-permission.service.ts` |
+| `ContextResolverService` | Auto-detect scope from HTTP requests | `src/permissions/services/context-resolver.service.ts` |
+| `PermissionRegistry` | Key-to-bit-index mapping | `src/permissions/services/permission-registry.service.ts` |
+
+### Evaluation Precedence
+```
+Scope (highest) → Role → User → Default (deny)
+```
+Deny overrides allow at each level. Use `PermissionEvaluator.evaluateBatch()` for multi-key checks.
+
+### Cache Lifecycle
+- **Login**: `UserPermissionService.initUserPermissions(userId)` (fire-and-forget in `AuthService`)
+- **Logout**: `UserPermissionService.clearUserPermissions(userId)` (in `AuthService.logout/logoutAll`)
+- **Effective permissions cache**: 5 min TTL, key `permissions:effective:{userId}:{scopeType}:{scopeId}`
 
 ---
 
@@ -394,6 +426,8 @@ export class ArticlesModule {}
 | `createSlug` | `src/common/utils/slug.util.ts` | Vietnamese-aware slug generation |
 | `mapTypeOrmError` / `notFound` | `src/common/utils/error.util.ts` | TypeORM error mapping and 404 helpers |
 | `normalizeSearchInput` | `src/common/utils/query.util.ts` | Search input normalization (NFC) |
+| `PermissionEvaluator` | `src/permissions/services` | Permission evaluation with batch API |
+| `UserPermissionService` | `src/permissions/services` | Permission cache lifecycle management |
 
 ---
 

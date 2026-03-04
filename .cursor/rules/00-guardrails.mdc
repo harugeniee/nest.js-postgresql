@@ -49,5 +49,10 @@ const dbHost = this.configService.get('database.host');
 - MUST import AnalyticsModule in feature module.
 
 ## Permissions
-- If an endpoint requires authorization beyond basic auth, USE @RequirePermissions decorator.
-- MUST import PermissionsModule in feature module.
+- If an endpoint requires authorization beyond basic auth, USE `@RequirePermissions({ all: ['component.action'] })` decorator.
+- MUST import `PermissionsModule` in feature module.
+- Permission keys MUST use `component.action` format from `src/permissions/constants/permission-definitions.ts`.
+- NEVER reorder `PERMISSION_COMPONENTS` or `PERMISSION_ACTIONS` arrays — bit positions are stored in DB bitmasks.
+- To add a new permission component, APPEND to `PERMISSION_COMPONENTS` array only.
+- In services, use `PermissionEvaluator.evaluateBatch()` for multi-permission checks, NOT N individual `evaluate()` calls.
+- Use `ContextResolverService.autoDetectContext()` for scope detection — do NOT manually extract scope from request.
