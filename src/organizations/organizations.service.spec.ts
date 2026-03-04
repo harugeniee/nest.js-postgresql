@@ -555,7 +555,6 @@ describe('OrganizationsService', () => {
       // Arrange
       const userId = 'owner-uuid-123';
       const organizationId = '1234567890123456789';
-      const permission = 'ORGANIZATION_MANAGE_MEMBERS';
 
       jest
         .spyOn(service, 'findById')
@@ -565,7 +564,7 @@ describe('OrganizationsService', () => {
       const result = await service.hasOrganizationPermission(
         userId,
         organizationId,
-        permission,
+        'organization.update',
       );
 
       // Assert
@@ -577,7 +576,6 @@ describe('OrganizationsService', () => {
       // Arrange
       const userId = 'user-uuid-123';
       const organizationId = '1234567890123456789';
-      const permission = '9'; // Legacy bit position for ORGANIZATION_MANAGE_MEMBERS
 
       jest
         .spyOn(service, 'findById')
@@ -588,14 +586,14 @@ describe('OrganizationsService', () => {
       const result = await service.hasOrganizationPermission(
         userId,
         organizationId,
-        permission,
+        'organization.update',
       );
 
       // Assert
       expect(result).toBe(true);
       expect(mockPermissionsService.evaluate).toHaveBeenCalledWith(
         userId,
-        '9',
+        'organization.update',
         'organization',
         organizationId,
       );

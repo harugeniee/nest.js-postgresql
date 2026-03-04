@@ -27,6 +27,7 @@ import { UserPermission } from './entities/user-permission.entity';
 import { UserRole } from './entities/user-role.entity';
 import { EffectivePermissions } from './interfaces/effective-permissions.interface';
 import { PermissionsService } from './permissions.service';
+import { PermissionKey } from './types/permission-key.type';
 
 /**
  * Permissions controller providing REST API endpoints for Discord-style permission system
@@ -178,7 +179,7 @@ export class PermissionsController {
   @Auth()
   async getUsersWithSegmentPermission(
     @Param('segmentId', SnowflakeIdPipe) segmentId: string,
-    @Query('permission') permission?: 'SEGMENTS_UPDATE' | 'SEGMENTS_CREATE',
+    @Query('permission') permission?: PermissionKey,
   ): Promise<UserPermission[]> {
     return this.permissionsService.getUsersWithSegmentPermission(
       segmentId,

@@ -360,7 +360,7 @@ export class OrganizationsService extends BaseService<Organization> {
   async hasOrganizationPermission(
     userId: string,
     organizationId: string,
-    permission: string | PermissionKey,
+    permission: PermissionKey,
   ): Promise<boolean> {
     // Check if user is organization owner (always has all permissions)
     const organization = await this.findById(organizationId);
@@ -368,32 +368,9 @@ export class OrganizationsService extends BaseService<Organization> {
       return true;
     }
 
-    // Convert old permission format to PermissionKey if needed
-    // Support both old format (e.g., 'ORGANIZATION_MANAGE_MEMBERS') and new format (e.g., 'organization.update')
-    let permissionKey: PermissionKey = permission as PermissionKey;
-    if (typeof permission === 'string' && permission.includes('_')) {
-      // Old format: convert 'ORGANIZATION_MANAGE_MEMBERS' to 'organization.update'
-      if (
-        permission.includes('MANAGE_MEMBERS') ||
-        permission.includes('MANAGE_SETTINGS')
-      ) {
-        permissionKey = 'organization.update';
-      } else if (permission.includes('DELETE')) {
-        permissionKey = 'organization.delete';
-      } else if (permission.includes('VIEW_ANALYTICS')) {
-        permissionKey = 'organization.read';
-      } else if (permission.includes('INVITE_MEMBERS')) {
-        permissionKey = 'organization.update';
-      } else {
-        // Default: try to map to organization.update
-        permissionKey = 'organization.update';
-      }
-    }
-
-    // Check if user has the specific permission through roles
     return await this.permissionsService.evaluate(
       userId,
-      permissionKey,
+      permission,
       'organization',
       organizationId,
     );

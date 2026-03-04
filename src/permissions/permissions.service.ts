@@ -368,7 +368,7 @@ export class PermissionsService {
 
   async getUsersWithSegmentPermission(
     segmentId: string,
-    permission?: 'SEGMENTS_UPDATE' | 'SEGMENTS_CREATE',
+    permission?: PermissionKey,
   ): Promise<UserPermission[]> {
     const where: FindOptionsWhere<UserPermission> = {
       contextId: segmentId,

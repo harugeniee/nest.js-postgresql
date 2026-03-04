@@ -16,7 +16,9 @@
       "Bash(git -C /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql log --oneline)",
       "Bash(git -C /Users/nguyenhuuhung/Documents/GitHub/nest.js-postgresql show --stat 53112d3)",
       "Bash(yarn test -- --testPathPattern='src/permissions/permissions.service.spec.ts' --no-coverage)",
-      "Bash(yarn test -- --testPathPattern='src/organizations/' --no-coverage)"
+      "Bash(yarn test -- --testPathPattern='src/organizations/' --no-coverage)",
+      "Bash(yarn test --no-coverage -- --testPathPattern='src/\\(permissions|organizations|articles|auth\\)/')",
+      "Bash(yarn test --no-coverage -- --testPathPattern='src/organizations/')"
     ]
   }
 }

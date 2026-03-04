@@ -23,6 +23,7 @@ import { OtpData } from './interfaces';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { UserPermissionService } from 'src/permissions/services/user-permission.service';
 import { FirebaseService } from 'src/shared/services/firebase/firebase.service';
 import { MailerEmailOtpSender, RedisOtpStore } from './providers';
 
@@ -44,6 +45,7 @@ export class AuthService {
     private readonly otpStore: RedisOtpStore,
     private readonly emailOtpSender: MailerEmailOtpSender,
     private readonly firebaseService: FirebaseService,
+    private readonly userPermissionService: UserPermissionService,
   ) {}
 
   async register(registerDto: RegisterDto, clientInfo: ClientInfo) {
@@ -137,6 +139,13 @@ export class AuthService {
       ),
     ]);
 
+    // Warm permission cache (fire-and-forget, don't block login)
+    this.userPermissionService
+      .initUserPermissions(id)
+      .catch((err) =>
+        this.logger.error(`Failed to init permissions cache for user ${id}`, err),
+      );
+
     return { accessToken, refreshToken };
   }
 
@@ -144,6 +153,7 @@ export class AuthService {
     await Promise.all([
       this.usersService.revokeSession(authPayload.ssid),
       this.cacheService.deleteKeysBySuffix(`*${authPayload.ssid}`),
+      this.userPermissionService.clearUserPermissions(authPayload.uid),
     ]);
     return buildResponse({
       messageKey: 'user.LOGOUT_SUCCESS',
@@ -154,6 +164,7 @@ export class AuthService {
     await Promise.all([
       this.usersService.revokeSessionsByUserId(authPayload.uid),
       this.cacheService.deleteKeysBySuffix(`auth:user:${authPayload.uid}:*`),
+      this.userPermissionService.clearUserPermissions(authPayload.uid),
     ]);
     return buildResponse({
       messageKey: 'user.LOGOUT_ALL_DEVICES_SUCCESS',

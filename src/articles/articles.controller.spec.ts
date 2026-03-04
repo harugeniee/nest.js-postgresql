@@ -93,19 +93,11 @@ describe('ArticlesController', () => {
         {
           provide: UserPermissionService,
           useValue: {
-            getUserPermissions: jest.fn(),
-            hasPermission: jest.fn(),
-            hasAnyPermission: jest.fn(),
-            hasAllPermissions: jest.fn(),
-            checkUserPermissions: jest.fn(),
-            getUserRoles: jest.fn(),
-            hasRole: jest.fn(),
-            hasAnyRole: jest.fn(),
-            hasAllRoles: jest.fn(),
-            checkUserRoles: jest.fn(),
-            getEffectivePermissions: jest.fn(),
+            initUserPermissions: jest.fn(),
             refreshUserPermissions: jest.fn(),
             clearUserPermissions: jest.fn(),
+            batchRefreshPermissions: jest.fn(),
+            isCached: jest.fn(),
           },
         },
         {

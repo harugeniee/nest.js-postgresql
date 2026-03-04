@@ -17,6 +17,7 @@ import {
 import { User } from 'src/users/entities';
 import { UsersService } from 'src/users/users.service';
 import { AuthService } from './auth.service';
+import { UserPermissionService } from 'src/permissions/services/user-permission.service';
 import { FirebaseLoginDto, OtpRequestDto, OtpVerifyDto } from './dto';
 import { OtpData } from './interfaces';
 import { MailerEmailOtpSender, RedisOtpStore } from './providers';
@@ -153,6 +154,14 @@ describe('AuthService', () => {
       authenticate: jest.fn(),
     };
 
+    const mockUserPermissionService = {
+      initUserPermissions: jest.fn().mockResolvedValue(undefined),
+      refreshUserPermissions: jest.fn().mockResolvedValue(undefined),
+      clearUserPermissions: jest.fn().mockResolvedValue(undefined),
+      batchRefreshPermissions: jest.fn().mockResolvedValue(undefined),
+      isCached: jest.fn().mockResolvedValue(false),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -183,6 +192,10 @@ describe('AuthService', () => {
         {
           provide: FirebaseService,
           useValue: mockFirebaseService,
+        },
+        {
+          provide: UserPermissionService,
+          useValue: mockUserPermissionService,
         },
       ],
     }).compile();
