@@ -18,7 +18,8 @@
       "Bash(yarn test -- --testPathPattern='src/permissions/permissions.service.spec.ts' --no-coverage)",
       "Bash(yarn test -- --testPathPattern='src/organizations/' --no-coverage)",
       "Bash(yarn test --no-coverage -- --testPathPattern='src/\\(permissions|organizations|articles|auth\\)/')",
-      "Bash(yarn test --no-coverage -- --testPathPattern='src/organizations/')"
+      "Bash(yarn test --no-coverage -- --testPathPattern='src/organizations/')",
+      "Bash(npx eslint src/auth/guard/permissions.guard.ts)"
     ]
   }
 }

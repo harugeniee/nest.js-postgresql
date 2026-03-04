@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -15,7 +16,17 @@ import {
 import { AuthPayload } from 'src/common/interface';
 import { ContextResolverService } from 'src/permissions/services/context-resolver.service';
 import { PermissionEvaluator } from 'src/permissions/services/permission-evaluator.service';
+import { PermissionKey } from 'src/permissions/types/permission-key.type';
 import { USER_CONSTANTS, UserRole } from 'src/shared/constants';
+
+interface PermissionEvaluatorLike {
+  evaluateBatch(
+    userId: string,
+    permissionKeys: PermissionKey[],
+    scopeType?: string,
+    scopeId?: string,
+  ): Promise<Map<PermissionKey, boolean>>;
+}
 
 /**
  * High-performance permission guard using Redis cache
@@ -40,7 +51,8 @@ export class PermissionsGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly contextResolverService: ContextResolverService,
-    private readonly permissionEvaluator: PermissionEvaluator,
+    @Inject(PermissionEvaluator)
+    private readonly permissionEvaluator: PermissionEvaluatorLike,
   ) {}
 
   /**
@@ -210,7 +222,7 @@ export class PermissionsGuard implements CanActivate {
       }
 
       // Always use permission evaluation
-      return this.evaluatePermissions(
+      return await this.evaluatePermissions(
         user,
         {
           ...permissionOptions,
@@ -250,9 +262,16 @@ export class PermissionsGuard implements CanActivate {
       }
     }
 
-    if (!scopeType && !scopeId && permissionOptions.organizationId) {
-      scopeType = 'organization';
-      scopeId = permissionOptions.organizationId;
+    if (!scopeType && !scopeId) {
+      const legacyOrganizationId =
+        'organizationId' in permissionOptions
+          ? (permissionOptions as { organizationId?: string }).organizationId
+          : undefined;
+
+      if (legacyOrganizationId) {
+        scopeType = 'organization';
+        scopeId = legacyOrganizationId;
+      }
     }
 
     // Collect all unique keys and evaluate in one batch
